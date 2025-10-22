@@ -1,0 +1,17 @@
+{
+  "market_1761174158555_test1": {
+    "id": "market_1761174158555_test1",
+    "seller": "test1",
+    "item": {
+      "id": "item_1761174044253_0.1792969597223455",
+      "slot": "Utility",
+      "tier": 1,
+      "stats": {
+        "speed": 0.1,
+        "energyRegen": 2
+      },
+      "name": "U1"
+    },
+    "price": 6732673
+  }
+}

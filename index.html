@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galactic OS - Alpha</title>
+    <style>
+        body, html { background-color: #05060a; color: #00f0ff; font-family: 'Consolas', 'Monaco', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; user-select: none; }
+        #gameCanvas { background-color: #10121f; cursor: crosshair; }
+        #chat-container { position: fixed; bottom: 20px; left: 20px; width: 400px; background-color: rgba(5, 6, 10, 0.7); border: 1px solid #00f0ff; border-radius: 5px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; z-index: 10; }
+        #chat-log { height: 150px; padding: 10px; overflow-y: scroll; font-size: 14px; list-style: none; margin: 0; }
+        #chat-log::-webkit-scrollbar { width: 4px; } #chat-log::-webkit-scrollbar-thumb { background: #00f0ff; }
+        #chat-input { width: 100%; border: none; border-top: 1px solid #00f0ff; background-color: #05060a; color: #fff; padding: 8px; font-family: 'Consolas', 'Monaco', monospace; box-sizing: border-box; }
+        #chat-input:focus { outline: none; box-shadow: 0 0 10px rgba(0, 240, 255, 0.7) inset; }
+        .ui-panel { background-color: rgba(5, 6, 10, 0.85); border: 1px solid #00f0ff; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; padding: 10px; }
+        #class-selection, #ship-selection, #login-container, #death-screen, #shop-container, #bank-container { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; text-align: center; }
+        .selection-panel h2 { margin-top: 0; color: #ffff00; }
+        .class-option { border: 1px solid #777; padding: 15px; margin: 10px; cursor: pointer; transition: all 0.2s ease; }
+        .class-option:hover { background: #00f0ff; color: #05060a; border-color: #fff; }
+        .class-option h3 { margin: 0 0 5px 0; } .class-option p { margin: 0; font-size: 14px; }
+        #color-grid { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+        .color-option { width: 40px; height: 40px; border: 2px solid #777; cursor: pointer; transition: all 0.2s ease; }
+        .color-option:hover { border-color: #fff; transform: scale(1.1); box-shadow: 0 0 10px #fff; }
+        #login-container, #death-screen { width: 350px; z-index: 101; }
+        #login-container h2, #death-screen h2 { margin-bottom: 20px; }
+        .login-form input { width: calc(100% - 20px); background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 10px; margin-bottom: 10px; font-family: inherit; }
+        .login-form button, #death-screen button { background: #00f0ff; color: #05060a; border: none; padding: 10px 15px; cursor: pointer; font-family: inherit; font-weight: bold; width: 100%; }
+        .login-form button:hover, #death-screen button:hover { background: #fff; }
+        #login-error { color: #ff3355; margin-top: 10px; height: 20px; }
+        .login-toggle { color: #00f0ff; cursor: pointer; text-decoration: underline; margin-top: 15px; }
+        #right-ui-container { position: fixed; top: 20px; right: 20px; width: 220px; z-index: 15; }
+        #minimap-container { border: 2px solid #00f0ff; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); margin-bottom: 10px; }
+        #coords { text-align: center; font-size: 16px; margin-bottom: 10px; color: #00f0ff; }
+        #equipment-panel { text-align: left; margin-bottom: 10px; }
+        #equipment-panel h3 { margin: 0 0 10px 0; color: #ffff00; text-align: center; font-size: 1em; }
+        .equip-slot { margin-bottom: 4px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 5px; border: 1px solid #555; cursor: pointer; }
+        .equip-slot:hover { background-color: rgba(255,255,255,0.1); }
+        .equip-slot strong { color: #aaa; display: inline-block; width: 60px; }
+        #inventory-panel h3 { margin: 0 0 10px 0; color: #ffff00; text-align: center; font-size: 1em; }
+        #inventory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+        .inventory-slot, .bank-slot { width: 45px; height: 45px; background-color: rgba(0,0,0,0.5); border: 1px solid #555; display: flex; justify-content: center; align-items: center; font-size: 10px; text-align: center; cursor: pointer; }
+        .inventory-slot:hover, .bank-slot:hover { background-color: rgba(255,255,255,0.1); }
+        .context-menu { display: none; position: fixed; z-index: 102; background-color: #05060a; border: 1px solid #00f0ff; list-style: none; padding: 5px; margin: 0; font-size: 14px; }
+        .context-menu li { padding: 8px; cursor: pointer; }
+        .context-menu li:hover { background-color: #00f0ff; color: #05060a; }
+        
+        /* --- NEW UI Styles --- */
+        #xp-bar-container { position: fixed; bottom: 0; left: 0; width: 100%; height: 8px; background-color: rgba(0,0,0,0.5); z-index: 9; }
+        #xp-bar { width: 0%; height: 100%; background-color: #a832a4; box-shadow: 0 0 10px #a832a4; transition: width 0.5s ease; }
+        
+        #bank-container { width: 250px; }
+        #bank-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
+        
+        #shop-container { width: 600px; }
+        .shop-tabs { display: flex; justify-content: center; margin-bottom: 10px; }
+        .shop-tab { padding: 8px 15px; cursor: pointer; border: 1px solid #555; background-color: #05060a; }
+        .shop-tab.active { background: #00f0ff; color: #05060a; border-color: #00f0ff; }
+        .shop-content { display: none; }
+        .shop-content.active { display: block; }
+
+        .shop-grid { display: grid; grid-template-columns: 1fr; gap: 5px; max-height: 300px; overflow-y: auto; padding: 5px; }
+        .shop-item, .market-item { display: grid; grid-template-columns: 2fr 1fr 1fr; align-items: center; background-color: rgba(0,0,0,0.5); border: 1px solid #555; padding: 8px; }
+        .market-item { grid-template-columns: 2fr 1fr 1fr 1fr; }
+        .shop-item-name, .market-item-name { font-size: 14px; }
+        .shop-item-buy, .shop-item-sell, .market-buy-btn { background: #00f0ff; color: #05060a; border: none; padding: 5px 10px; cursor: pointer; }
+        .shop-item-buy:disabled, .market-buy-btn:disabled { background: #555; cursor: default; }
+
+        #market-sell-panel { margin-top: 15px; border-top: 1px solid #555; padding-top: 10px; }
+        #market-sell-panel select, #market-sell-panel input { background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; font-family: inherit; margin: 0 5px; }
+        #market-sell-panel button { background: #00f0ff; color: #05060a; border: none; padding: 8px 15px; cursor: pointer; font-family: inherit; }
+    </style>
+</head>
+
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <ul id="item-context-menu" class="context-menu">
+        <!-- Options will be added dynamically by JS -->
+    </ul>
+    <ul id="ground-item-context-menu" class="context-menu"></ul>
+    <div id="chat-container"> <ul id="chat-log"></ul> <input type="text" id="chat-input" placeholder="Press Enter to chat..." maxlength="100"> </div>
+    <div id="login-container" class="ui-panel"><div id="login-form" class="login-form"><h2>LOGIN</h2><input type="text" id="login-username" placeholder="Username" required><input type="password" id="login-password" placeholder="Password" required><button onclick="handleLogin()">ENTER GALACTIC OS</button><p class="login-toggle" onclick="toggleLoginRegister(false)">Need an account? Register</p></div><div id="register-form" class="login-form" style="display: none;"><h2>REGISTER</h2><input type="text" id="register-username" placeholder="Username" required><input type="password" id="register-password" placeholder="Password" required><button onclick="handleRegister()">CREATE ACCOUNT</button><p class="login-toggle" onclick="toggleLoginRegister(true)">Already have an account? Login</p></div><div id="login-error"></div></div>
+    <div id="class-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR CLASS</h2><div class="class-option" onclick="chooseClass('Operator')"><h3>OPERATOR</h3><p>High speed, low health. Ability: Invisibility.</p></div><div class="class-option" onclick="chooseClass('Guardian')"><h3>GUARDIAN</h3><p>High health, low speed. Ability: Personal Shield.</p></div><div class="class-option" onclick="chooseClass('Spectre')"><h3>SPECTRE</h3><p>Balanced stats. Ability: Short-range Blink.</p></div></div>
+    <div id="ship-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR SHIP COLOR</h2><div id="color-grid"><div class="color-option" style="background-color: #00f0ff;" onclick="chooseColor('#00f0ff')"></div><div class="color-option" style="background-color: #33ff99;" onclick="chooseColor('#33ff99')"></div><div class="color-option" style="background-color: #f07cff;" onclick="chooseColor('#f07cff')"></div><div class="color-option" style="background-color: #ff3355;" onclick="chooseColor('#ff3355')"></div><div class="color-option" style="background-color: #e3d400;" onclick="chooseColor('#e3d400')"></div><div class="color-option" style="background-color: #ffffff;" onclick="chooseColor('#ffffff')"></div></div></div>
+    
+    <div id="right-ui-container" style="display: none;">
+        <div id="minimap-container"><canvas id="minimapCanvas" width="220" height="220"></canvas></div>
+        <div id="coords"></div>
+        <div id="equipment-panel" class="ui-panel"><h3>EQUIPMENT</h3><div id="equip-slot-Weapon" class="equip-slot" data-slot-type="Weapon"><strong data-slot="Weapon">Weapon:</strong> <span id="equip-Weapon">None</span></div><div id="equip-slot-Module" class="equip-slot" data-slot-type="Module"><strong data-slot="Module">Module:</strong> <span id="equip-Module">None</span></div><div id="equip-slot-Plating" class="equip-slot" data-slot-type="Plating"><strong data-slot="Plating">Plating:</strong> <span id="equip-Plating">None</span></div><div id="equip-slot-Utility" class="equip-slot" data-slot-type="Utility"><strong data-slot="Utility">Utility:</strong> <span id="equip-Utility">None</span></div></div>
+        <div id="inventory-panel" class="ui-panel"><h3>INVENTORY</h3><div id="inventory-grid"></div></div>
+    </div>
+
+    <!-- NEW: Bank and Shop Containers -->
+    <div id="bank-container" class="ui-panel">
+        <h2 id="bank-title">BANK</h2>
+        <div id="bank-grid"></div>
+    </div>
+
+    <div id="shop-container" class="ui-panel">
+        <h2 id="shop-title">EXCHANGE</h2>
+        <div class="shop-tabs">
+            <div class="shop-tab active" id="shop-tab-npc">NPC Trade</div>
+            <div class="shop-tab" id="shop-tab-market">Galactic Market</div>
+        </div>
+        <div id="npc-trade-content" class="shop-content active">
+            <div class="shop-grid" id="npc-buy-grid"></div>
+            <div id="npc-sell-panel">
+                <h3>SELL ITEMS</h3>
+                <div class="shop-grid" id="npc-sell-grid"></div>
+            </div>
+        </div>
+        <div id="market-content" class="shop-content">
+            <div class="shop-grid" id="market-buy-grid"></div>
+            <div id="market-sell-panel">
+                 <select id="market-item-select"></select>
+                 <input type="number" id="market-price-input" placeholder="Price..." min="1">
+                 <button id="market-list-btn">List Item</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="death-screen" class="ui-panel"><h2>YOU ARE OFFLINE</h2><p>Your journey has ended. Your legacy is stored in the Bank.</p><button onclick="handleRespawn()">RE-ESTABLISH CONNECTION</button></div>
+
+    <div id="xp-bar-container"><div id="xp-bar"></div></div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+    const minimapCanvas = document.getElementById('minimapCanvas'), minimapCtx = minimapCanvas.getContext('2d');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+
+    const ws = new WebSocket('ws://localhost:8080');
+    let myPlayerId = null, localWorld = {}, gameState = { players: {}, entities: [] };
+    let camera = { x: 0, y: 0, zoom: 1 };
+    let inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, mouse: { x: 0, y: 0, down: false } };
+    let isGameRunning = false, isChatting = false, isShopOpen = false, isBankOpen = false;
+    let loggedInUser = "Player", chosenClassName = null;
+    let currentShopName = null;
+    const TILE_SIZE = 40, CHUNK_SIZE = 16;
+    const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
+    const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
+    let particles = [];
+
+    ws.onmessage = (message) => {
+        try {
+            const data = JSON.parse(message.data);
+            if (data.type === 'sfx') {
+                if (data.effect === 'blink') {
+                    for(let i=0; i<20; i++) particles.push({x: data.x, y: data.y, life: 1, size: Math.random()*3+1, color: data.color});
+                }
+            }
+            else if (data.type === 'init') { myPlayerId = data.playerId; localWorld = data.world; }
+            else if (data.type === 'update') { gameState = data; }
+            else if (data.type === 'chat') { addChatMessage(data.sender, data.message, data.color); }
+            else if (data.type === 'playerDied') { showDeathScreen(); }
+            else if (data.type === 'openShop') { openShop(data.npcName, data.inventory, data.marketListings); }
+            else if (data.type === 'openBank') { openBank(data.bank); }
+            else if (data.type === 'marketUpdate') { if(isShopOpen) updateMarketView(data.marketListings); }
+            else if (data.type === 'worldChunkUpdate') { localWorld[data.key] = data.chunk; }
+        } catch (error) { console.error('[CLIENT] Error processing server message:', error); }
+    };
+    function sendToServer(data) { if(ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data)); }
+
+    function getTile(worldX, worldY) { const cX = Math.floor(worldX / TILE_SIZE), cY = Math.floor(worldY / TILE_SIZE); const chX = Math.floor(cX / CHUNK_SIZE), chY = Math.floor(cY / CHUNK_SIZE); const key = `${chX},${chY}`; const chunk = localWorld[key]; if (!chunk) return 1; const tX = (cX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; const tY = (cY % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; return chunk.tiles[tY * CHUNK_SIZE + tX]; }
+
+    function drawBossHealthbar(boss) {
+        const myPlayer = gameState.players[myPlayerId];
+        if (!myPlayer || Math.hypot(myPlayer.x - boss.x, myPlayer.y - boss.y) > boss.aggroRadius) return;
+        const barWidth = 200, barHeight = 15;
+        const barX = boss.x - barWidth / 2;
+        const barY = boss.y - boss.radius - 25;
+        ctx.fillStyle = 'rgba(255, 106, 0, 0.5)';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        ctx.fillStyle = boss.color;
+        ctx.fillRect(barX, barY, barWidth * (boss.health / boss.maxHealth), barHeight);
+        ctx.strokeStyle = '#000';
+        ctx.strokeRect(barX, barY, barWidth, barHeight);
+        ctx.font = '14px "Consolas",monospace';
+        ctx.fillStyle="#fff";
+        ctx.textAlign="center";
+        ctx.fillText(boss.bossName, boss.x, barY + 12);
+    }
+
+    const drawFunctions = {
+        'Player': (p) => {
+            if (p.isDead) return;
+            ctx.save();
+            ctx.globalAlpha = p.isInvisible ? 0.3 : 1;
+            ctx.translate(p.x, p.y);
+            // Draw Player Name and Level
+            ctx.font = '12px "Consolas",monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = '#000';
+            ctx.shadowBlur = 5;
+            ctx.fillText(`[Lvl ${p.level}] ${p.username}`, 0, -25);
+            // Draw Ship
+            ctx.rotate(p.angle);
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 15;
+            const r = 15;
+            ctx.beginPath();
+            ctx.moveTo(r, 0);
+            ctx.lineTo(-r / 2, -r / 2);
+            ctx.lineTo(-r / 2, r / 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+            // Draw Effects
+            if (p.isBoosting && p.id === myPlayerId) {
+                const angle = p.angle + Math.PI + (Math.random() - 0.5) * 0.5;
+                const x = p.x + Math.cos(angle) * (r - 2);
+                const y = p.y + Math.sin(angle) * (r - 2);
+                particles.push({x: x, y: y, life: 1, size: Math.random() * 3 + 2, color: p.color});
+            }
+            if(p.shieldActive){ctx.fillStyle=`rgba(51, 255, 153, 0.4)`; ctx.beginPath(); ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2); ctx.fill();}
+            // Draw Health Bar for other players
+            if (p.id !== myPlayerId && p.health < p.stats.maxHealth) {
+                const barW = 40, barH = 5, barX = p.x - barW / 2, barY = p.y - r - 15;
+                ctx.fillStyle = 'rgba(255, 51, 85, 0.7)'; ctx.fillRect(barX, barY, barW, barH);
+                ctx.fillStyle = p.color; ctx.fillRect(barX, barY, barW * (p.health / p.stats.maxHealth), barH);
+            }
+            ctx.globalAlpha = 1;
+        },
+        'Enemy': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 3; const r = e.radius; ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(-r / 2, -r * 0.866); ctx.lineTo(-r / 2, r * 0.866); ctx.closePath(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
+        'Stinger': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 3; const r = e.radius; ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0); ctx.closePath(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
+        'VoidSwarmer': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; const r = e.radius; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-r-15; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
+        'Warden': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 4; const r = e.radius; ctx.beginPath(); for (let i = 0; i < 5; i++) ctx.lineTo(r*Math.cos(i*2*Math.PI/5), r*Math.sin(i*2*Math.PI/5)); ctx.closePath(); ctx.stroke(); ctx.restore(); if (e.shield > 0) { ctx.fillStyle = `rgba(227, 212, 0, ${0.1 + (e.shield / e.maxShield) * 0.3})`; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 8, 0, Math.PI*2); ctx.fill(); } if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
+        'Dreadnought': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 30; ctx.beginPath(); ctx.rect(-e.radius, -e.radius/2, e.radius*2, e.radius); ctx.fill(); ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.rect(-e.radius/2, -e.radius/1.5, e.radius, e.radius*1.3); ctx.fill(); ctx.restore(); drawBossHealthbar(e); },
+        'SerpentHead': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 20; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); drawBossHealthbar(e); e.segments.forEach(seg => drawFunctions['SerpentBody'](seg)); },
+        'SerpentBody': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.shadowColor = e.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-e.radius-10; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
+        'TheOracle': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 30; ctx.lineWidth = 8; ctx.beginPath(); for(let i=0; i<6; i++) ctx.lineTo(e.radius * Math.cos(i*2*Math.PI/6), e.radius*Math.sin(i*2*Math.PI/6)); ctx.closePath(); ctx.stroke(); ctx.restore(); drawBossHealthbar(e); },
+        'aclysmHunter': (e) => { if(e.isInvisible) return; ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = '#ff3355'; ctx.shadowBlur = 25; ctx.beginPath(); ctx.moveTo(e.radius, 0); ctx.lineTo(-e.radius, e.radius); ctx.lineTo(-e.radius, -e.radius); ctx.closePath(); ctx.fill(); ctx.restore(); drawBossHealthbar(e); },
+        'Projectile': (p) => { ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); },
+        'MortarProjectile': (p) => { ctx.strokeStyle=`rgba(255,106,0,${1-(p.life/2)})`; ctx.lineWidth=5; ctx.beginPath(); ctx.arc(p.tX, p.tY, p.radius*(1-(p.life/2))*10,0,Math.PI*2); ctx.stroke(); },
+        'Grenade': (p) => { ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); },
+        'Laser': (l) => { ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(l.angle); ctx.strokeStyle = l.color; ctx.shadowColor = l.color; ctx.shadowBlur = 15; ctx.lineWidth = 4; ctx.globalAlpha = l.life * 10; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(l.length, 0); ctx.stroke(); ctx.restore(); },
+        'Shockwave': (s) => { ctx.strokeStyle=`rgba(255,204,0,${s.life*2})`; ctx.lineWidth=8; ctx.beginPath(); ctx.arc(s.x,s.y,s.radius,0,Math.PI*2); ctx.stroke()},
+        'NPC': (n) => { ctx.fillStyle=n.color; ctx.shadowColor=n.color; ctx.shadowBlur=10; ctx.beginPath(); ctx.rect(n.x-n.radius, n.y-n.radius, n.radius*2, n.radius*2); ctx.fill(); ctx.font = '12px "Consolas"'; ctx.textAlign = 'center'; ctx.fillStyle='#fff'; ctx.fillText(n.name, n.x, n.y - n.radius-5); },
+        'LootDrop': (l) => { ctx.fillStyle=l.color; ctx.shadowColor=l.color; ctx.shadowBlur=10; ctx.fillRect(l.x-l.radius,l.y-l.radius,l.radius*2,l.radius*2)},
+        'EquipmentDrop': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.color; ctx.shadowColor = d.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, d.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
+        'PlayerLootBag': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.item.color || TIER_COLORS[6]; ctx.shadowColor = d.item.color || TIER_COLORS[6]; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, 12, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
+        'floatingText': (ft) => { ctx.font = 'bold 18px "Consolas",monospace'; ctx.fillStyle = ft.color || 'rgba(255,255,100,0.8)'; ctx.globalAlpha = ft.life; ctx.textAlign = 'center'; ctx.fillText(ft.text, ft.x, ft.y); ctx.globalAlpha = 1; },
+    };
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const myPlayer = gameState.players[myPlayerId];
+        if (!isGameRunning || !myPlayer) return;
+        camera.x = myPlayer.x; camera.y = myPlayer.y;
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
+        const b = { l: Math.floor((camera.x-canvas.width/2/camera.zoom)/TILE_SIZE)-1, r: Math.ceil((camera.x+canvas.width/2/camera.zoom)/TILE_SIZE)+1, t: Math.floor((camera.y-canvas.height/2/camera.zoom)/TILE_SIZE)-1, b: Math.ceil((camera.y+canvas.height/2/camera.zoom)/TILE_SIZE)+1, };
+        for (let y = b.t; y < b.b; y++) for (let x = b.l; x < b.r; x++) { const tX = x * TILE_SIZE, tY = y * TILE_SIZE; const tileId = getTile(tX, tY), tile = TILE_TYPES[tileId] || TILE_TYPES[1]; if (tile.wc) { const floorTile = TILE_TYPES[tileId - 1] || TILE_TYPES[1]; ctx.fillStyle = floorTile.c; ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE); ctx.fillStyle = tile.wc; ctx.shadowColor = tile.wc; ctx.shadowBlur = 10; } else { ctx.fillStyle = tile.c; ctx.shadowBlur = 0; } ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE); }
+        ctx.shadowBlur = 0;
+        particles.forEach(p => { p.life -= 0.05; p.x += (Math.random() - 0.5)*2; p.y += (Math.random() - 0.5)*2; ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); }); particles = particles.filter(p => p.life > 0); ctx.globalAlpha = 1;
+        gameState.entities.forEach(e => { if (drawFunctions[e.type]) drawFunctions[e.type](e); });
+        for (const id in gameState.players) drawFunctions['Player'](gameState.players[id]);
+        ctx.restore();
+        if (!myPlayer.isDead) { drawUI(myPlayer); drawMinimap(myPlayer); }
+    }
+
+    function gameLoop() {
+        if (isGameRunning && myPlayerId && gameState.players[myPlayerId] && !isShopOpen && !isBankOpen) { const myPlayer = gameState.players[myPlayerId]; if (!myPlayer.isDead) { const worldMouseX = (inputs.mouse.x - canvas.width / 2) / camera.zoom + myPlayer.x; const worldMouseY = (inputs.mouse.y - canvas.height / 2) / camera.zoom + myPlayer.y; const angle = Math.atan2(worldMouseY - myPlayer.y, worldMouseX - myPlayer.x); sendToServer({ type: 'input', inputs, angle }); } }
+        render();
+        requestAnimationFrame(gameLoop);
+    }
+
+    const loginContainer=document.getElementById('login-container'), classSelectionPanel=document.getElementById('class-selection'), shipSelectionPanel=document.getElementById('ship-selection'), rightUI=document.getElementById('right-ui-container'), deathScreen=document.getElementById('death-screen');
+    function showLoginScreen() { loginContainer.style.display = 'block'; classSelectionPanel.style.display = 'none'; shipSelectionPanel.style.display = 'none'; rightUI.style.display = 'none'; deathScreen.style.display = 'none'; isGameRunning = false; }
+    function showClassSelection() { loginContainer.style.display = 'none'; classSelectionPanel.style.display = 'block'; }
+    function showShipSelection() { classSelectionPanel.style.display = 'none'; shipSelectionPanel.style.display = 'block'; }
+    function showDeathScreen() { deathScreen.style.display = 'block'; rightUI.style.display = 'none'; isGameRunning = false; closeShop(); closeBank(); }
+    function chooseClass(className) { chosenClassName = className; showShipSelection(); }
+    function chooseColor(color) { shipSelectionPanel.style.display = 'none'; rightUI.style.display = 'block'; deathScreen.style.display = 'none'; sendToServer({ type: 'playerInit', username: loggedInUser, color: color, className: chosenClassName }); isGameRunning = true; }
+    function handleRespawn() { sendToServer({type: 'playerRespawn'}); showClassSelection(); deathScreen.style.display = 'none'; }
+    function handleLogin() { const u=document.getElementById('login-username').value, p=document.getElementById('login-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]&&users[u]===p){loggedInUser=u;showClassSelection()}else{e.textContent='Invalid username or password.'} }
+    function handleRegister() { const u=document.getElementById('register-username').value, p=document.getElementById('register-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} if(u.length<3){e.textContent='Username must be at least 3 characters.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]){e.textContent='Username already taken.'}else{users[u]=p;localStorage.setItem('galactic_os_users',JSON.stringify(users));loggedInUser=u;showClassSelection()} }
+    function toggleLoginRegister(showLogin) { document.getElementById('login-form').style.display=showLogin?'block':'none';document.getElementById('register-form').style.display=showLogin?'none':'block';document.getElementById('login-error').textContent=''; }
+
+    function drawUI(player) { if (!player || !player.stats) return; document.getElementById('xp-bar').style.width = `${(player.xp / player.xpToNextLevel) * 100}%`; ctx.font = '20px "Consolas",monospace'; ctx.fillStyle = '#ffff00'; ctx.shadowColor = '#ffff00'; ctx.shadowBlur = 10; ctx.textAlign = 'left'; let currentY = 40; ctx.fillText(`Data Bits: ${player.dataBits}`, 20, currentY); currentY += 30; ctx.font = '16px "Consolas",monospace'; ctx.fillStyle = player.abilityCooldown > 0 ? '#777' : '#00f0ff'; const abilityName = player.className === 'Operator' ? 'Invis' : (player.className === 'Guardian' ? 'Shield' : 'Blink'); ctx.fillText(`${abilityName} (Q): ${player.abilityCooldown > 0 ? player.abilityCooldown.toFixed(1) + 's' : 'READY'}`, 20, currentY); currentY += 25; ctx.fillStyle = player.teleportCooldown > 0 ? '#777' : '#00f0ff'; ctx.fillText(`Teleport Home (H): ${player.teleportCooldown > 0 ? (player.teleportCooldown/60).toFixed(1) + 'm' : 'READY'}`, 20, currentY); currentY += 35; const barW = 250, barH = 15; ctx.fillStyle = '#ff3355'; ctx.fillRect(20, currentY, barW * (player.health / player.stats.maxHealth), barH); ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.strokeRect(20, currentY, barW, barH); ctx.font = '14px "Consolas"'; ctx.fillStyle="#fff"; ctx.textAlign="center"; ctx.fillText(`${Math.ceil(player.health)} / ${player.stats.maxHealth}`, 20 + barW / 2, currentY + barH - 2); currentY += barH + 5; ctx.fillStyle = '#aaaaff'; ctx.fillRect(20, currentY, barW * (player.energy / player.stats.maxEnergy), barH); ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.strokeRect(20, currentY, barW, barH); ctx.fillText(`${Math.ceil(player.energy)} / ${player.stats.maxEnergy}`, 20 + barW / 2, currentY + barH - 2); ctx.shadowBlur = 0; document.getElementById('coords').textContent = `X: ${Math.floor(player.x / TILE_SIZE)} Y: ${Math.floor(player.y / TILE_SIZE)}`; updateInventoryAndEquipUI(player); }
+    function drawMinimap(player) { const mapSize = 220, viewDist = 25 * TILE_SIZE; minimapCtx.fillStyle = '#05060a'; minimapCtx.fillRect(0, 0, mapSize, mapSize); const scale = mapSize / (viewDist * 2); for(let y = -viewDist; y < viewDist; y += TILE_SIZE) for(let x = -viewDist; x < viewDist; x += TILE_SIZE) { const tileId = getTile(player.x + x, player.y + y); const tile = TILE_TYPES[tileId] || TILE_TYPES[1]; if(tile) { minimapCtx.fillStyle = tile.wc || tile.c; minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, TILE_SIZE * scale, TILE_SIZE * scale); } } minimapCtx.fillStyle = player.color || '#00ff00'; minimapCtx.fillRect(mapSize/2 - 2, mapSize/2 - 2, 4, 4); gameState.entities.forEach(e => { if(e.isBoss || e.type.includes('Enemy') || e.type === 'VoidSwarmer') { const dX = e.x - player.x, dY = e.y - player.y; if(Math.abs(dX) < viewDist && Math.abs(dY) < viewDist) { minimapCtx.fillStyle = e.color; minimapCtx.fillRect(mapSize/2 + dX * scale - 1.5, mapSize/2 + dY * scale - 1.5, 3, 3); } } }); }
+    function updateInventoryAndEquipUI(player) { for(const slot in player.equipment) { const el = document.getElementById(`equip-${slot}`); const slotContainer = document.getElementById(`equip-slot-${slot}`); const item = player.equipment[slot]; slotContainer.oncontextmenu = (e) => showContextMenu(e, 'equipment', slot, item); if(item) { el.textContent = item.name; el.style.color = TIER_COLORS[item.tier]; slotContainer.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');} else { el.textContent = 'None'; el.style.color = '#777'; slotContainer.title = ''; } } const grid = document.getElementById('inventory-grid'); grid.innerHTML = ''; player.inventory.forEach((item, index) => { const slot = document.createElement('div'); slot.className = 'inventory-slot'; slot.oncontextmenu = (e) => showContextMenu(e, 'inventory', index, item); if(item) { slot.style.borderColor = TIER_COLORS[item.tier]; slot.textContent = item.name; slot.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n'); } grid.appendChild(slot); }); }
+
+    const contextMenu = document.getElementById('item-context-menu'); const groundContextMenu = document.getElementById('ground-item-context-menu');
+    function showContextMenu(event, source, index, item) { event.preventDefault(); if (!item) return; hideGroundContextMenu(); contextMenu.innerHTML = ''; if (source === 'inventory') { contextMenu.innerHTML += `<li id="context-equip">Equip</li>`; if (isBankOpen) contextMenu.innerHTML += `<li id="context-bank-deposit">Deposit</li>`; } else if (source === 'equipment') { contextMenu.innerHTML += `<li id="context-unequip">Unequip</li>`; } else if (source === 'bank') { contextMenu.innerHTML += `<li id="context-bank-withdraw">Withdraw</li>`; } contextMenu.innerHTML += `<li id="context-drop">Drop</li>`; contextMenu.style.display = 'block'; contextMenu.style.left = `${event.clientX}px`; contextMenu.style.top = `${event.clientY}px`; if (document.getElementById('context-equip')) document.getElementById('context-equip').onclick = () => { sendToServer({ type: 'equipItem', itemIndex: index }); hideContextMenu(); }; if (document.getElementById('context-unequip')) document.getElementById('context-unequip').onclick = () => { sendToServer({ type: 'unequipItem', slot: index }); hideContextMenu(); }; if (document.getElementById('context-drop')) document.getElementById('context-drop').onclick = () => { sendToServer({ type: 'dropItem', source: source, index: index }); hideContextMenu(); }; if (document.getElementById('context-bank-deposit')) document.getElementById('context-bank-deposit').onclick = () => { sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: index}); hideContextMenu(); }; if (document.getElementById('context-bank-withdraw')) document.getElementById('context-bank-withdraw').onclick = () => { sendToServer({ type: 'bankAction', action: 'withdraw', itemIndex: index}); hideContextMenu(); }; }
+    function hideContextMenu() { contextMenu.style.display = 'none'; }
+    function showGroundContextMenu(event) { event.preventDefault(); hideContextMenu(); const worldMouseX = (event.clientX - canvas.width / 2) / camera.zoom + camera.x; const worldMouseY = (event.clientY - canvas.height / 2) / camera.zoom + camera.y; const pickupRadius = 40; const itemsToShow = gameState.entities.filter(e => (e.type === 'EquipmentDrop' || e.type === 'PlayerLootBag') && e.pickupDelay <= 0 && Math.hypot(e.x - worldMouseX, e.y - worldMouseY) < pickupRadius); groundContextMenu.innerHTML = ''; if (itemsToShow.length > 0) { itemsToShow.forEach(itemEntity => { if (itemEntity.type === 'PlayerLootBag') { if (itemEntity.bits > 0) { const bitsLi = document.createElement('li'); bitsLi.innerHTML = `Pickup <span style="color: ${TIER_COLORS[6]}">${itemEntity.bits} Data Bits</span>`; bitsLi.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: 'bits'}); hideGroundContextMenu(); }; groundContextMenu.appendChild(bitsLi); } itemEntity.items.forEach((item, index) => { if (!item) return; const li = document.createElement('li'); li.innerHTML = `Pickup <span style="color:${TIER_COLORS[item.tier]}">${item.name}</span>`; li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: index}); hideGroundContextMenu(); }; groundContextMenu.appendChild(li); }); } else { const li = document.createElement('li'); li.innerHTML = `Pickup <span style="color:${TIER_COLORS[itemEntity.item.tier]}">${itemEntity.item.name}</span>`; li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id}); hideGroundContextMenu(); }; groundContextMenu.appendChild(li); } }); groundContextMenu.style.display = 'block'; groundContextMenu.style.left = `${event.clientX}px`; groundContextMenu.style.top = `${event.clientY}px`; } else { hideGroundContextMenu(); } }
+    function hideGroundContextMenu() { groundContextMenu.style.display = 'none'; }
+
+    const shopContainer = document.getElementById('shop-container'); const bankContainer = document.getElementById('bank-container');
+    function openShop(npcName, npcInventory, marketListings) { isShopOpen = true; currentShopName = npcName; shopContainer.style.display = 'block'; document.getElementById('shop-tab-npc').onclick = () => showShopTab('npc', { npcInventory }); document.getElementById('shop-tab-market').onclick = () => showShopTab('market', { marketListings }); document.getElementById('market-list-btn').onclick = listMarketItem; showShopTab('npc', { npcInventory }); }
+    function closeShop() { isShopOpen = false; shopContainer.style.display = 'none'; currentShopName = null; }
+    function openBank(bankData) { isBankOpen = true; bankContainer.style.display = 'block'; updateBankView(bankData); }
+    function closeBank() { isBankOpen = false; bankContainer.style.display = 'none'; }
+    function updateBankView(bankData) { const grid = document.getElementById('bank-grid'); grid.innerHTML = ''; bankData.forEach((item, index) => { const slot = document.createElement('div'); slot.className = 'bank-slot'; slot.oncontextmenu = (e) => showContextMenu(e, 'bank', index, item); if (item) { slot.style.borderColor = TIER_COLORS[item.tier]; slot.textContent = item.name; slot.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n'); } grid.appendChild(slot); }); }
+    function showShopTab(tab, data) { document.getElementById('npc-trade-content').classList.toggle('active', tab === 'npc'); document.getElementById('market-content').classList.toggle('active', tab === 'market'); document.getElementById('shop-tab-npc').classList.toggle('active', tab === 'npc'); document.getElementById('shop-tab-market').classList.toggle('active', tab === 'market'); if(tab === 'npc') updateNpcTradeView(data.npcInventory); else if(tab === 'market') updateMarketView(data.marketListings); }
+    function updateNpcTradeView(npcInventory) { const buyGrid = document.getElementById('npc-buy-grid'); const sellGrid = document.getElementById('npc-sell-grid'); const myPlayer = gameState.players[myPlayerId]; if(!myPlayer) return; buyGrid.innerHTML = '<h3>BUY</h3>'; sellGrid.innerHTML = ''; npcInventory.forEach((shopItem, index) => { const div = document.createElement('div'); div.className = 'shop-item'; div.innerHTML = `<span class="shop-item-name" style="color:${TIER_COLORS[shopItem.item.tier]}">${shopItem.item.name}</span> <span>${shopItem.cost} bits</span> <button class="shop-item-buy">BUY</button>`; const btn = div.querySelector('button'); btn.onclick = () => sendToServer({type: 'buyNpcItem', shopName: currentShopName, itemIndex: index}); btn.disabled = myPlayer.dataBits < shopItem.cost; buyGrid.appendChild(div); }); myPlayer.inventory.forEach((item, index) => { if(!item) return; const sellPrice = Math.floor(getItemBaseValue(item) / 3); const div = document.createElement('div'); div.className = 'shop-item'; div.innerHTML = `<span class="shop-item-name" style="color:${TIER_COLORS[item.tier]}">${item.name}</span> <span>${sellPrice} bits</span> <button class="shop-item-sell">SELL</button>`; div.querySelector('button').onclick = () => sendToServer({type: 'sellItem', itemIndex: index}); sellGrid.appendChild(div); }); }
+    function updateMarketView(marketListings) { const buyGrid = document.getElementById('market-buy-grid'); const itemSelect = document.getElementById('market-item-select'); const myPlayer = gameState.players[myPlayerId]; if(!myPlayer) return; buyGrid.innerHTML = ''; itemSelect.innerHTML = ''; for(const id in marketListings) { const listing = marketListings[id]; const div = document.createElement('div'); div.className = 'market-item'; div.innerHTML = `<span class="market-item-name" style="color:${TIER_COLORS[listing.item.tier]}">${listing.item.name}</span><span>${listing.seller}</span><span>${listing.price} bits</span><button>BUY</button>`; const btn = div.querySelector('button'); btn.onclick = () => sendToServer({type: 'marketAction', action: 'buy', listingId: id}); btn.disabled = myPlayer.dataBits < listing.price || myPlayer.username === listing.seller; buyGrid.appendChild(div); } myPlayer.inventory.forEach((item, index) => { if(item) { const option = document.createElement('option'); option.value = index; option.textContent = item.name; itemSelect.appendChild(option); } }); }
+    function listMarketItem() { const itemIndex = document.getElementById('market-item-select').value; const price = document.getElementById('market-price-input').value; if(itemIndex !== '' && price > 0) { sendToServer({type: 'marketAction', action: 'list', itemIndex: parseInt(itemIndex), price: parseInt(price)}); document.getElementById('market-price-input').value = ''; } }
+
+    const chatInput = document.getElementById('chat-input'), chatLog = document.getElementById('chat-log');
+    chatInput.addEventListener('focus', () => { isChatting = true; }); chatInput.addEventListener('blur', () => { isChatting = false; });
+    function addChatMessage(sender, message, color = '#00f0ff') { const li = document.createElement('li'); li.innerHTML = `<strong style="color:${color};">[${sender}]</strong>: ${message}`; chatLog.appendChild(li); chatLog.scrollTop = chatLog.scrollHeight; }
+
+    document.addEventListener('keydown', e => { const key = e.key.toLowerCase(); if (key === 'escape' && (isShopOpen || isBankOpen)) { closeShop(); closeBank(); } if (isChatting) { if(key === 'enter') { const msg = chatInput.value.trim(); if(msg) sendToServer({type: 'chat', message: msg}); chatInput.value = ''; chatInput.blur(); } return; } if (key === 'enter') { e.preventDefault(); chatInput.focus(); } else if (inputs.hasOwnProperty(key) && !isShopOpen && !isBankOpen) { inputs[key] = true; } });
+    document.addEventListener('keyup', e => { const key = e.key.toLowerCase(); if (inputs.hasOwnProperty(key)) inputs[key] = false; });
+    window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+    canvas.addEventListener('contextmenu', showGroundContextMenu);
+    canvas.addEventListener('mousemove', e => { inputs.mouse.x = e.clientX; inputs.mouse.y = e.clientY; });
+    window.addEventListener('mousedown', (e) => { if(e.target.closest('.ui-panel, .context-menu')) return; if(e.button === 0) inputs.mouse.down = true; hideContextMenu(); hideGroundContextMenu(); });
+    window.addEventListener('mouseup', (e) => { if(e.button === 0) inputs.mouse.down = false; });
+
+    showLoginScreen();
+    gameLoop();
+</script>
+</body>
+</html>
