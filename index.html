@@ -1,3 +1,7 @@
+<!--
+Copyright (c) 2025 GalacticChannel8.com
+All Rights Reserved.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -127,7 +131,7 @@
     const minimapCanvas = document.getElementById('minimapCanvas'), minimapCtx = minimapCanvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
-    const ws = new WebSocket('ws://localhost:8080');
+    const ws = new WebSocket('wss://galactic-alpha.onrender.com');
     let myPlayerId = null, localWorld = {}, gameState = { players: {}, entities: [] };
     let camera = { x: 0, y: 0, zoom: 1 };
     let inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, mouse: { x: 0, y: 0, down: false } };
