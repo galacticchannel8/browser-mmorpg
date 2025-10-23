@@ -695,7 +695,19 @@ function gameLoop() {
         }
     }
 
-    for (const entity of entities) { if (entity.type === 'LootDrop') { for (const pid in players) { const player = players[pid]; if (!player.isDead && Math.hypot(entity.x - player.x, entity.y - p.y) < player.radius + 30) { player.dataBits += entity.value; entity.isDead = true; break; } } } }
+    for (const entity of entities) { 
+    if (entity.type === 'LootDrop') { 
+        for (const pid in players) { 
+            const player = players[pid]; 
+            // vvv FIX IS HERE vvv
+            if (!player.isDead && Math.hypot(entity.x - player.x, entity.y - player.y) < player.radius + 30) { 
+                player.dataBits += entity.value; 
+                entity.isDead = true; 
+                break; 
+            } 
+        } 
+    } 
+}
 
     for(const bossName in bossRespawnTimers) { if(bossRespawnTimers[bossName] > 0) { bossRespawnTimers[bossName] -= dt; if(bossRespawnTimers[bossName] <= 0) { const loc = BOSS_LOCATIONS[bossName]; const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter }; const BossClass = bossClasses[bossName]; if(BossClass) entities.push(new BossClass(loc.x, loc.y)); broadcastMessage({type: 'chat', sender: 'SYSTEM', message: `The ${bossName} has respawned!`, color: '#ff6a00'}); delete bossRespawnTimers[bossName]; } } }
 
