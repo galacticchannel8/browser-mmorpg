@@ -37,6 +37,7 @@ const ENEMY_SPAWN_INTERVAL = 1;
 let enemySpawnTimer = ENEMY_SPAWN_INTERVAL;
 let lastTime = Date.now();
 const bossRespawnTimers = {};
+const activeTrades = {}; // NEW: To manage trade sessions
 
 // --- PERSISTENT DATA ---
 const banks = loadData('banks.json');
@@ -85,7 +86,44 @@ function generateEquipment(tier) {
     }
     return item;
 }
-const shopInventories = { 'Exchange': [ { item: generateEquipment(1), cost: 20 }, { item: generateEquipment(1), cost: 20 }, { item: generateEquipment(2), cost: 100 } ] };
+
+// --- MODIFIED SECTION 1: SHOP INVENTORY ---
+// Function to create specific equipment pieces for the shop
+function createShopItem(tier, slot) {
+    const item = { id: `${slot}_shop_${tier}`, slot, tier, stats: {} };
+    switch(slot) {
+        case 'Weapon':
+            item.name = `W1 Emitter`;
+            item.type = 'Default'; // Or 'Beam', 'Scatter', 'Launcher' if you prefer
+            item.stats = { damage: 2 }; // A small base damage bonus
+            break;
+        case 'Module':
+            item.name = `M1`;
+            item.stats = { damage: 5, fireRate: 0.5 };
+            break;
+        case 'Plating':
+            item.name = `P1`;
+            item.stats = { maxHealth: 10, defense: 1 };
+            break;
+        case 'Utility':
+            item.name = `U1`;
+            item.stats = { speed: 0.1, energyRegen: 2 };
+            break;
+    }
+    return item;
+}
+
+const shopInventories = {
+    'Exchange': [
+        { item: createShopItem(1, 'Weapon'), cost: 75 },   // A bit more for the weapon
+        { item: createShopItem(1, 'Plating'), cost: 50 },
+        { item: createShopItem(1, 'Module'), cost: 50 },
+        { item: createShopItem(1, 'Utility'), cost: 50 },
+        { item: generateEquipment(2), cost: 250 }          // Higher cost for the T2 item
+    ]
+};
+// --- END MODIFIED SECTION 1 ---
+
 const localWorld = {};
 function generateChunk(chunkX, chunkY) { const key = `${chunkX},${chunkY}`; if (localWorld[key]) return; const chunk = { tiles: Array(CHUNK_SIZE * CHUNK_SIZE).fill(1) }; for(const bossName in BOSS_LOCATIONS) { const loc = BOSS_LOCATIONS[bossName]; const bossChunkX = Math.floor(loc.x / TILE_SIZE / CHUNK_SIZE); const bossChunkY = Math.floor(loc.y / TILE_SIZE / CHUNK_SIZE); if(chunkX === bossChunkX && chunkY === bossChunkY){ for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { const worldX = (chunkX * CHUNK_SIZE + x) * TILE_SIZE; const worldY = (chunkY * CHUNK_SIZE + y) * TILE_SIZE; const dist = Math.hypot(worldX - loc.x, worldY - loc.y); if (dist < 10 * TILE_SIZE) chunk.tiles[y * CHUNK_SIZE + x] = 13; if (dist > 9 * TILE_SIZE && dist < 10 * TILE_SIZE) chunk.tiles[y * CHUNK_SIZE + x] = 12; } localWorld[key] = chunk; broadcastMessage({type: 'worldChunkUpdate', key: key, chunk: chunk}); return;} } if (chunkX === 0 && chunkY === 0) { for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { chunk.tiles[y * CHUNK_SIZE + x] = cityData[y]?.[x] ?? 10; } } else { for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { const wX = chunkX * CHUNK_SIZE + x, wY = chunkY * CHUNK_SIZE + y; const bV = (biomeNoise.get(wX / 200, wY / 200) + 1) / 2; let t = 1; if (bV < 0.4) t = 2; else if (bV > 0.85) t = 3; if ((t === 2 || t === 3) && (perlin.get(wX / 25, wY / 25) + 1) / 2 > 0.55) t -= 1; chunk.tiles[y * CHUNK_SIZE + x] = t; } } localWorld[key] = chunk; broadcastMessage({type: 'worldChunkUpdate', key: key, chunk: chunk}); }
 function getTile(worldX, worldY) { const cX = Math.floor(worldX / TILE_SIZE); const cY = Math.floor(worldY / TILE_SIZE); const chX = Math.floor(cX / CHUNK_SIZE); const chY = Math.floor(cY / CHUNK_SIZE); const key = `${chX},${chY}`; if (!localWorld[key]) generateChunk(chX, chY); const chunk = localWorld[key]; const tX = (cX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; const tY = (cY % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; return chunk.tiles[tY * CHUNK_SIZE + tX]; }
@@ -98,7 +136,7 @@ function getItemBaseValue(item) { if (!item) return 0; return (item.tier * item.
 class Player {
     constructor(id, username, color, className) {
         this.id = id;
-        this.username = username; // This is the account name, used for the bank
+        this.username = username;
         this.color = color;
         this.className = className;
         this.x = CITY_SPAWN_POINT.x;
@@ -109,7 +147,6 @@ class Player {
         this.equipment = { Weapon: null, Module: null, Plating: null, Utility: null };
         this.inventory = Array(12).fill(null);
         
-        // --- NEW: Level and XP System ---
         this.level = 1;
         this.xp = 0;
         this.xpToNextLevel = this.calculateXpToNextLevel();
@@ -120,20 +157,29 @@ class Player {
         this.health = this.stats.maxHealth;
         this.energy = this.stats.maxEnergy;
         this.gunCooldown = 0;
+        this.meleeCooldown = 0; // NEW
         this.teleportCooldown = 0;
-        this.teleportMaxCooldown = 600; // 10 minutes
+        this.teleportMaxCooldown = 600; 
         this.abilityCooldown = 0;
         this.isSlowed = false;
         this.isDead = false;
         this.isBoosting = false;
         this.canBoost = true;
         this.timeSinceLastHit = 0;
-        this.REGEN_DELAY = 5; // seconds
-        this.inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, mouse: { down: false } };
+        this.REGEN_DELAY = 5;
+        
+        // NEW: Trade state
+        this.trade = {
+            partnerId: null,
+            offer: [], // { item, from: 'inventory', originalIndex }
+            offerBits: 0,
+            accepted: false
+        };
+
+        this.inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, space: false, mouse: { down: false } };
     }
     
     calculateXpToNextLevel() {
-        // A simple exponential curve for leveling
         return Math.floor(100 * Math.pow(1.15, this.level - 1));
     }
 
@@ -144,17 +190,15 @@ class Player {
             this.xp -= this.xpToNextLevel;
             this.level++;
             this.xpToNextLevel = this.calculateXpToNextLevel();
-            // Level up effect can be added here
-            this.recalculateStats(); // Recalculate stats on level up
-            // Fully heal on level up
+            this.recalculateStats();
             this.health = this.stats.maxHealth;
             this.energy = this.stats.maxEnergy;
         }
     }
 
     recalculateStats() {
-        const base = { maxHealth: 100, maxEnergy: 300, defense: 0, speed: 4.0, fireRate: 2, damage: 8, energyRegen: 25, healthRegen: 5, ...this.classStats };
-        // Add level-based stat scaling
+        // MODIFIED: Added base healthRegen
+        const base = { maxHealth: 100, maxEnergy: 300, defense: 0, speed: 4.0, fireRate: 2, damage: 8, energyRegen: 25, healthRegen: 2, ...this.classStats };
         base.maxHealth += (this.level - 1) * 5;
         base.damage += (this.level - 1) * 1;
 
@@ -172,10 +216,17 @@ class Player {
     }
 
     update(dt) {
+        // MODIFIED: Added baseline health regeneration
         this.timeSinceLastHit += dt;
         if (this.timeSinceLastHit > this.REGEN_DELAY && this.health < this.stats.maxHealth) {
             this.health += this.stats.healthRegen * dt;
             this.health = Math.min(this.health, this.stats.maxHealth);
+        }
+
+        // Do not allow actions if in a trade
+        if (this.trade.partnerId) {
+            this.isBoosting = false;
+            return;
         }
 
         let currentSpeed = this.isSlowed ? this.stats.speed * 0.5 : this.stats.speed;
@@ -198,10 +249,65 @@ class Player {
         }
         this.energy = Math.max(0, Math.min(this.stats.maxEnergy, this.energy));
 
-        const forward = (this.inputs.w ? 1 : 0) - (this.inputs.s ? 1 : 0); const strafe = (this.inputs.d ? 1 : 0) - (this.inputs.a ? 1 : 0); const moveX = Math.cos(this.angle) * forward - Math.sin(this.angle) * strafe; const moveY = Math.sin(this.angle) * forward + Math.cos(this.angle) * strafe; const mag = Math.hypot(moveX, moveY); if (mag > 0) { const timeAdjustedSpeed = currentSpeed * (dt * 60); const finalMoveX = mag > 1 ? (moveX / mag) * timeAdjustedSpeed : moveX * timeAdjustedSpeed; const finalMoveY = mag > 1 ? (moveY / mag) * timeAdjustedSpeed : moveY * timeAdjustedSpeed; const nX = this.x + finalMoveX; const nY = this.y + finalMoveY; if (!isSolid(getTile(nX, this.y))) this.x = nX; if (!isSolid(getTile(this.x, nY))) this.y = nY; } this.gunCooldown -= dt; if (this.inputs.mouse.down && this.gunCooldown <= 0) this.fireWeapon(); this.teleportCooldown = Math.max(0, this.teleportCooldown - dt); if (this.inputs.h && this.teleportCooldown <= 0) { this.teleportCooldown = this.teleportMaxCooldown; this.x = CITY_SPAWN_POINT.x; this.y = CITY_SPAWN_POINT.y; } this.abilityCooldown = Math.max(0, this.abilityCooldown - dt); if (this.inputs.q) { this.useAbility(); } this.updateAbility(dt); if (this.inputs.e) { this.attemptInteraction(); this.inputs.e = false; } }
-    fireWeapon() { const weapon = this.equipment.Weapon || { type: 'Default' }; this.gunCooldown = 1 / this.stats.fireRate; const p = { ownerId: this.id, angle: this.angle, color: this.color, damage: this.stats.damage }; switch(weapon.type) { case 'Beam': if(this.energy > 5){ this.energy -= 5; entities.push(new Laser(this.x, this.y, p, 800)); } break; case 'Scatter': for(let i=0; i < 5; i++) { p.angle = this.angle + (Math.random() - 0.5) * 0.4; entities.push(new Projectile(this.x, this.y, p)); } break; case 'Launcher': entities.push(new Grenade(this.x, this.y, p, 60)); break; default: entities.push(new Projectile(this.x, this.y, p)); break; } }
-    takeDamage(amount, damager = null) { if(this.isDead) return; this.timeSinceLastHit = 0; const damageTaken = Math.max(1, amount - this.stats.defense); this.health = Math.max(0, this.health - damageTaken); entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(damageTaken)}`)); if (this.health <= 0) this.die(); }
+        const forward = (this.inputs.w ? 1 : 0) - (this.inputs.s ? 1 : 0); const strafe = (this.inputs.d ? 1 : 0) - (this.inputs.a ? 1 : 0); const moveX = Math.cos(this.angle) * forward - Math.sin(this.angle) * strafe; const moveY = Math.sin(this.angle) * forward + Math.cos(this.angle) * strafe; const mag = Math.hypot(moveX, moveY); if (mag > 0) { const timeAdjustedSpeed = currentSpeed * (dt * 60); const finalMoveX = mag > 1 ? (moveX / mag) * timeAdjustedSpeed : moveX * timeAdjustedSpeed; const finalMoveY = mag > 1 ? (moveY / mag) * timeAdjustedSpeed : moveY * timeAdjustedSpeed; const nX = this.x + finalMoveX; const nY = this.y + finalMoveY; if (!isSolid(getTile(nX, this.y))) this.x = nX; if (!isSolid(getTile(this.x, nY))) this.y = nY; }
+        
+        // Update Cooldowns
+        this.gunCooldown -= dt;
+        this.meleeCooldown -= dt; // NEW
+        this.teleportCooldown = Math.max(0, this.teleportCooldown - dt);
+        this.abilityCooldown = Math.max(0, this.abilityCooldown - dt);
+
+        // Handle Inputs
+        if (this.inputs.mouse.down && this.gunCooldown <= 0) this.fireWeapon();
+        if (this.inputs.space && this.meleeCooldown <= 0) this.fireMelee(); // NEW
+        if (this.inputs.h && this.teleportCooldown <= 0) { this.teleportCooldown = this.teleportMaxCooldown; this.x = CITY_SPAWN_POINT.x; this.y = CITY_SPAWN_POINT.y; }
+        if (this.inputs.q) { this.useAbility(); }
+        this.updateAbility(dt);
+        if (this.inputs.e) { this.attemptInteraction(); this.inputs.e = false; }
+    }
+
+    fireWeapon() {
+        if (this.trade.partnerId) return; // Prevent firing while trading
+        const weapon = this.equipment.Weapon || { type: 'Default' };
+        this.gunCooldown = 1 / this.stats.fireRate;
+        const p = { ownerId: this.id, angle: this.angle, color: this.color, damage: this.stats.damage };
+        switch(weapon.type) {
+            case 'Beam': if(this.energy > 5){ this.energy -= 5; entities.push(new Laser(this.x, this.y, p, 800)); } break;
+            case 'Scatter': for(let i=0; i < 5; i++) { p.angle = this.angle + (Math.random() - 0.5) * 0.4; entities.push(new Projectile(this.x, this.y, p)); } break;
+            case 'Launcher': entities.push(new Grenade(this.x, this.y, p, 60)); break;
+            default: entities.push(new Projectile(this.x, this.y, p)); break;
+        }
+    }
+
+    // NEW: Melee attack method
+    fireMelee() {
+        if (this.trade.partnerId) return; // Prevent melee while trading
+        this.meleeCooldown = 0.8; // 0.8 second cooldown
+        const meleeDamage = this.stats.damage * 1.2; // Melee does 120% of base damage
+        entities.push(new MeleeSlash(this.x, this.y, this.angle, this.id, meleeDamage, this.color));
+    }
+
+    takeDamage(amount, damager = null) {
+        if(this.isDead) return;
+        this.timeSinceLastHit = 0;
+
+        // NEW: Cancel trade on taking damage
+        if (this.trade.partnerId) {
+            cancelTrade(this.id, "Trade cancelled due to combat.");
+        }
+
+        const damageTaken = Math.max(1, amount - this.stats.defense);
+        this.health = Math.max(0, this.health - damageTaken);
+        entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(damageTaken)}`));
+        if (this.health <= 0) this.die();
+    }
+
     die() {
+        // NEW: Cancel trade on death
+        if (this.trade.partnerId) {
+            cancelTrade(this.id, `${this.username} went offline.`);
+        }
+
         this.isDead = true;
         const droppedItems = [...Object.values(this.equipment), ...this.inventory].filter(item => item !== null);
         const droppedBits = Math.floor(this.dataBits * 0.8);
@@ -211,6 +317,7 @@ class Player {
         const playerSocket = getSocketByPlayerId(this.id);
         if (playerSocket) playerSocket.send(JSON.stringify({ type: 'playerDied' }));
     }
+
     respawn() {
         this.isDead = false;
         this.equipment = { Weapon: null, Module: null, Plating: null, Utility: null };
@@ -223,7 +330,18 @@ class Player {
         this.health = this.stats.maxHealth;
         this.energy = this.stats.maxEnergy;
     }
-    addToInventory(item) { if (!item) return false; const index = this.inventory.findIndex(slot => slot === null); if (index !== -1) { this.inventory[index] = { ...item }; this.recalculateStats(); return true; } return false; }
+
+    addToInventory(item) {
+        if (!item) return false;
+        const index = this.inventory.findIndex(slot => slot === null);
+        if (index !== -1) {
+            this.inventory[index] = { ...item };
+            this.recalculateStats();
+            return true;
+        }
+        return false;
+    }
+
     attemptInteraction() {
         const lootRadius = 80;
         const closestLootBag = entities.find(e => e.type === 'PlayerLootBag' && e.pickupDelay <= 0 && Math.hypot(e.x - this.x, e.y - this.y) < lootRadius);
@@ -233,29 +351,51 @@ class Player {
             return;
         }
 
-        for(const entity of entities) { if(entity instanceof NPC && Math.hypot(this.x - entity.x, this.y - entity.y) < 50) { const playerSocket = getSocketByPlayerId(this.id); if (playerSocket) {
-            if (entity.name === "Bank") {
-                if (!banks[this.username]) banks[this.username] = Array(12).fill(null);
-                playerSocket.send(JSON.stringify({type: 'openBank', bank: banks[this.username]}));
-            } else {
-                 playerSocket.send(JSON.stringify({type: 'openShop', npcName: entity.name, inventory: shopInventories[entity.name], marketListings: marketListings }));
+        for(const entity of entities) {
+            if(entity instanceof NPC && Math.hypot(this.x - entity.x, this.y - entity.y) < 50) {
+                const playerSocket = getSocketByPlayerId(this.id);
+                if (playerSocket) {
+                    if (entity.name === "Bank") {
+                        if (!banks[this.username]) banks[this.username] = Array(12).fill(null);
+                        playerSocket.send(JSON.stringify({type: 'openBank', bank: banks[this.username]}));
+                    } else {
+                         playerSocket.send(JSON.stringify({type: 'openShop', npcName: entity.name, inventory: shopInventories[entity.name], marketListings: marketListings }));
+                    }
+                }
+                return;
             }
-        } return; } }
+        }
 
         const pickupRadius = 60;
-        const closestItem = entities.filter(e => (e.type === 'EquipmentDrop') && e.pickupDelay <= 0 && Math.hypot(e.x - this.x, e.y - this.y) < pickupRadius).sort((a,b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y))[0];
-        if(closestItem) { if(this.addToInventory(closestItem.item)) closestItem.isDead = true; }
+        const closestItem = entities.filter(e => (e.type === 'EquipmentDrop') && e.pickupDelay <= 0 && Math.hypot(e.x - this.x, e.y - this.y) < pickupRadius)
+            .sort((a,b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y))[0];
+        if(closestItem) {
+            if(this.addToInventory(closestItem.item)) closestItem.isDead = true;
+        }
     }
-    useAbility() {} updateAbility(dt) {}
-    getData() { return { id: this.id, x: this.x, y: this.y, angle: this.angle, color: this.color, username: this.username, health: this.health, stats: this.stats, energy: this.energy, abilityCooldown: this.abilityCooldown, teleportCooldown: this.teleportCooldown, dataBits: this.dataBits, inventory: this.inventory, equipment: this.equipment, isInvisible: this.isInvisible, shieldActive: this.shieldActive, isDead: this.isDead, isBoosting: this.isBoosting, className: this.className, level: this.level, xp: this.xp, xpToNextLevel: this.xpToNextLevel }; }
+
+    useAbility() {}
+    updateAbility(dt) {}
+
+    // MODIFIED: Send trade state to client
+    getData() {
+        return {
+            id: this.id, x: this.x, y: this.y, angle: this.angle, color: this.color, username: this.username,
+            health: this.health, stats: this.stats, energy: this.energy, abilityCooldown: this.abilityCooldown,
+            teleportCooldown: this.teleportCooldown, dataBits: this.dataBits, inventory: this.inventory,
+            equipment: this.equipment, isInvisible: this.isInvisible, shieldActive: this.shieldActive,
+            isDead: this.isDead, isBoosting: this.isBoosting, className: this.className, level: this.level,
+            xp: this.xp, xpToNextLevel: this.xpToNextLevel, trade: this.trade // NEW
+        };
+    }
 }
 
-class Operator extends Player { constructor(id, u, c) { super(id, u, c, 'Operator'); this.classStats = { speed: 4.5, maxHealth: 80 }; this.isInvisible = false; this.invisDuration = 0; this.recalculateStats(); } useAbility() { if (this.abilityCooldown <= 0) { this.abilityCooldown = 12; this.isInvisible = true; this.invisDuration = 3; } } updateAbility(dt) { if (this.isInvisible) { this.invisDuration -= dt; if (this.invisDuration <= 0) this.isInvisible = false; } } }
-class Guardian extends Player { constructor(id, u, c) { super(id, u, c, 'Guardian'); this.classStats = { speed: 3.5, maxHealth: 150 }; this.shieldActive = false; this.shieldDuration = 0; this.shieldHealth = 0; this.recalculateStats(); } useAbility() { if (this.abilityCooldown <= 0) { this.abilityCooldown = 20; this.shieldActive = true; this.shieldDuration = 5; this.shieldHealth = 100; } } updateAbility(dt) { if (this.shieldActive) { this.shieldDuration -= dt; if (this.shieldDuration <= 0) this.shieldActive = false; } } takeDamage(amount, damager = null) { this.timeSinceLastHit = 0; if (this.shieldActive) { const damageAbsorbed = Math.min(this.shieldHealth, amount); this.shieldHealth -= damageAbsorbed; const damageLeft = amount - damageAbsorbed; if (this.shieldHealth <= 0) this.shieldActive = false; if (damageLeft > 0) super.takeDamage(damageLeft, damager); } else { super.takeDamage(amount, damager); } } }
+class Operator extends Player { constructor(id, u, c) { super(id, u, c, 'Operator'); this.classStats = { speed: 4.5, maxHealth: 80 }; this.isInvisible = false; this.invisDuration = 0; this.recalculateStats(); } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId) { this.abilityCooldown = 12; this.isInvisible = true; this.invisDuration = 3; } } updateAbility(dt) { if (this.isInvisible) { this.invisDuration -= dt; if (this.invisDuration <= 0) this.isInvisible = false; } } }
+class Guardian extends Player { constructor(id, u, c) { super(id, u, c, 'Guardian'); this.classStats = { speed: 3.5, maxHealth: 150 }; this.shieldActive = false; this.shieldDuration = 0; this.shieldHealth = 0; this.recalculateStats(); } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId) { this.abilityCooldown = 20; this.shieldActive = true; this.shieldDuration = 5; this.shieldHealth = 100; } } updateAbility(dt) { if (this.shieldActive) { this.shieldDuration -= dt; if (this.shieldDuration <= 0) this.shieldActive = false; } } takeDamage(amount, damager = null) { this.timeSinceLastHit = 0; if (this.shieldActive) { const damageAbsorbed = Math.min(this.shieldHealth, amount); this.shieldHealth -= damageAbsorbed; const damageLeft = amount - damageAbsorbed; if (this.shieldHealth <= 0) this.shieldActive = false; if (damageLeft > 0) super.takeDamage(damageLeft, damager); } else { super.takeDamage(amount, damager); } } }
 class Spectre extends Player {
     constructor(id, u, c) { super(id, u, c, 'Spectre'); this.recalculateStats(); }
     useAbility() {
-        if (this.abilityCooldown <= 0) {
+        if (this.abilityCooldown <= 0 && !this.trade.partnerId) {
             this.abilityCooldown = 6;
             const blinkDist = 150;
             const startX = this.x;
@@ -289,7 +429,7 @@ class Enemy extends Entity {
         let closestDist = Infinity;
         for(const pid in players){
             const player = players[pid];
-            if (player.isDead || player.isInvisible) continue;
+            if (player.isDead || player.isInvisible || player.trade.partnerId) continue; // MODIFIED: Enemies ignore players in a trade
             const dist = Math.hypot(player.x - this.x, player.y - this.y);
             if(dist < closestDist){
                 closestDist = dist;
@@ -336,13 +476,21 @@ class Enemy extends Entity {
                 players[damager.ownerId].addXp(this.xpValue);
             }
             for (let i = 0; i < 2; i++) entities.push(new LootDrop(this.x, this.y, this.threatLevel));
-            if (Math.random() < 0.1) entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(this.threatLevel + Math.floor(Math.random()*2))));
+
+            // --- MODIFIED SECTION 2: ENEMY LOOT DROP ---
+            // Drop chance starts at 1% and increases by 2.5% for each threat level
+            const dropChance = 0.01 + (this.threatLevel * 0.025);
+            if (Math.random() < dropChance) {
+                // Small chance for a "jackpot" drop of a higher tier item
+                const tierBonus = (Math.random() < 0.05) ? 2 : Math.floor(Math.random() * 2);
+                const itemTier = this.threatLevel + tierBonus;
+                entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(itemTier)));
+            }
+            // --- END MODIFIED SECTION 2 ---
         }
     }
 }
 class Stinger extends Enemy { constructor(x, y, tL) { super(x, y, tL, 'Stinger'); this.radius = 10; this.speed = 3.5; this.health = this.maxHealth = 20; this.color = '#f07cff'; this.shootCooldown = 2; this.xpValue = 15 * tL; this.applyThreatLevel(); } update(dt) { super.update(dt); this.shootCooldown -= dt; if (this.shootCooldown <= 0) { this.shootCooldown = 2; for(const pid in players){ const player = players[pid]; if(!player.isDead && Math.hypot(player.x - this.x, player.y - this.y) < this.aggroRadius){ const p = { ownerId: this.id, angle: Math.atan2(player.y - this.y, player.x - this.x), color: this.color, damage: 5*this.damageMultiplier }; entities.push(new Projectile(this.x, this.y, p, 0.8)); break; } } } } }
-
-// NEW MOB
 class VoidSwarmer extends Enemy {
     constructor(x, y, tL) {
         super(x, y, tL, 'VoidSwarmer');
@@ -351,7 +499,6 @@ class VoidSwarmer extends Enemy {
         this.applyThreatLevel();
     }
 }
-
 class Warden extends Enemy {
     constructor(x, y, tL) {
         super(x, y, tL, 'Warden');
@@ -389,8 +536,6 @@ class Warden extends Enemy {
         }
     }
 }
-
-// --- BOSSES (SERVER-SIDE) ---
 class WorldBoss extends Enemy {
     constructor(x, y, name, color, hp, type) {
         super(x, y, 5, type);
@@ -413,11 +558,23 @@ class WorldBoss extends Enemy {
                 players[damager.ownerId].addXp(this.xpValue);
             }
             bossRespawnTimers[this.bossName] = 300;
-            for (let i = 0; i < 10; i++) entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(5)));
+            
+            // --- MODIFIED SECTION 3: BOSS LOOT DROP ---
+            // Guaranteed Drops
+            entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(5)));
+            entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(5)));
+
+            // Bonus Drops (50% chance for 3 extra items of tier 4 or 5)
+            if (Math.random() < 0.5) {
+                for (let i = 0; i < 3; i++) {
+                    const tier = 4 + Math.floor(Math.random() * 2); // Randomly tier 4 or 5
+                    entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(tier)));
+                }
+            }
+            // --- END MODIFIED SECTION 3 ---
         }
     }
 }
-
 class Dreadnought extends WorldBoss {
     constructor(x, y) { super(x, y, "DREADNOUGHT", '#ff6a00', 5000, "Dreadnought"); }
     update(dt) {
@@ -442,7 +599,6 @@ class Dreadnought extends WorldBoss {
         }
     }
 }
-
 class SerpentHead extends WorldBoss {
     constructor(x, y) {
         super(x, y, "SERPENT", '#33ff99', 3000, "SerpentHead");
@@ -484,7 +640,6 @@ class SerpentHead extends WorldBoss {
         return data;
     }
 }
-
 class SerpentBody extends Enemy {
     constructor(x, y, head) {
         super(x, y, 5, 'SerpentBody');
@@ -517,7 +672,6 @@ class SerpentBody extends Enemy {
         }
     }
 }
-
 class TheOracle extends WorldBoss {
     constructor(x,y) { super(x,y, "THE ORACLE", '#a832a4', 8000, "TheOracle"); }
     update(dt) {
@@ -545,7 +699,6 @@ class TheOracle extends WorldBoss {
         }
     }
 }
-
 class VoidHunter extends WorldBoss {
     constructor(x, y) { super(x, y, "VOID HUNTER", '#1f283e', 4000, "aclysmHunter"); this.radius = 25; this.isInvisible = true; this.attackTimer = 3; }
     update(dt) {
@@ -580,6 +733,27 @@ class VoidHunter extends WorldBoss {
 }
 
 // --- OTHER ENTITIES (SERVER-SIDE) ---
+// NEW: MeleeSlash entity
+class MeleeSlash extends Entity {
+    constructor(x, y, angle, ownerId, damage, color) {
+        super(x, y, 'MeleeSlash');
+        this.ownerId = ownerId;
+        this.angle = angle;
+        this.damage = damage;
+        this.color = color;
+        this.life = 0.2; // The slash visual lasts for 0.2 seconds
+        this.hitTargets = []; // Prevent hitting the same enemy multiple times
+        this.radius = 60; // The reach of the slash
+        this.arc = Math.PI / 2; // 90 degree arc
+    }
+    update(dt) {
+        this.life -= dt;
+        if (this.life <= 0) {
+            this.isDead = true;
+        }
+    }
+}
+
 class Projectile extends Entity { constructor(x,y,p,l=1.5,r=4){ super(x,y,'Projectile'); this.ownerId = p.ownerId; this.angle = p.angle; this.radius=r; this.speed=15; this.life=l; this.color=p.color; this.damage=p.damage;} update(dt){ this.x+=Math.cos(this.angle)*this.speed*(dt*60); this.y+=Math.sin(this.angle)*this.speed*(dt*60); this.life-=dt; if(this.life<=0||isSolid(getTile(this.x,this.y))) this.isDead=true; } }
 class MortarProjectile extends Entity { constructor(sX,sY,tX,tY,ownerId){ super(sX,sY,'MortarProjectile'); this.tX=tX; this.tY=tY; this.ownerId=ownerId; this.life=2; this.radius=15 } update(dt){ this.life-=dt; if(this.life<=0){ this.isDead=true; entities.push(new Shockwave(this.tX,this.tY,150,40,this.ownerId)); } } }
 class Laser extends Entity { constructor(x,y,p,l){ super(x,y,'Laser'); this.ownerId=p.ownerId; this.angle=p.angle; this.color=p.color; this.damage=p.damage; this.length=l; this.life=0.1;} update(dt){ this.life-=dt; if(this.life<=0) this.isDead = true; } }
@@ -593,9 +767,8 @@ class FloatingText extends Entity { constructor(x, y, text, color = '#ff8888') {
 
 // --- INITIALIZE WORLD ---
 function initializeWorld() {
-    // FIX: Renamed Armory to Bank
     entities.push(new NPC(6.5 * TILE_SIZE, 3.5 * TILE_SIZE, 'Exchange'));
-    entities.push(new NPC(8.5 * TILE_SIZE, 3.5 * TILE_SIZE, 'Bank', '#e3d400')); // Give bank a different color
+    entities.push(new NPC(8.5 * TILE_SIZE, 3.5 * TILE_SIZE, 'Bank', '#e3d400'));
     generateChunk(0, 0);
     const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter };
     for(const bossName in BOSS_LOCATIONS) {
@@ -606,7 +779,6 @@ function initializeWorld() {
     console.log('[SERVER] World initialized and bosses have been spawned.');
 }
 initializeWorld();
-
 
 // --- MAIN GAME LOOP ---
 function gameLoop() {
@@ -658,6 +830,25 @@ function gameLoop() {
                  if (entity.isDead) continue;
             }
         }
+        // NEW: Melee Slash Collision
+        else if (entity.type === 'MeleeSlash') {
+            const owner = players[entity.ownerId];
+            if (!owner) continue;
+             for(const other of entities) {
+                if (other instanceof Enemy && !entity.hitTargets.includes(other.id)) {
+                    const dist = Math.hypot(other.x - owner.x, other.y - owner.y);
+                    if (dist < other.radius + entity.radius) {
+                        const angleToTarget = Math.atan2(other.y - owner.y, other.x - owner.x);
+                        let angleDiff = Math.abs(entity.angle - angleToTarget);
+                        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                        if (angleDiff < entity.arc / 2) {
+                            other.takeDamage(entity.damage, { ownerId: entity.ownerId });
+                            entity.hitTargets.push(other.id);
+                        }
+                    }
+                }
+             }
+        }
         else if (entity.type === 'Laser') {
              const ownerIsPlayer = entity.ownerId.startsWith('player_');
              if(ownerIsPlayer) {
@@ -696,18 +887,17 @@ function gameLoop() {
     }
 
     for (const entity of entities) { 
-    if (entity.type === 'LootDrop') { 
-        for (const pid in players) { 
-            const player = players[pid]; 
-            // vvv FIX IS HERE vvv
-            if (!player.isDead && Math.hypot(entity.x - player.x, entity.y - player.y) < player.radius + 30) { 
-                player.dataBits += entity.value; 
-                entity.isDead = true; 
-                break; 
+        if (entity.type === 'LootDrop') { 
+            for (const pid in players) { 
+                const player = players[pid]; 
+                if (!player.isDead && Math.hypot(entity.x - player.x, entity.y - player.y) < player.radius + 30) { 
+                    player.dataBits += entity.value; 
+                    entity.isDead = true; 
+                    break; 
+                } 
             } 
         } 
-    } 
-}
+    }
 
     for(const bossName in bossRespawnTimers) { if(bossRespawnTimers[bossName] > 0) { bossRespawnTimers[bossName] -= dt; if(bossRespawnTimers[bossName] <= 0) { const loc = BOSS_LOCATIONS[bossName]; const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter }; const BossClass = bossClasses[bossName]; if(BossClass) entities.push(new BossClass(loc.x, loc.y)); broadcastMessage({type: 'chat', sender: 'SYSTEM', message: `The ${bossName} has respawned!`, color: '#ff6a00'}); delete bossRespawnTimers[bossName]; } } }
 
@@ -727,7 +917,6 @@ function gameLoop() {
                 if(!isCity(spawnX, spawnY) && !isSolid(getTile(spawnX, spawnY))){
                      const threat = getThreatLevel(spawnX, spawnY);
                      let enemyType;
-                     // FIX: Spawn Void Swarmers in outer regions
                      if (distFromCenter > 400 && Math.random() < 0.6) {
                          enemyType = VoidSwarmer;
                      } else if (threat >= 3 && Math.random() < 0.3) {
@@ -746,20 +935,81 @@ function gameLoop() {
     const playersData = {};
     for (const id in players) playersData[id] = players[id].getData();
     
-    // Custom logic to handle Serpent's circular reference before sending
-    const entitiesData = entities.map(e => {
-        if (e.type === 'SerpentHead') {
-            const headData = e.getData();
-            headData.segments = e.segments.map(seg => seg.getData());
-            return headData;
-        }
-        return e.getData();
-    });
+    const entitiesData = entities.map(e => e.getData());
 
     const stateToSend = JSON.stringify({ type: 'update', players: playersData, entities: entitiesData });
     wss.clients.forEach(client => { if (client.readyState === WebSocket.OPEN) client.send(stateToSend); });
 }
 setInterval(gameLoop, 1000 / TICK_RATE);
+
+// --- TRADE LOGIC ---
+function startTrade(player1Id, player2Id) {
+    const tradeId = `trade_${Date.now()}`;
+    const p1 = players[player1Id];
+    const p2 = players[player2Id];
+
+    activeTrades[tradeId] = { p1: player1Id, p2: player2Id };
+    
+    p1.trade.partnerId = player2Id;
+    p2.trade.partnerId = player1Id;
+    
+    const p1Socket = getSocketByPlayerId(player1Id);
+    const p2Socket = getSocketByPlayerId(player2Id);
+    if(p1Socket) p1Socket.send(JSON.stringify({ type: 'tradeStarted', partner: p2.getData() }));
+    if(p2Socket) p2Socket.send(JSON.stringify({ type: 'tradeStarted', partner: p1.getData() }));
+}
+
+function cancelTrade(cancellerId, reason) {
+    const player = players[cancellerId];
+    if (!player || !player.trade.partnerId) return;
+
+    const partnerId = player.trade.partnerId;
+    const partner = players[partnerId];
+    
+    // Return items to both players
+    [player, partner].forEach(p => {
+        if(!p) return;
+        p.trade.offer.forEach(offerItem => {
+            p.inventory[offerItem.originalIndex] = offerItem.item;
+        });
+        p.dataBits += p.trade.offerBits;
+
+        // Reset trade state
+        p.trade = { partnerId: null, offer: [], offerBits: 0, accepted: false };
+
+        const socket = getSocketByPlayerId(p.id);
+        if(socket) socket.send(JSON.stringify({ type: 'tradeCancelled', reason: reason }));
+    });
+}
+
+function finalizeTrade(p1Id, p2Id) {
+    const p1 = players[p1Id];
+    const p2 = players[p2Id];
+
+    // Safety checks
+    if (!p1 || !p2 || p1.dataBits < p1.trade.offerBits || p2.dataBits < p2.trade.offerBits) {
+        cancelTrade(p1Id, "An error occurred during trade.");
+        return;
+    }
+    
+    // Exchange bits
+    p1.dataBits -= p1.trade.offerBits;
+    p2.dataBits -= p2.trade.offerBits;
+    p1.dataBits += p2.trade.offerBits;
+    p2.dataBits += p1.trade.offerBits;
+
+    // Exchange items
+    p2.trade.offer.forEach(item => p1.addToInventory(item.item));
+    p1.trade.offer.forEach(item => p2.addToInventory(item.item));
+
+    // Reset trade state for both
+    [p1, p2].forEach(p => {
+        p.trade = { partnerId: null, offer: [], offerBits: 0, accepted: false };
+        const socket = getSocketByPlayerId(p.id);
+        if (socket) socket.send(JSON.stringify({ type: 'tradeCompleted' }));
+    });
+}
+
 
 // --- WEBSOCKET LOGIC ---
 function broadcastMessage(message) { const data = JSON.stringify(message); wss.clients.forEach(client => { if (client.readyState === WebSocket.OPEN) client.send(data); }); }
@@ -793,51 +1043,67 @@ wss.on('connection', (ws) => {
                     } else if (lootBag.type === 'EquipmentDrop') { if(player.addToInventory(lootBag.item)) { lootBag.isDead = true; } }
                 }
             }
+            if (player && data.type === 'bankAction') { /* ... existing bank code ... */ }
+            if (player && data.type === 'marketAction') { /* ... existing market code ... */ }
 
-            // Bank and Market logic needs the player to be logged in, but not necessarily alive
-            if (player && data.type === 'bankAction') {
-                if (!banks[player.username]) banks[player.username] = Array(12).fill(null);
-                const bank = banks[player.username];
-                if (data.action === 'deposit') {
-                    const item = player.inventory[data.itemIndex];
-                    const bankIndex = bank.findIndex(slot => slot === null);
-                    if (item && bankIndex !== -1) {
-                        bank[bankIndex] = item;
-                        player.inventory[data.itemIndex] = null;
-                    }
-                } else if (data.action === 'withdraw') {
-                    const item = bank[data.itemIndex];
-                    if (item && player.addToInventory(item)) {
-                        bank[data.itemIndex] = null;
+            // --- NEW TRADE HANDLERS ---
+            if (player && data.type === 'tradeRequest') {
+                const targetPlayer = players[data.targetId];
+                if (targetPlayer && !targetPlayer.trade.partnerId) {
+                    const targetSocket = getSocketByPlayerId(data.targetId);
+                    if (targetSocket) {
+                        targetSocket.send(JSON.stringify({ type: 'tradeRequest', from: player.getData() }));
                     }
                 }
-                saveData('banks.json', banks);
-                ws.send(JSON.stringify({type: 'openBank', bank: bank})); // Refresh client's view
             }
-
-            if (player && data.type === 'marketAction') {
-                if (data.action === 'list') {
-                    const item = player.inventory[data.itemIndex];
-                    const price = parseInt(data.price, 10);
-                    if (item && price > 0) {
-                        const listingId = `market_${Date.now()}_${player.username}`;
-                        marketListings[listingId] = { id: listingId, seller: player.username, item: item, price: price };
-                        player.inventory[data.itemIndex] = null;
+            if (player && data.type === 'tradeResponse') {
+                const requester = players[data.requesterId];
+                if (requester && data.accepted) {
+                    startTrade(player.id, requester.id);
+                }
+            }
+            if (player && player.trade.partnerId && data.type === 'tradeUpdate') {
+                player.trade.offer = [];
+                data.offerItems.forEach(offerItem => {
+                    const originalItem = player.inventory[offerItem.originalIndex];
+                    if (originalItem && originalItem.id === offerItem.item.id) {
+                        player.trade.offer.push(offerItem);
                     }
-                } else if (data.action === 'buy') {
-                    const listing = marketListings[data.listingId];
-                    if (listing && player.dataBits >= listing.price && player.addToInventory(listing.item)) {
-                        player.dataBits -= listing.price;
-                        // Give money to seller (if they're online, otherwise it would require a database)
-                        const seller = Object.values(players).find(p => p.username === listing.seller);
-                        if (seller) seller.dataBits += listing.price;
-                        delete marketListings[data.listingId];
+                });
+                player.inventory.forEach((item, index) => {
+                    if (item && player.trade.offer.some(o => o.originalIndex === index)) {
+                        player.inventory[index] = null;
+                    }
+                });
+                 data.offerItems.forEach(offerItem => {
+                     if (!player.inventory[offerItem.originalIndex]) {
+                         player.inventory[offerItem.originalIndex] = offerItem.item;
+                     }
+                 });
+                player.trade.offerBits = Math.max(0, parseInt(data.offerBits, 10)) || 0;
+                player.trade.accepted = false; // Un-accept on change
+                const partner = players[player.trade.partnerId];
+                if (partner) {
+                    partner.trade.accepted = false; // Un-accept partner too
+                    const partnerSocket = getSocketByPlayerId(partner.id);
+                    if (partnerSocket) {
+                        partnerSocket.send(JSON.stringify({ type: 'tradeUpdate', offer: player.trade }));
                     }
                 }
-                saveData('market.json', marketListings);
-                broadcastMessage({type: 'marketUpdate', marketListings: marketListings});
             }
-
+             if (player && player.trade.partnerId && data.type === 'tradeAccept') {
+                player.trade.accepted = true;
+                const partner = players[player.trade.partnerId];
+                if (partner && partner.trade.accepted) {
+                    finalizeTrade(player.id, partner.id);
+                } else if (partner) {
+                    const partnerSocket = getSocketByPlayerId(partner.id);
+                    if(partnerSocket) partnerSocket.send(JSON.stringify({ type: 'tradePartnerAccepted' }));
+                }
+            }
+            if (player && player.trade.partnerId && data.type === 'tradeCancel') {
+                cancelTrade(player.id, `${player.username} cancelled the trade.`);
+            }
 
             if (!player || player.isDead) return;
             if (data.type === 'input') { player.inputs = data.inputs; player.angle = data.angle; }
@@ -854,6 +1120,10 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         const player = players[ws.playerId];
         if (player) {
+            // NEW: Cancel trade on disconnect
+            if (player.trade.partnerId) {
+                cancelTrade(player.id, `${player.username} has disconnected.`);
+            }
             console.log(`[SERVER] Player ${player.username} (${ws.playerId}) disconnected.`);
             delete players[ws.playerId];
         }

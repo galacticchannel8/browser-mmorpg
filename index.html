@@ -17,7 +17,7 @@ All Rights Reserved.
         #chat-input { width: 100%; border: none; border-top: 1px solid #00f0ff; background-color: #05060a; color: #fff; padding: 8px; font-family: 'Consolas', 'Monaco', monospace; box-sizing: border-box; }
         #chat-input:focus { outline: none; box-shadow: 0 0 10px rgba(0, 240, 255, 0.7) inset; }
         .ui-panel { background-color: rgba(5, 6, 10, 0.85); border: 1px solid #00f0ff; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; padding: 10px; }
-        #class-selection, #ship-selection, #login-container, #death-screen, #shop-container, #bank-container { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; text-align: center; }
+        #class-selection, #ship-selection, #login-container, #death-screen, #shop-container, #bank-container, #trade-container { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; text-align: center; }
         .selection-panel h2 { margin-top: 0; color: #ffff00; }
         .class-option { border: 1px solid #777; padding: 15px; margin: 10px; cursor: pointer; transition: all 0.2s ease; }
         .class-option:hover { background: #00f0ff; color: #05060a; border-color: #fff; }
@@ -28,8 +28,9 @@ All Rights Reserved.
         #login-container, #death-screen { width: 350px; z-index: 101; }
         #login-container h2, #death-screen h2 { margin-bottom: 20px; }
         .login-form input { width: calc(100% - 20px); background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 10px; margin-bottom: 10px; font-family: inherit; }
-        .login-form button, #death-screen button { background: #00f0ff; color: #05060a; border: none; padding: 10px 15px; cursor: pointer; font-family: inherit; font-weight: bold; width: 100%; }
-        .login-form button:hover, #death-screen button:hover { background: #fff; }
+        .login-form button, #death-screen button, .trade-button { background: #00f0ff; color: #05060a; border: none; padding: 10px 15px; cursor: pointer; font-family: inherit; font-weight: bold; width: 100%; }
+        .login-form button:hover, #death-screen button:hover, .trade-button:hover { background: #fff; }
+        .login-form button:disabled, .trade-button:disabled { background: #555; cursor: default; }
         #login-error { color: #ff3355; margin-top: 10px; height: 20px; }
         .login-toggle { color: #00f0ff; cursor: pointer; text-decoration: underline; margin-top: 15px; }
         #right-ui-container { position: fixed; top: 20px; right: 20px; width: 220px; z-index: 15; }
@@ -42,36 +43,62 @@ All Rights Reserved.
         .equip-slot strong { color: #aaa; display: inline-block; width: 60px; }
         #inventory-panel h3 { margin: 0 0 10px 0; color: #ffff00; text-align: center; font-size: 1em; }
         #inventory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
-        .inventory-slot, .bank-slot { width: 45px; height: 45px; background-color: rgba(0,0,0,0.5); border: 1px solid #555; display: flex; justify-content: center; align-items: center; font-size: 10px; text-align: center; cursor: pointer; }
-        .inventory-slot:hover, .bank-slot:hover { background-color: rgba(255,255,255,0.1); }
+        .inventory-slot, .bank-slot, .trade-slot { width: 45px; height: 45px; background-color: rgba(0,0,0,0.5); border: 1px solid #555; display: flex; justify-content: center; align-items: center; font-size: 10px; text-align: center; cursor: pointer; position: relative; }
+        .inventory-slot:hover, .bank-slot:hover, .trade-slot:hover { background-color: rgba(255,255,255,0.1); }
         .context-menu { display: none; position: fixed; z-index: 102; background-color: #05060a; border: 1px solid #00f0ff; list-style: none; padding: 5px; margin: 0; font-size: 14px; }
         .context-menu li { padding: 8px; cursor: pointer; }
         .context-menu li:hover { background-color: #00f0ff; color: #05060a; }
-        
-        /* --- NEW UI Styles --- */
         #xp-bar-container { position: fixed; bottom: 0; left: 0; width: 100%; height: 8px; background-color: rgba(0,0,0,0.5); z-index: 9; }
         #xp-bar { width: 0%; height: 100%; background-color: #a832a4; box-shadow: 0 0 10px #a832a4; transition: width 0.5s ease; }
-        
         #bank-container { width: 250px; }
         #bank-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
-        
         #shop-container { width: 600px; }
         .shop-tabs { display: flex; justify-content: center; margin-bottom: 10px; }
         .shop-tab { padding: 8px 15px; cursor: pointer; border: 1px solid #555; background-color: #05060a; }
         .shop-tab.active { background: #00f0ff; color: #05060a; border-color: #00f0ff; }
         .shop-content { display: none; }
         .shop-content.active { display: block; }
-
-        .shop-grid { display: grid; grid-template-columns: 1fr; gap: 5px; max-height: 300px; overflow-y: auto; padding: 5px; }
+        .shop-grid { display: grid; grid-template-columns: 1fr; gap: 5px; max-height: 300px; overflow-y: auto; padding: 5px; border: 1px solid #333; }
         .shop-item, .market-item { display: grid; grid-template-columns: 2fr 1fr 1fr; align-items: center; background-color: rgba(0,0,0,0.5); border: 1px solid #555; padding: 8px; }
         .market-item { grid-template-columns: 2fr 1fr 1fr 1fr; }
         .shop-item-name, .market-item-name { font-size: 14px; }
         .shop-item-buy, .shop-item-sell, .market-buy-btn { background: #00f0ff; color: #05060a; border: none; padding: 5px 10px; cursor: pointer; }
         .shop-item-buy:disabled, .market-buy-btn:disabled { background: #555; cursor: default; }
-
         #market-sell-panel { margin-top: 15px; border-top: 1px solid #555; padding-top: 10px; }
         #market-sell-panel select, #market-sell-panel input { background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; font-family: inherit; margin: 0 5px; }
         #market-sell-panel button { background: #00f0ff; color: #05060a; border: none; padding: 8px 15px; cursor: pointer; font-family: inherit; }
+        
+        /* --- UI STYLES --- */
+        #left-ui-container { position: fixed; top: 20px; left: 20px; width: 300px; z-index: 15; display: none; }
+        #portrait-container { width: 100px; height: 100px; border: 2px solid #00f0ff; background-color: #05060a; margin-bottom: 10px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); /* Placeholder for character portrait */ }
+        #hud-container { text-align: left; font-size: 16px; }
+        #hud-info p { margin: 6px 0; }
+        #hud-info strong { color: #ffff00; display: inline-block; width: 80px; }
+        .hud-bar { width: 100%; height: 15px; background-color: rgba(0,0,0,0.5); border: 1px solid #555; margin-top: 2px; }
+        .hud-bar > div { height: 100%; transition: width 0.3s ease; }
+        #health-bar-fill { background-color: #ff3355; }
+        #energy-bar-fill { background-color: #aaaaff; }
+        #keybind-info { font-size: 12px; color: #999; margin-top: 15px; border-top: 1px solid #333; padding-top: 10px; }
+        #keybind-info p { margin: 4px 0; }
+        #keybind-info strong { color: #00f0ff; }
+        #trade-container { width: 550px; padding: 15px; }
+        #trade-header { margin-bottom: 15px; font-size: 1.2em; }
+        .trade-window { display: flex; justify-content: space-between; gap: 10px; }
+        .trade-panel { width: 48%; }
+        .trade-panel h3 { margin: 0 0 10px 0; color: #ffff00; font-size: 1em; }
+        .trade-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; min-height: 100px; background-color: rgba(0,0,0,0.3); padding: 5px; border: 1px solid #555; margin-bottom: 10px; }
+        .trade-bits-input { width: 100%; box-sizing: border-box; background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; margin-bottom: 10px; font-family: inherit; }
+        #other-trade-bits { padding: 8px; background-color: rgba(0,0,0,0.3); border: 1px solid #555; text-align: right; margin-bottom: 10px; }
+        #trade-status { margin-top: 15px; height: 20px; color: #ffff00; font-weight: bold; }
+        #trade-buttons { margin-top: 10px; display: flex; gap: 10px; }
+        .trade-slot.offered::after { content: '✓'; position: absolute; top: 0; right: 2px; color: #33ff99; font-weight: bold; }
+
+        /* --- MODIFIED SECTION 2: SHOP UI TWEAK --- */
+        .npc-trade-columns { display: flex; justify-content: space-between; gap: 15px; }
+        #npc-buy-panel, #npc-sell-panel { width: 48%; }
+        #npc-buy-panel h3, #npc-sell-panel h3 { margin-top: 0; text-align: center; color: #ffff00; }
+        /* --- END MODIFIED SECTION 2 --- */
+
     </style>
 </head>
 
@@ -81,19 +108,39 @@ All Rights Reserved.
         <!-- Options will be added dynamically by JS -->
     </ul>
     <ul id="ground-item-context-menu" class="context-menu"></ul>
+    <ul id="player-context-menu" class="context-menu"></ul>
+
     <div id="chat-container"> <ul id="chat-log"></ul> <input type="text" id="chat-input" placeholder="Press Enter to chat..." maxlength="100"> </div>
     <div id="login-container" class="ui-panel"><div id="login-form" class="login-form"><h2>LOGIN</h2><input type="text" id="login-username" placeholder="Username" required><input type="password" id="login-password" placeholder="Password" required><button onclick="handleLogin()">ENTER GALACTIC OS</button><p class="login-toggle" onclick="toggleLoginRegister(false)">Need an account? Register</p></div><div id="register-form" class="login-form" style="display: none;"><h2>REGISTER</h2><input type="text" id="register-username" placeholder="Username" required><input type="password" id="register-password" placeholder="Password" required><button onclick="handleRegister()">CREATE ACCOUNT</button><p class="login-toggle" onclick="toggleLoginRegister(true)">Already have an account? Login</p></div><div id="login-error"></div></div>
     <div id="class-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR CLASS</h2><div class="class-option" onclick="chooseClass('Operator')"><h3>OPERATOR</h3><p>High speed, low health. Ability: Invisibility.</p></div><div class="class-option" onclick="chooseClass('Guardian')"><h3>GUARDIAN</h3><p>High health, low speed. Ability: Personal Shield.</p></div><div class="class-option" onclick="chooseClass('Spectre')"><h3>SPECTRE</h3><p>Balanced stats. Ability: Short-range Blink.</p></div></div>
     <div id="ship-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR SHIP COLOR</h2><div id="color-grid"><div class="color-option" style="background-color: #00f0ff;" onclick="chooseColor('#00f0ff')"></div><div class="color-option" style="background-color: #33ff99;" onclick="chooseColor('#33ff99')"></div><div class="color-option" style="background-color: #f07cff;" onclick="chooseColor('#f07cff')"></div><div class="color-option" style="background-color: #ff3355;" onclick="chooseColor('#ff3355')"></div><div class="color-option" style="background-color: #e3d400;" onclick="chooseColor('#e3d400')"></div><div class="color-option" style="background-color: #ffffff;" onclick="chooseColor('#ffffff')"></div></div></div>
     
-    <div id="right-ui-container" style="display: none;">
+    <div id="left-ui-container">
+        <div id="portrait-container">
+            <!-- Character animations will be controlled here via JS -->
+        </div>
+        <div id="hud-container" class="ui-panel">
+            <div id="hud-info">
+                <!-- Player stats and info will be injected here by JS -->
+            </div>
+            <!-- --- MODIFIED SECTION 3: KEYBINDS UI TWEAK --- -->
+            <div id="keybind-info">
+                <p><strong>[E]</strong> Interact / <strong>[RMB]</strong> Loot Menu</p>
+                <p><strong>[H]</strong> Home / <strong>[Shift]</strong> Boost</p>
+                <p><strong>[Space]</strong> Melee / <strong>[LMB]</strong> Range</p>
+                <p><strong>[Q]</strong> Class Ability</p>
+            </div>
+            <!-- --- END MODIFIED SECTION 3 --- -->
+        </div>
+    </div>
+
+    <div id="right-ui-container">
         <div id="minimap-container"><canvas id="minimapCanvas" width="220" height="220"></canvas></div>
         <div id="coords"></div>
         <div id="equipment-panel" class="ui-panel"><h3>EQUIPMENT</h3><div id="equip-slot-Weapon" class="equip-slot" data-slot-type="Weapon"><strong data-slot="Weapon">Weapon:</strong> <span id="equip-Weapon">None</span></div><div id="equip-slot-Module" class="equip-slot" data-slot-type="Module"><strong data-slot="Module">Module:</strong> <span id="equip-Module">None</span></div><div id="equip-slot-Plating" class="equip-slot" data-slot-type="Plating"><strong data-slot="Plating">Plating:</strong> <span id="equip-Plating">None</span></div><div id="equip-slot-Utility" class="equip-slot" data-slot-type="Utility"><strong data-slot="Utility">Utility:</strong> <span id="equip-Utility">None</span></div></div>
         <div id="inventory-panel" class="ui-panel"><h3>INVENTORY</h3><div id="inventory-grid"></div></div>
     </div>
 
-    <!-- NEW: Bank and Shop Containers -->
     <div id="bank-container" class="ui-panel">
         <h2 id="bank-title">BANK</h2>
         <div id="bank-grid"></div>
@@ -105,13 +152,20 @@ All Rights Reserved.
             <div class="shop-tab active" id="shop-tab-npc">NPC Trade</div>
             <div class="shop-tab" id="shop-tab-market">Galactic Market</div>
         </div>
+        <!-- --- MODIFIED SECTION 2: SHOP UI TWEAK --- -->
         <div id="npc-trade-content" class="shop-content active">
-            <div class="shop-grid" id="npc-buy-grid"></div>
-            <div id="npc-sell-panel">
-                <h3>SELL ITEMS</h3>
-                <div class="shop-grid" id="npc-sell-grid"></div>
+            <div class="npc-trade-columns">
+                <div id="npc-buy-panel">
+                    <h3>BUY</h3>
+                    <div class="shop-grid" id="npc-buy-grid"></div>
+                </div>
+                <div id="npc-sell-panel">
+                    <h3>SELL ITEMS</h3>
+                    <div class="shop-grid" id="npc-sell-grid"></div>
+                </div>
             </div>
         </div>
+        <!-- --- END MODIFIED SECTION 2 --- -->
         <div id="market-content" class="shop-content">
             <div class="shop-grid" id="market-buy-grid"></div>
             <div id="market-sell-panel">
@@ -122,27 +176,70 @@ All Rights Reserved.
         </div>
     </div>
     
+    <div id="trade-container" class="ui-panel">
+        <h2 id="trade-header">Trading with Player</h2>
+        <div class="trade-window">
+            <div id="my-trade-panel" class="trade-panel">
+                <h3>YOUR OFFER</h3>
+                <div id="my-trade-grid" class="trade-grid"></div>
+                <input type="number" id="my-trade-bits" class="trade-bits-input" placeholder="0 Data Bits" min="0">
+            </div>
+            <div id="other-trade-panel" class="trade-panel">
+                <h3 id="other-player-trade-name">THEIR OFFER</h3>
+                <div id="other-trade-grid" class="trade-grid"></div>
+                <div id="other-trade-bits">0 Data Bits</div>
+            </div>
+        </div>
+        <div id="trade-status"></div>
+        <div id="trade-buttons">
+            <button id="trade-accept-btn" class="trade-button">ACCEPT</button>
+            <button id="trade-cancel-btn" class="trade-button" style="background-color: #ff3355;">CANCEL</button>
+        </div>
+    </div>
+
     <div id="death-screen" class="ui-panel"><h2>YOU ARE OFFLINE</h2><p>Your journey has ended. Your legacy is stored in the Bank.</p><button onclick="handleRespawn()">RE-ESTABLISH CONNECTION</button></div>
 
     <div id="xp-bar-container"><div id="xp-bar"></div></div>
 
-<script>
+    <script>
     const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
     const minimapCanvas = document.getElementById('minimapCanvas'), minimapCtx = minimapCanvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
-    const ws = new WebSocket('wss://galactic-alpha.onrender.com');
+    // --- DOM Element References ---
+    const loginContainer = document.getElementById('login-container');
+    const classSelectionPanel = document.getElementById('class-selection');
+    const shipSelectionPanel = document.getElementById('ship-selection');
+    const rightUI = document.getElementById('right-ui-container');
+    const leftUI = document.getElementById('left-ui-container');
+    const hudInfo = document.getElementById('hud-info');
+    const deathScreen = document.getElementById('death-screen');
+    const shopContainer = document.getElementById('shop-container');
+    const bankContainer = document.getElementById('bank-container');
+    const tradeContainer = document.getElementById('trade-container');
+    const chatInput = document.getElementById('chat-input');
+    const chatLog = document.getElementById('chat-log');
+    const itemContextMenu = document.getElementById('item-context-menu');
+    const groundContextMenu = document.getElementById('ground-item-context-menu');
+    const playerContextMenu = document.getElementById('player-context-menu');
+
+    // --- WebSocket & Game State ---
+    const ws = new WebSocket('ws://localhost:8080');
     let myPlayerId = null, localWorld = {}, gameState = { players: {}, entities: [] };
     let camera = { x: 0, y: 0, zoom: 1 };
-    let inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, mouse: { x: 0, y: 0, down: false } };
-    let isGameRunning = false, isChatting = false, isShopOpen = false, isBankOpen = false;
+    let inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, space: false, mouse: { x: 0, y: 0, down: false } };
+    let isGameRunning = false, isChatting = false, isShopOpen = false, isBankOpen = false, isTrading = false;
     let loggedInUser = "Player", chosenClassName = null;
     let currentShopName = null;
+    let currentTradeData = { myOfferItems: [], myOfferBits: 0 };
+
+    // --- Constants ---
     const TILE_SIZE = 40, CHUNK_SIZE = 16;
     const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
     const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
     let particles = [];
 
+    // --- WebSocket Handler ---
     ws.onmessage = (message) => {
         try {
             const data = JSON.parse(message.data);
@@ -159,10 +256,24 @@ All Rights Reserved.
             else if (data.type === 'openBank') { openBank(data.bank); }
             else if (data.type === 'marketUpdate') { if(isShopOpen) updateMarketView(data.marketListings); }
             else if (data.type === 'worldChunkUpdate') { localWorld[data.key] = data.chunk; }
+            // Trade Handlers
+            else if (data.type === 'tradeRequest') {
+                if (isTrading) return; // Ignore if already busy
+                if(confirm(`${data.from.username} wants to trade with you. Accept?`)) {
+                    sendToServer({ type: 'tradeResponse', requesterId: data.from.id, accepted: true });
+                }
+            }
+            else if (data.type === 'tradeStarted') { openTradeWindow(data.partner); }
+            else if (data.type === 'tradeUpdate') { updateOtherTradeOffer(data.offer); }
+            else if (data.type === 'tradePartnerAccepted') { document.getElementById('trade-status').textContent = 'Partner has accepted. Waiting for you.'; }
+            else if (data.type === 'tradeCancelled') { addChatMessage('SYSTEM', data.reason, '#ff3355'); closeTradeWindow(); }
+            else if (data.type === 'tradeCompleted') { addChatMessage('SYSTEM', 'Trade successful!', '#33ff99'); closeTradeWindow(); }
+
         } catch (error) { console.error('[CLIENT] Error processing server message:', error); }
     };
     function sendToServer(data) { if(ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data)); }
 
+    // --- Render & Game Loop ---
     function getTile(worldX, worldY) { const cX = Math.floor(worldX / TILE_SIZE), cY = Math.floor(worldY / TILE_SIZE); const chX = Math.floor(cX / CHUNK_SIZE), chY = Math.floor(cY / CHUNK_SIZE); const key = `${chX},${chY}`; const chunk = localWorld[key]; if (!chunk) return 1; const tX = (cX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; const tY = (cY % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; return chunk.tiles[tY * CHUNK_SIZE + tX]; }
 
     function drawBossHealthbar(boss) {
@@ -186,6 +297,17 @@ All Rights Reserved.
     const drawFunctions = {
         'Player': (p) => {
             if (p.isDead) return;
+
+            // NEW: Add context menu for other players
+            if (p.id !== myPlayerId) {
+                const screenX = (p.x - camera.x) * camera.zoom + canvas.width / 2;
+                const screenY = (p.y - camera.y) * camera.zoom + canvas.height / 2;
+                if (Math.hypot(inputs.mouse.x - screenX, inputs.mouse.y - screenY) < p.radius) {
+                    canvas.style.cursor = 'pointer';
+                    canvas.oncontextmenu = (e) => showPlayerContextMenu(e, p);
+                }
+            }
+
             ctx.save();
             ctx.globalAlpha = p.isInvisible ? 0.3 : 1;
             ctx.translate(p.x, p.y);
@@ -225,6 +347,23 @@ All Rights Reserved.
             }
             ctx.globalAlpha = 1;
         },
+        'MeleeSlash': (s) => {
+            const owner = gameState.players[s.ownerId];
+            if (!owner) return;
+            ctx.save();
+            ctx.translate(owner.x, owner.y);
+            ctx.rotate(s.angle);
+            ctx.fillStyle = s.color;
+            ctx.globalAlpha = s.life * 2.5; // Fade out effect
+            ctx.shadowColor = s.color;
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, s.radius, -s.arc / 2, s.arc / 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        },
         'Enemy': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 3; const r = e.radius; ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(-r / 2, -r * 0.866); ctx.lineTo(-r / 2, r * 0.866); ctx.closePath(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
         'Stinger': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 3; const r = e.radius; ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0); ctx.closePath(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
         'VoidSwarmer': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; const r = e.radius; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-r-15; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
@@ -250,70 +389,566 @@ All Rights Reserved.
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         const myPlayer = gameState.players[myPlayerId];
         if (!isGameRunning || !myPlayer) return;
+        
+        leftUI.style.display = 'block'; // Make sure left UI is visible
         camera.x = myPlayer.x; camera.y = myPlayer.y;
+        
         ctx.save();
         ctx.translate(canvas.width / 2, canvas.height / 2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
+        
         const b = { l: Math.floor((camera.x-canvas.width/2/camera.zoom)/TILE_SIZE)-1, r: Math.ceil((camera.x+canvas.width/2/camera.zoom)/TILE_SIZE)+1, t: Math.floor((camera.y-canvas.height/2/camera.zoom)/TILE_SIZE)-1, b: Math.ceil((camera.y+canvas.height/2/camera.zoom)/TILE_SIZE)+1, };
         for (let y = b.t; y < b.b; y++) for (let x = b.l; x < b.r; x++) { const tX = x * TILE_SIZE, tY = y * TILE_SIZE; const tileId = getTile(tX, tY), tile = TILE_TYPES[tileId] || TILE_TYPES[1]; if (tile.wc) { const floorTile = TILE_TYPES[tileId - 1] || TILE_TYPES[1]; ctx.fillStyle = floorTile.c; ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE); ctx.fillStyle = tile.wc; ctx.shadowColor = tile.wc; ctx.shadowBlur = 10; } else { ctx.fillStyle = tile.c; ctx.shadowBlur = 0; } ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE); }
         ctx.shadowBlur = 0;
+        
         particles.forEach(p => { p.life -= 0.05; p.x += (Math.random() - 0.5)*2; p.y += (Math.random() - 0.5)*2; ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); }); particles = particles.filter(p => p.life > 0); ctx.globalAlpha = 1;
+        
+        // Default cursor and context menu
+        canvas.style.cursor = 'crosshair';
+        canvas.oncontextmenu = showGroundContextMenu;
+
         gameState.entities.forEach(e => { if (drawFunctions[e.type]) drawFunctions[e.type](e); });
         for (const id in gameState.players) drawFunctions['Player'](gameState.players[id]);
+        
         ctx.restore();
-        if (!myPlayer.isDead) { drawUI(myPlayer); drawMinimap(myPlayer); }
+        
+        if (!myPlayer.isDead) { 
+            drawUI(myPlayer); 
+            drawMinimap(myPlayer); 
+        }
     }
 
     function gameLoop() {
-        if (isGameRunning && myPlayerId && gameState.players[myPlayerId] && !isShopOpen && !isBankOpen) { const myPlayer = gameState.players[myPlayerId]; if (!myPlayer.isDead) { const worldMouseX = (inputs.mouse.x - canvas.width / 2) / camera.zoom + myPlayer.x; const worldMouseY = (inputs.mouse.y - canvas.height / 2) / camera.zoom + myPlayer.y; const angle = Math.atan2(worldMouseY - myPlayer.y, worldMouseX - myPlayer.x); sendToServer({ type: 'input', inputs, angle }); } }
+        if (isGameRunning && myPlayerId && gameState.players[myPlayerId] && !isShopOpen && !isBankOpen && !isTrading) { 
+            const myPlayer = gameState.players[myPlayerId];
+            if (!myPlayer.isDead) {
+                const worldMouseX = (inputs.mouse.x - canvas.width / 2) / camera.zoom + myPlayer.x;
+                const worldMouseY = (inputs.mouse.y - canvas.height / 2) / camera.zoom + myPlayer.y;
+                const angle = Math.atan2(worldMouseY - myPlayer.y, worldMouseX - myPlayer.x);
+                sendToServer({ type: 'input', inputs, angle });
+            }
+        }
         render();
         requestAnimationFrame(gameLoop);
     }
 
-    const loginContainer=document.getElementById('login-container'), classSelectionPanel=document.getElementById('class-selection'), shipSelectionPanel=document.getElementById('ship-selection'), rightUI=document.getElementById('right-ui-container'), deathScreen=document.getElementById('death-screen');
-    function showLoginScreen() { loginContainer.style.display = 'block'; classSelectionPanel.style.display = 'none'; shipSelectionPanel.style.display = 'none'; rightUI.style.display = 'none'; deathScreen.style.display = 'none'; isGameRunning = false; }
+    // --- UI & Screen Management ---
+    function showLoginScreen() {
+        loginContainer.style.display = 'block';
+        classSelectionPanel.style.display = 'none';
+        shipSelectionPanel.style.display = 'none';
+        rightUI.style.display = 'none';
+        leftUI.style.display = 'none';
+        deathScreen.style.display = 'none';
+        isGameRunning = false;
+    }
     function showClassSelection() { loginContainer.style.display = 'none'; classSelectionPanel.style.display = 'block'; }
     function showShipSelection() { classSelectionPanel.style.display = 'none'; shipSelectionPanel.style.display = 'block'; }
-    function showDeathScreen() { deathScreen.style.display = 'block'; rightUI.style.display = 'none'; isGameRunning = false; closeShop(); closeBank(); }
+    function showDeathScreen() {
+        deathScreen.style.display = 'block';
+        rightUI.style.display = 'none';
+        leftUI.style.display = 'none';
+        isGameRunning = false;
+        closeAllPanels();
+    }
     function chooseClass(className) { chosenClassName = className; showShipSelection(); }
-    function chooseColor(color) { shipSelectionPanel.style.display = 'none'; rightUI.style.display = 'block'; deathScreen.style.display = 'none'; sendToServer({ type: 'playerInit', username: loggedInUser, color: color, className: chosenClassName }); isGameRunning = true; }
+    function chooseColor(color) {
+        shipSelectionPanel.style.display = 'none';
+        rightUI.style.display = 'block';
+        leftUI.style.display = 'block';
+        deathScreen.style.display = 'none';
+        sendToServer({ type: 'playerInit', username: loggedInUser, color: color, className: chosenClassName });
+        isGameRunning = true;
+    }
     function handleRespawn() { sendToServer({type: 'playerRespawn'}); showClassSelection(); deathScreen.style.display = 'none'; }
     function handleLogin() { const u=document.getElementById('login-username').value, p=document.getElementById('login-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]&&users[u]===p){loggedInUser=u;showClassSelection()}else{e.textContent='Invalid username or password.'} }
     function handleRegister() { const u=document.getElementById('register-username').value, p=document.getElementById('register-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} if(u.length<3){e.textContent='Username must be at least 3 characters.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]){e.textContent='Username already taken.'}else{users[u]=p;localStorage.setItem('galactic_os_users',JSON.stringify(users));loggedInUser=u;showClassSelection()} }
     function toggleLoginRegister(showLogin) { document.getElementById('login-form').style.display=showLogin?'block':'none';document.getElementById('register-form').style.display=showLogin?'none':'block';document.getElementById('login-error').textContent=''; }
 
-    function drawUI(player) { if (!player || !player.stats) return; document.getElementById('xp-bar').style.width = `${(player.xp / player.xpToNextLevel) * 100}%`; ctx.font = '20px "Consolas",monospace'; ctx.fillStyle = '#ffff00'; ctx.shadowColor = '#ffff00'; ctx.shadowBlur = 10; ctx.textAlign = 'left'; let currentY = 40; ctx.fillText(`Data Bits: ${player.dataBits}`, 20, currentY); currentY += 30; ctx.font = '16px "Consolas",monospace'; ctx.fillStyle = player.abilityCooldown > 0 ? '#777' : '#00f0ff'; const abilityName = player.className === 'Operator' ? 'Invis' : (player.className === 'Guardian' ? 'Shield' : 'Blink'); ctx.fillText(`${abilityName} (Q): ${player.abilityCooldown > 0 ? player.abilityCooldown.toFixed(1) + 's' : 'READY'}`, 20, currentY); currentY += 25; ctx.fillStyle = player.teleportCooldown > 0 ? '#777' : '#00f0ff'; ctx.fillText(`Teleport Home (H): ${player.teleportCooldown > 0 ? (player.teleportCooldown/60).toFixed(1) + 'm' : 'READY'}`, 20, currentY); currentY += 35; const barW = 250, barH = 15; ctx.fillStyle = '#ff3355'; ctx.fillRect(20, currentY, barW * (player.health / player.stats.maxHealth), barH); ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.strokeRect(20, currentY, barW, barH); ctx.font = '14px "Consolas"'; ctx.fillStyle="#fff"; ctx.textAlign="center"; ctx.fillText(`${Math.ceil(player.health)} / ${player.stats.maxHealth}`, 20 + barW / 2, currentY + barH - 2); currentY += barH + 5; ctx.fillStyle = '#aaaaff'; ctx.fillRect(20, currentY, barW * (player.energy / player.stats.maxEnergy), barH); ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.strokeRect(20, currentY, barW, barH); ctx.fillText(`${Math.ceil(player.energy)} / ${player.stats.maxEnergy}`, 20 + barW / 2, currentY + barH - 2); ctx.shadowBlur = 0; document.getElementById('coords').textContent = `X: ${Math.floor(player.x / TILE_SIZE)} Y: ${Math.floor(player.y / TILE_SIZE)}`; updateInventoryAndEquipUI(player); }
-    function drawMinimap(player) { const mapSize = 220, viewDist = 25 * TILE_SIZE; minimapCtx.fillStyle = '#05060a'; minimapCtx.fillRect(0, 0, mapSize, mapSize); const scale = mapSize / (viewDist * 2); for(let y = -viewDist; y < viewDist; y += TILE_SIZE) for(let x = -viewDist; x < viewDist; x += TILE_SIZE) { const tileId = getTile(player.x + x, player.y + y); const tile = TILE_TYPES[tileId] || TILE_TYPES[1]; if(tile) { minimapCtx.fillStyle = tile.wc || tile.c; minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, TILE_SIZE * scale, TILE_SIZE * scale); } } minimapCtx.fillStyle = player.color || '#00ff00'; minimapCtx.fillRect(mapSize/2 - 2, mapSize/2 - 2, 4, 4); gameState.entities.forEach(e => { if(e.isBoss || e.type.includes('Enemy') || e.type === 'VoidSwarmer') { const dX = e.x - player.x, dY = e.y - player.y; if(Math.abs(dX) < viewDist && Math.abs(dY) < viewDist) { minimapCtx.fillStyle = e.color; minimapCtx.fillRect(mapSize/2 + dX * scale - 1.5, mapSize/2 + dY * scale - 1.5, 3, 3); } } }); }
-    function updateInventoryAndEquipUI(player) { for(const slot in player.equipment) { const el = document.getElementById(`equip-${slot}`); const slotContainer = document.getElementById(`equip-slot-${slot}`); const item = player.equipment[slot]; slotContainer.oncontextmenu = (e) => showContextMenu(e, 'equipment', slot, item); if(item) { el.textContent = item.name; el.style.color = TIER_COLORS[item.tier]; slotContainer.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');} else { el.textContent = 'None'; el.style.color = '#777'; slotContainer.title = ''; } } const grid = document.getElementById('inventory-grid'); grid.innerHTML = ''; player.inventory.forEach((item, index) => { const slot = document.createElement('div'); slot.className = 'inventory-slot'; slot.oncontextmenu = (e) => showContextMenu(e, 'inventory', index, item); if(item) { slot.style.borderColor = TIER_COLORS[item.tier]; slot.textContent = item.name; slot.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n'); } grid.appendChild(slot); }); }
+    // NEW: Rewritten drawUI function to use DOM elements
+    function drawUI(player) {
+        if (!player || !player.stats) return;
 
-    const contextMenu = document.getElementById('item-context-menu'); const groundContextMenu = document.getElementById('ground-item-context-menu');
-    function showContextMenu(event, source, index, item) { event.preventDefault(); if (!item) return; hideGroundContextMenu(); contextMenu.innerHTML = ''; if (source === 'inventory') { contextMenu.innerHTML += `<li id="context-equip">Equip</li>`; if (isBankOpen) contextMenu.innerHTML += `<li id="context-bank-deposit">Deposit</li>`; } else if (source === 'equipment') { contextMenu.innerHTML += `<li id="context-unequip">Unequip</li>`; } else if (source === 'bank') { contextMenu.innerHTML += `<li id="context-bank-withdraw">Withdraw</li>`; } contextMenu.innerHTML += `<li id="context-drop">Drop</li>`; contextMenu.style.display = 'block'; contextMenu.style.left = `${event.clientX}px`; contextMenu.style.top = `${event.clientY}px`; if (document.getElementById('context-equip')) document.getElementById('context-equip').onclick = () => { sendToServer({ type: 'equipItem', itemIndex: index }); hideContextMenu(); }; if (document.getElementById('context-unequip')) document.getElementById('context-unequip').onclick = () => { sendToServer({ type: 'unequipItem', slot: index }); hideContextMenu(); }; if (document.getElementById('context-drop')) document.getElementById('context-drop').onclick = () => { sendToServer({ type: 'dropItem', source: source, index: index }); hideContextMenu(); }; if (document.getElementById('context-bank-deposit')) document.getElementById('context-bank-deposit').onclick = () => { sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: index}); hideContextMenu(); }; if (document.getElementById('context-bank-withdraw')) document.getElementById('context-bank-withdraw').onclick = () => { sendToServer({ type: 'bankAction', action: 'withdraw', itemIndex: index}); hideContextMenu(); }; }
-    function hideContextMenu() { contextMenu.style.display = 'none'; }
-    function showGroundContextMenu(event) { event.preventDefault(); hideContextMenu(); const worldMouseX = (event.clientX - canvas.width / 2) / camera.zoom + camera.x; const worldMouseY = (event.clientY - canvas.height / 2) / camera.zoom + camera.y; const pickupRadius = 40; const itemsToShow = gameState.entities.filter(e => (e.type === 'EquipmentDrop' || e.type === 'PlayerLootBag') && e.pickupDelay <= 0 && Math.hypot(e.x - worldMouseX, e.y - worldMouseY) < pickupRadius); groundContextMenu.innerHTML = ''; if (itemsToShow.length > 0) { itemsToShow.forEach(itemEntity => { if (itemEntity.type === 'PlayerLootBag') { if (itemEntity.bits > 0) { const bitsLi = document.createElement('li'); bitsLi.innerHTML = `Pickup <span style="color: ${TIER_COLORS[6]}">${itemEntity.bits} Data Bits</span>`; bitsLi.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: 'bits'}); hideGroundContextMenu(); }; groundContextMenu.appendChild(bitsLi); } itemEntity.items.forEach((item, index) => { if (!item) return; const li = document.createElement('li'); li.innerHTML = `Pickup <span style="color:${TIER_COLORS[item.tier]}">${item.name}</span>`; li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: index}); hideGroundContextMenu(); }; groundContextMenu.appendChild(li); }); } else { const li = document.createElement('li'); li.innerHTML = `Pickup <span style="color:${TIER_COLORS[itemEntity.item.tier]}">${itemEntity.item.name}</span>`; li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id}); hideGroundContextMenu(); }; groundContextMenu.appendChild(li); } }); groundContextMenu.style.display = 'block'; groundContextMenu.style.left = `${event.clientX}px`; groundContextMenu.style.top = `${event.clientY}px`; } else { hideGroundContextMenu(); } }
-    function hideGroundContextMenu() { groundContextMenu.style.display = 'none'; }
+        const abilityName = player.className === 'Operator' ? 'Invis' : (player.className === 'Guardian' ? 'Shield' : 'Blink');
 
-    const shopContainer = document.getElementById('shop-container'); const bankContainer = document.getElementById('bank-container');
-    function openShop(npcName, npcInventory, marketListings) { isShopOpen = true; currentShopName = npcName; shopContainer.style.display = 'block'; document.getElementById('shop-tab-npc').onclick = () => showShopTab('npc', { npcInventory }); document.getElementById('shop-tab-market').onclick = () => showShopTab('market', { marketListings }); document.getElementById('market-list-btn').onclick = listMarketItem; showShopTab('npc', { npcInventory }); }
-    function closeShop() { isShopOpen = false; shopContainer.style.display = 'none'; currentShopName = null; }
-    function openBank(bankData) { isBankOpen = true; bankContainer.style.display = 'block'; updateBankView(bankData); }
-    function closeBank() { isBankOpen = false; bankContainer.style.display = 'none'; }
-    function updateBankView(bankData) { const grid = document.getElementById('bank-grid'); grid.innerHTML = ''; bankData.forEach((item, index) => { const slot = document.createElement('div'); slot.className = 'bank-slot'; slot.oncontextmenu = (e) => showContextMenu(e, 'bank', index, item); if (item) { slot.style.borderColor = TIER_COLORS[item.tier]; slot.textContent = item.name; slot.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n'); } grid.appendChild(slot); }); }
-    function showShopTab(tab, data) { document.getElementById('npc-trade-content').classList.toggle('active', tab === 'npc'); document.getElementById('market-content').classList.toggle('active', tab === 'market'); document.getElementById('shop-tab-npc').classList.toggle('active', tab === 'npc'); document.getElementById('shop-tab-market').classList.toggle('active', tab === 'market'); if(tab === 'npc') updateNpcTradeView(data.npcInventory); else if(tab === 'market') updateMarketView(data.marketListings); }
-    function updateNpcTradeView(npcInventory) { const buyGrid = document.getElementById('npc-buy-grid'); const sellGrid = document.getElementById('npc-sell-grid'); const myPlayer = gameState.players[myPlayerId]; if(!myPlayer) return; buyGrid.innerHTML = '<h3>BUY</h3>'; sellGrid.innerHTML = ''; npcInventory.forEach((shopItem, index) => { const div = document.createElement('div'); div.className = 'shop-item'; div.innerHTML = `<span class="shop-item-name" style="color:${TIER_COLORS[shopItem.item.tier]}">${shopItem.item.name}</span> <span>${shopItem.cost} bits</span> <button class="shop-item-buy">BUY</button>`; const btn = div.querySelector('button'); btn.onclick = () => sendToServer({type: 'buyNpcItem', shopName: currentShopName, itemIndex: index}); btn.disabled = myPlayer.dataBits < shopItem.cost; buyGrid.appendChild(div); }); myPlayer.inventory.forEach((item, index) => { if(!item) return; const sellPrice = Math.floor(getItemBaseValue(item) / 3); const div = document.createElement('div'); div.className = 'shop-item'; div.innerHTML = `<span class="shop-item-name" style="color:${TIER_COLORS[item.tier]}">${item.name}</span> <span>${sellPrice} bits</span> <button class="shop-item-sell">SELL</button>`; div.querySelector('button').onclick = () => sendToServer({type: 'sellItem', itemIndex: index}); sellGrid.appendChild(div); }); }
-    function updateMarketView(marketListings) { const buyGrid = document.getElementById('market-buy-grid'); const itemSelect = document.getElementById('market-item-select'); const myPlayer = gameState.players[myPlayerId]; if(!myPlayer) return; buyGrid.innerHTML = ''; itemSelect.innerHTML = ''; for(const id in marketListings) { const listing = marketListings[id]; const div = document.createElement('div'); div.className = 'market-item'; div.innerHTML = `<span class="market-item-name" style="color:${TIER_COLORS[listing.item.tier]}">${listing.item.name}</span><span>${listing.seller}</span><span>${listing.price} bits</span><button>BUY</button>`; const btn = div.querySelector('button'); btn.onclick = () => sendToServer({type: 'marketAction', action: 'buy', listingId: id}); btn.disabled = myPlayer.dataBits < listing.price || myPlayer.username === listing.seller; buyGrid.appendChild(div); } myPlayer.inventory.forEach((item, index) => { if(item) { const option = document.createElement('option'); option.value = index; option.textContent = item.name; itemSelect.appendChild(option); } }); }
-    function listMarketItem() { const itemIndex = document.getElementById('market-item-select').value; const price = document.getElementById('market-price-input').value; if(itemIndex !== '' && price > 0) { sendToServer({type: 'marketAction', action: 'list', itemIndex: parseInt(itemIndex), price: parseInt(price)}); document.getElementById('market-price-input').value = ''; } }
+        hudInfo.innerHTML = `
+            <p><strong>Data Bits:</strong> ${player.dataBits}</p>
+            <p><strong>Ability:</strong> <span style="color: ${player.abilityCooldown > 0 ? '#777' : '#00f0ff'}">${abilityName} ${player.abilityCooldown > 0 ? player.abilityCooldown.toFixed(1) + 's' : 'READY'}</span></p>
+            <p><strong>Teleport:</strong> <span style="color: ${player.teleportCooldown > 0 ? '#777' : '#00f0ff'}">${player.teleportCooldown > 0 ? (player.teleportCooldown/60).toFixed(1) + 'm' : 'READY'}</span></p>
+            <div class="hud-bar"><div id="health-bar-fill" style="width: ${player.health / player.stats.maxHealth * 100}%;"></div></div>
+            <p style="text-align: center; font-size: 12px;">HP: ${Math.ceil(player.health)} / ${player.stats.maxHealth}</p>
+            <div class="hud-bar"><div id="energy-bar-fill" style="width: ${player.energy / player.stats.maxEnergy * 100}%;"></div></div>
+            <p style="text-align: center; font-size: 12px;">EN: ${Math.ceil(player.energy)} / ${player.stats.maxEnergy}</p>
+        `;
 
-    const chatInput = document.getElementById('chat-input'), chatLog = document.getElementById('chat-log');
-    chatInput.addEventListener('focus', () => { isChatting = true; }); chatInput.addEventListener('blur', () => { isChatting = false; });
-    function addChatMessage(sender, message, color = '#00f0ff') { const li = document.createElement('li'); li.innerHTML = `<strong style="color:${color};">[${sender}]</strong>: ${message}`; chatLog.appendChild(li); chatLog.scrollTop = chatLog.scrollHeight; }
+        document.getElementById('xp-bar').style.width = `${(player.xp / player.xpToNextLevel) * 100}%`;
+        document.getElementById('coords').textContent = `X: ${Math.floor(player.x / TILE_SIZE)} Y: ${Math.floor(player.y / TILE_SIZE)}`;
+        updateInventoryAndEquipUI(player);
+    }
+    
+    // --- MODIFIED SECTION 1: MINIMAP FIX ---
+    function drawMinimap(player) {
+        const mapSize = 220, viewDist = 25 * TILE_SIZE;
+        minimapCtx.fillStyle = '#05060a';
+        minimapCtx.fillRect(0, 0, mapSize, mapSize);
+        const scale = mapSize / (viewDist * 2);
 
-    document.addEventListener('keydown', e => { const key = e.key.toLowerCase(); if (key === 'escape' && (isShopOpen || isBankOpen)) { closeShop(); closeBank(); } if (isChatting) { if(key === 'enter') { const msg = chatInput.value.trim(); if(msg) sendToServer({type: 'chat', message: msg}); chatInput.value = ''; chatInput.blur(); } return; } if (key === 'enter') { e.preventDefault(); chatInput.focus(); } else if (inputs.hasOwnProperty(key) && !isShopOpen && !isBankOpen) { inputs[key] = true; } });
-    document.addEventListener('keyup', e => { const key = e.key.toLowerCase(); if (inputs.hasOwnProperty(key)) inputs[key] = false; });
-    window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
-    canvas.addEventListener('contextmenu', showGroundContextMenu);
-    canvas.addEventListener('mousemove', e => { inputs.mouse.x = e.clientX; inputs.mouse.y = e.clientY; });
-    window.addEventListener('mousedown', (e) => { if(e.target.closest('.ui-panel, .context-menu')) return; if(e.button === 0) inputs.mouse.down = true; hideContextMenu(); hideGroundContextMenu(); });
-    window.addEventListener('mouseup', (e) => { if(e.button === 0) inputs.mouse.down = false; });
+        for(let y = -viewDist; y < viewDist; y += TILE_SIZE) for(let x = -viewDist; x < viewDist; x += TILE_SIZE) {
+            const tileId = getTile(player.x + x, player.y + y);
+            const tile = TILE_TYPES[tileId] || TILE_TYPES[1];
+            if(tile) {
+                minimapCtx.fillStyle = tile.wc || tile.c;
+                // Using Math.ceil() prevents 1px gaps between tiles from rounding errors
+                minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, Math.ceil(TILE_SIZE * scale), Math.ceil(TILE_SIZE * scale));
+            }
+        }
+        
+        // Draw other entities
+        for (const e of gameState.entities) {
+            const dX = e.x - player.x;
+            const dY = e.y - player.y;
+            if (Math.abs(dX) < viewDist && Math.abs(dY) < viewDist) {
+                if (e.isBoss) {
+                    minimapCtx.fillStyle = e.color;
+                    minimapCtx.fillRect(mapSize / 2 + dX * scale - 3, mapSize / 2 + dY * scale - 3, 6, 6);
+                } else if (e.type.includes('Enemy') || e.type === 'VoidSwarmer') {
+                    minimapCtx.fillStyle = e.color;
+                    minimapCtx.fillRect(mapSize / 2 + dX * scale - 1.5, mapSize / 2 + dY * scale - 1.5, 3, 3);
+                }
+            }
+        }
 
+        // Draw other players
+        for (const id in gameState.players) {
+            if (id === myPlayerId) continue;
+            const p = gameState.players[id];
+            const dX = p.x - player.x;
+            const dY = p.y - player.y;
+            if (Math.abs(dX) < viewDist && Math.abs(dY) < viewDist) {
+                minimapCtx.fillStyle = p.color;
+                minimapCtx.beginPath();
+                minimapCtx.arc(mapSize / 2 + dX * scale, mapSize / 2 + dY * scale, 3, 0, Math.PI * 2);
+                minimapCtx.fill();
+            }
+        }
+        
+        // Draw self
+        minimapCtx.fillStyle = player.color || '#00ff00';
+        minimapCtx.fillRect(mapSize/2 - 2, mapSize/2 - 2, 4, 4);
+    }
+    // --- END MODIFIED SECTION 1 ---
+
+    function updateInventoryAndEquipUI(player) {
+        for(const slot in player.equipment) {
+            const el = document.getElementById(`equip-${slot}`);
+            const slotContainer = document.getElementById(`equip-slot-${slot}`);
+            const item = player.equipment[slot];
+            slotContainer.oncontextmenu = (e) => showItemContextMenu(e, 'equipment', slot, item);
+            if(item) {
+                el.textContent = item.name;
+                el.style.color = TIER_COLORS[item.tier];
+                slotContainer.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
+            } else {
+                el.textContent = 'None';
+                el.style.color = '#777';
+                slotContainer.title = '';
+            }
+        }
+        const grid = document.getElementById('inventory-grid');
+        grid.innerHTML = '';
+        player.inventory.forEach((item, index) => {
+            const slot = document.createElement('div');
+            slot.className = 'inventory-slot';
+            slot.oncontextmenu = (e) => showItemContextMenu(e, 'inventory', index, item);
+            if(item) {
+                slot.style.borderColor = TIER_COLORS[item.tier];
+                slot.textContent = item.name;
+                slot.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
+            }
+            grid.appendChild(slot);
+        });
+    }
+
+    // --- Context Menus ---
+    function showItemContextMenu(event, source, index, item) {
+        event.preventDefault();
+        if (!item) return;
+        hideAllContextMenus();
+        itemContextMenu.innerHTML = '';
+        if (source === 'inventory') {
+            itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'equipItem', itemIndex: ${index} }); hideAllContextMenus();">Equip</li>`;
+            if (isBankOpen) {
+                itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: ${index}}); hideAllContextMenus();">Deposit</li>`;
+            }
+            if (isTrading) {
+                itemContextMenu.innerHTML += `<li onclick="offerTradeItem(${index}); hideAllContextMenus();">Offer</li>`;
+            }
+        } else if (source === 'equipment') {
+            itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'unequipItem', slot: '${index}' }); hideAllContextMenus();">Unequip</li>`;
+        } else if (source === 'bank') {
+            itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'withdraw', itemIndex: ${index}}); hideAllContextMenus();">Withdraw</li>`;
+        } else if (source === 'trade') {
+            itemContextMenu.innerHTML += `<li onclick="removeTradeItem(${index}); hideAllContextMenus();">Remove</li>`;
+        }
+
+        itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'dropItem', source: '${source}', index: '${index}' }); hideAllContextMenus();">Drop</li>`;
+
+        itemContextMenu.style.display = 'block';
+        itemContextMenu.style.left = `${event.clientX}px`;
+        itemContextMenu.style.top = `${event.clientY}px`;
+    }
+
+    function showGroundContextMenu(event) {
+        event.preventDefault();
+        hideAllContextMenus();
+        const worldMouseX = (event.clientX - canvas.width / 2) / camera.zoom + camera.x;
+        const worldMouseY = (event.clientY - canvas.height / 2) / camera.zoom + camera.y;
+        const pickupRadius = 40;
+        const itemsToShow = gameState.entities.filter(e => (e.type === 'EquipmentDrop' || e.type === 'PlayerLootBag') && e.pickupDelay <= 0 && Math.hypot(e.x - worldMouseX, e.y - worldMouseY) < pickupRadius);
+        groundContextMenu.innerHTML = '';
+        if (itemsToShow.length > 0) {
+            itemsToShow.forEach(itemEntity => {
+                if (itemEntity.type === 'PlayerLootBag') {
+                    if (itemEntity.bits > 0) {
+                        const bitsLi = document.createElement('li');
+                        bitsLi.innerHTML = `Pickup <span style="color: ${TIER_COLORS[6]}">${itemEntity.bits} Data Bits</span>`;
+                        bitsLi.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: 'bits'}); hideAllContextMenus(); };
+                        groundContextMenu.appendChild(bitsLi);
+                    }
+                    itemEntity.items.forEach((item, index) => {
+                        if (!item) return;
+                        const li = document.createElement('li');
+                        li.innerHTML = `Pickup <span style="color:${TIER_COLORS[item.tier]}">${item.name}</span>`;
+                        li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: index}); hideAllContextMenus(); };
+                        groundContextMenu.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    li.innerHTML = `Pickup <span style="color:${TIER_COLORS[itemEntity.item.tier]}">${itemEntity.item.name}</span>`;
+                    li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id}); hideAllContextMenus(); };
+                    groundContextMenu.appendChild(li);
+                }
+            });
+            groundContextMenu.style.display = 'block';
+            groundContextMenu.style.left = `${event.clientX}px`;
+            groundContextMenu.style.top = `${event.clientY}px`;
+        }
+    }
+
+    function showPlayerContextMenu(event, player) {
+        event.preventDefault();
+        if (!player || player.id === myPlayerId) return;
+        hideAllContextMenus();
+        
+        playerContextMenu.innerHTML = '';
+        const tradeLi = document.createElement('li');
+        tradeLi.textContent = `Trade ${player.username}`;
+        tradeLi.onclick = () => {
+            sendToServer({ type: 'tradeRequest', targetId: player.id });
+            addChatMessage('SYSTEM', `Trade request sent to ${player.username}.`, '#ffff00');
+            hideAllContextMenus();
+        };
+        playerContextMenu.appendChild(tradeLi);
+        
+        playerContextMenu.style.display = 'block';
+        playerContextMenu.style.left = `${event.clientX}px`;
+        playerContextMenu.style.top = `${event.clientY}px`;
+    }
+
+    function hideAllContextMenus() {
+        itemContextMenu.style.display = 'none';
+        groundContextMenu.style.display = 'none';
+        playerContextMenu.style.display = 'none';
+    }
+
+    // --- Panel Management (Shop, Bank, Trade) ---
+    function closeAllPanels() {
+        closeShop();
+        closeBank();
+        closeTradeWindow();
+    }
+
+    function openShop(npcName, npcInventory, marketListings) {
+        closeAllPanels();
+        isShopOpen = true;
+        currentShopName = npcName;
+        shopContainer.style.display = 'block';
+        document.getElementById('shop-tab-npc').onclick = () => showShopTab('npc', { npcInventory, marketListings });
+        document.getElementById('shop-tab-market').onclick = () => showShopTab('market', { npcInventory, marketListings });
+        document.getElementById('market-list-btn').onclick = listMarketItem;
+        showShopTab('npc', { npcInventory, marketListings });
+    }
+    function closeShop() {
+        isShopOpen = false;
+        shopContainer.style.display = 'none';
+        currentShopName = null;
+    }
+
+    function openBank(bankData) {
+        closeAllPanels();
+        isBankOpen = true;
+        bankContainer.style.display = 'block';
+        updateBankView(bankData);
+    }
+    function closeBank() {
+        isBankOpen = false;
+        bankContainer.style.display = 'none';
+    }
+    
+    // NEW: Trade Window Functions
+    function openTradeWindow(partnerData) {
+        closeAllPanels();
+        isTrading = true;
+        tradeContainer.style.display = 'block';
+        document.getElementById('trade-header').textContent = `Trading with ${partnerData.username}`;
+        document.getElementById('other-player-trade-name').textContent = `${partnerData.username}'s OFFER`;
+        document.getElementById('trade-accept-btn').disabled = false;
+        document.getElementById('trade-accept-btn').textContent = 'ACCEPT';
+        document.getElementById('trade-status').textContent = '';
+        
+        // Add event listeners
+        document.getElementById('trade-cancel-btn').onclick = () => sendToServer({ type: 'tradeCancel' });
+        document.getElementById('trade-accept-btn').onclick = () => {
+            document.getElementById('trade-status').textContent = 'Waiting for partner...';
+            sendToServer({ type: 'tradeAccept' });
+        };
+        document.getElementById('my-trade-bits').onchange = updateMyTradeOffer;
+        document.getElementById('my-trade-bits').onkeyup = updateMyTradeOffer;
+
+        renderMyTradeOffer();
+        updateOtherTradeOffer({ offer: [], offerBits: 0 }); // Clear other's offer initially
+    }
+    function closeTradeWindow() {
+        isTrading = false;
+        tradeContainer.style.display = 'none';
+        currentTradeData = { myOfferItems: [], myOfferBits: 0 };
+        document.getElementById('my-trade-bits').value = '';
+    }
+    function offerTradeItem(inventoryIndex) {
+        const myPlayer = gameState.players[myPlayerId];
+        const item = myPlayer.inventory[inventoryIndex];
+        if (item && !currentTradeData.myOfferItems.some(i => i.originalIndex === inventoryIndex)) {
+            currentTradeData.myOfferItems.push({ item: { ...item }, originalIndex: inventoryIndex });
+            renderMyTradeOffer();
+            updateMyTradeOffer();
+        }
+    }
+    function removeTradeItem(offerIndex) {
+        currentTradeData.myOfferItems.splice(offerIndex, 1);
+        renderMyTradeOffer();
+        updateMyTradeOffer();
+    }
+    function updateMyTradeOffer() {
+        const bits = parseInt(document.getElementById('my-trade-bits').value, 10) || 0;
+        currentTradeData.myOfferBits = bits;
+        sendToServer({ type: 'tradeUpdate', offerItems: currentTradeData.myOfferItems, offerBits: bits });
+        document.getElementById('trade-accept-btn').textContent = 'ACCEPT';
+        document.getElementById('trade-status').textContent = '';
+    }
+    function updateOtherTradeOffer(partnerTradeData) {
+        if (!isTrading) return;
+        const grid = document.getElementById('other-trade-grid');
+        grid.innerHTML = '';
+        partnerTradeData.offer.forEach(offerItem => {
+            const slot = document.createElement('div');
+            slot.className = 'trade-slot';
+            slot.style.borderColor = TIER_COLORS[offerItem.item.tier];
+            slot.textContent = offerItem.item.name;
+            slot.title = `${offerItem.item.name}\n` + Object.entries(offerItem.item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
+            grid.appendChild(slot);
+        });
+        document.getElementById('other-trade-bits').textContent = `${partnerTradeData.offerBits} Data Bits`;
+        document.getElementById('trade-accept-btn').textContent = 'ACCEPT';
+        document.getElementById('trade-status').textContent = '';
+    }
+    function renderMyTradeOffer() {
+        if (!isTrading) return;
+        const myPlayer = gameState.players[myPlayerId];
+        const grid = document.getElementById('my-trade-grid');
+        grid.innerHTML = '';
+        currentTradeData.myOfferItems.forEach((offerItem, index) => {
+            const slot = document.createElement('div');
+            slot.className = 'trade-slot';
+            slot.style.borderColor = TIER_COLORS[offerItem.item.tier];
+            slot.textContent = offerItem.item.name;
+            slot.title = `${offerItem.item.name}\n` + Object.entries(offerItem.item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
+            slot.oncontextmenu = (e) => showItemContextMenu(e, 'trade', index, offerItem.item);
+            grid.appendChild(slot);
+        });
+        // Also update inventory to show which items are offered
+        myPlayer.inventory.forEach((item, index) => {
+            const slot = document.querySelector(`#inventory-grid .inventory-slot:nth-child(${index + 1})`);
+            if (slot) {
+                if (currentTradeData.myOfferItems.some(i => i.originalIndex === index)) {
+                    slot.classList.add('offered');
+                } else {
+                    slot.classList.remove('offered');
+                }
+            }
+        });
+    }
+
+    function updateBankView(bankData) {
+        const grid = document.getElementById('bank-grid');
+        grid.innerHTML = '';
+        bankData.forEach((item, index) => {
+            const slot = document.createElement('div');
+            slot.className = 'bank-slot';
+            slot.oncontextmenu = (e) => showItemContextMenu(e, 'bank', index, item);
+            if (item) {
+                slot.style.borderColor = TIER_COLORS[item.tier];
+                slot.textContent = item.name;
+                slot.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
+            }
+            grid.appendChild(slot);
+        });
+    }
+
+    function showShopTab(tab, data) {
+        document.getElementById('npc-trade-content').classList.toggle('active', tab === 'npc');
+        document.getElementById('market-content').classList.toggle('active', tab === 'market');
+        document.getElementById('shop-tab-npc').classList.toggle('active', tab === 'npc');
+        document.getElementById('shop-tab-market').classList.toggle('active', tab === 'market');
+        if(tab === 'npc') updateNpcTradeView(data.npcInventory); 
+        else if(tab === 'market') updateMarketView(data.marketListings); 
+    }
+
+    function updateNpcTradeView(npcInventory) {
+        const buyGrid = document.getElementById('npc-buy-grid');
+        const sellGrid = document.getElementById('npc-sell-grid');
+        const myPlayer = gameState.players[myPlayerId];
+        if(!myPlayer) return;
+        buyGrid.innerHTML = '';
+        sellGrid.innerHTML = '';
+
+        npcInventory.forEach((shopItem, index) => {
+            const div = document.createElement('div');
+            div.className = 'shop-item';
+            div.innerHTML = `<span class="shop-item-name" style="color:${TIER_COLORS[shopItem.item.tier]}">${shopItem.item.name}</span> <span>${shopItem.cost} bits</span> <button class="shop-item-buy">BUY</button>`;
+            const btn = div.querySelector('button');
+            btn.onclick = () => sendToServer({type: 'buyNpcItem', shopName: currentShopName, itemIndex: index});
+            btn.disabled = myPlayer.dataBits < shopItem.cost;
+            buyGrid.appendChild(div);
+        });
+
+        myPlayer.inventory.forEach((item, index) => {
+            if(!item) return;
+            const sellPrice = Math.floor(getItemBaseValue(item) / 3);
+            const div = document.createElement('div');
+            div.className = 'shop-item';
+            div.innerHTML = `<span class="shop-item-name" style="color:${TIER_COLORS[item.tier]}">${item.name}</span> <span>${sellPrice} bits</span> <button class="shop-item-sell">SELL</button>`;
+            div.querySelector('button').onclick = () => sendToServer({type: 'sellItem', itemIndex: index});
+            sellGrid.appendChild(div);
+        });
+    }
+
+    function updateMarketView(marketListings) {
+        const buyGrid = document.getElementById('market-buy-grid');
+        const itemSelect = document.getElementById('market-item-select');
+        const myPlayer = gameState.players[myPlayerId];
+        if(!myPlayer) return;
+        buyGrid.innerHTML = '';
+        itemSelect.innerHTML = '';
+
+        for(const id in marketListings) {
+            const listing = marketListings[id];
+            const div = document.createElement('div');
+            div.className = 'market-item';
+            div.innerHTML = `<span class="market-item-name" style="color:${TIER_COLORS[listing.item.tier]}">${listing.item.name}</span><span>${listing.seller}</span><span>${listing.price} bits</span><button>BUY</button>`;
+            const btn = div.querySelector('button');
+            btn.onclick = () => sendToServer({type: 'marketAction', action: 'buy', listingId: id});
+            btn.disabled = myPlayer.dataBits < listing.price || myPlayer.username === listing.seller;
+            buyGrid.appendChild(div);
+        }
+        myPlayer.inventory.forEach((item, index) => {
+            if(item) {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = item.name;
+                itemSelect.appendChild(option);
+            }
+        });
+    }
+
+    function listMarketItem() {
+        const itemIndex = document.getElementById('market-item-select').value;
+        const price = document.getElementById('market-price-input').value;
+        if(itemIndex !== '' && price > 0) {
+            sendToServer({type: 'marketAction', action: 'list', itemIndex: parseInt(itemIndex), price: parseInt(price)});
+            document.getElementById('market-price-input').value = '';
+        }
+    }
+
+    function getItemBaseValue(item) {
+        if (!item) return 0;
+        return (item.tier * item.tier) * 20;
+    }
+
+    // --- Chat ---
+    chatInput.addEventListener('focus', () => { isChatting = true; });
+    chatInput.addEventListener('blur', () => { isChatting = false; });
+    function addChatMessage(sender, message, color = '#00f0ff') {
+        const li = document.createElement('li');
+        li.innerHTML = `<strong style="color:${color};">[${sender}]</strong>: ${message}`;
+        chatLog.appendChild(li);
+        chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    // --- Event Listeners ---
+    document.addEventListener('keydown', e => {
+        const key = e.key.toLowerCase();
+        if (key === 'escape') {
+            closeAllPanels();
+        }
+        if (isChatting) {
+            if(key === 'enter') {
+                const msg = chatInput.value.trim();
+                if(msg) sendToServer({type: 'chat', message: msg});
+                chatInput.value = '';
+                chatInput.blur();
+            }
+            return;
+        }
+        
+        if (key === 'enter') {
+            e.preventDefault();
+            chatInput.focus();
+        } else if (inputs.hasOwnProperty(key) && !isShopOpen && !isBankOpen && !isTrading) {
+            inputs[key] = true;
+        }
+    });
+
+    document.addEventListener('keyup', e => {
+        const key = e.key.toLowerCase();
+        if (inputs.hasOwnProperty(key)) {
+            inputs[key] = false;
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    });
+
+    canvas.addEventListener('mousemove', e => {
+        inputs.mouse.x = e.clientX;
+        inputs.mouse.y = e.clientY;
+    });
+
+    window.addEventListener('mousedown', (e) => {
+        // Don't register clicks if clicking on a UI panel
+        if(e.target.closest('.ui-panel, .context-menu')) return;
+        
+        if(e.button === 0) inputs.mouse.down = true;
+        
+        // Always hide context menus on any click
+        hideAllContextMenus();
+    });
+
+    window.addEventListener('mouseup', (e) => {
+        if(e.button === 0) inputs.mouse.down = false;
+    });
+
+    // --- Initialization ---
     showLoginScreen();
     gameLoop();
 </script>
