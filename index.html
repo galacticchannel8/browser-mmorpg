@@ -224,7 +224,8 @@ All Rights Reserved.
     const playerContextMenu = document.getElementById('player-context-menu');
 
     // --- WebSocket & Game State ---
-    const ws = new WebSocket('ws://localhost:8080');
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const ws = new WebSocket(`${protocol}//${window.location.host}`);
     let myPlayerId = null, localWorld = {}, gameState = { players: {}, entities: [] };
     let camera = { x: 0, y: 0, zoom: 1 };
     let inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, space: false, mouse: { x: 0, y: 0, down: false } };
