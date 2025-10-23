@@ -332,10 +332,9 @@ class Enemy extends Entity {
         this.health -= amount;
         if (this.health <= 0 && !this.isDead) {
             this.isDead = true;
-            const owner = damager ? players[damager.ownerId] : null;
-if (owner) {
-    owner.addXp(this.xpValue);
-}
+            if (damager && players[damager.ownerId]) {
+                players[damager.ownerId].addXp(this.xpValue);
+            }
             for (let i = 0; i < 2; i++) entities.push(new LootDrop(this.x, this.y, this.threatLevel));
             if (Math.random() < 0.1) entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(this.threatLevel + Math.floor(Math.random()*2))));
         }
@@ -409,11 +408,10 @@ class WorldBoss extends Enemy {
         this.health -= amount;
         if (this.health <= 0 && !this.isDead) {
             this.isDead = true;
-            const owner = damager ? players[damager.ownerId] : null;
-if(owner) {
-    broadcastMessage({ type: 'chat', sender: 'SYSTEM', message: `${owner.username} has defeated the ${this.bossName}!`, color: '#ff00ff' });
-    owner.addXp(this.xpValue);
-}
+            if(damager && players[damager.ownerId]) {
+                broadcastMessage({ type: 'chat', sender: 'SYSTEM', message: `${players[damager.ownerId].username} has defeated the ${this.bossName}!`, color: '#ff00ff' });
+                players[damager.ownerId].addXp(this.xpValue);
+            }
             bossRespawnTimers[this.bossName] = 300;
             for (let i = 0; i < 10; i++) entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(5)));
         }
