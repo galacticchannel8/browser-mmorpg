@@ -87,7 +87,6 @@ function generateEquipment(tier) {
     return item;
 }
 
-// --- MODIFIED SECTION 1: SHOP INVENTORY ---
 // Function to create specific equipment pieces for the shop
 function createShopItem(tier, slot) {
     const item = { id: `${slot}_shop_${tier}`, slot, tier, stats: {} };
@@ -122,7 +121,6 @@ const shopInventories = {
         { item: generateEquipment(2), cost: 250 }          // Higher cost for the T2 item
     ]
 };
-// --- END MODIFIED SECTION 1 ---
 
 const localWorld = {};
 function generateChunk(chunkX, chunkY) { const key = `${chunkX},${chunkY}`; if (localWorld[key]) return; const chunk = { tiles: Array(CHUNK_SIZE * CHUNK_SIZE).fill(1) }; for(const bossName in BOSS_LOCATIONS) { const loc = BOSS_LOCATIONS[bossName]; const bossChunkX = Math.floor(loc.x / TILE_SIZE / CHUNK_SIZE); const bossChunkY = Math.floor(loc.y / TILE_SIZE / CHUNK_SIZE); if(chunkX === bossChunkX && chunkY === bossChunkY){ for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { const worldX = (chunkX * CHUNK_SIZE + x) * TILE_SIZE; const worldY = (chunkY * CHUNK_SIZE + y) * TILE_SIZE; const dist = Math.hypot(worldX - loc.x, worldY - loc.y); if (dist < 10 * TILE_SIZE) chunk.tiles[y * CHUNK_SIZE + x] = 13; if (dist > 9 * TILE_SIZE && dist < 10 * TILE_SIZE) chunk.tiles[y * CHUNK_SIZE + x] = 12; } localWorld[key] = chunk; broadcastMessage({type: 'worldChunkUpdate', key: key, chunk: chunk}); return;} } if (chunkX === 0 && chunkY === 0) { for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { chunk.tiles[y * CHUNK_SIZE + x] = cityData[y]?.[x] ?? 10; } } else { for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { const wX = chunkX * CHUNK_SIZE + x, wY = chunkY * CHUNK_SIZE + y; const bV = (biomeNoise.get(wX / 200, wY / 200) + 1) / 2; let t = 1; if (bV < 0.4) t = 2; else if (bV > 0.85) t = 3; if ((t === 2 || t === 3) && (perlin.get(wX / 25, wY / 25) + 1) / 2 > 0.55) t -= 1; chunk.tiles[y * CHUNK_SIZE + x] = t; } } localWorld[key] = chunk; broadcastMessage({type: 'worldChunkUpdate', key: key, chunk: chunk}); }
@@ -418,7 +416,7 @@ class Entity { constructor(x, y, type) { this.id = `${type}_${Date.now()}_${Math
 class Enemy extends Entity {
     constructor(x, y, threatLevel, type = 'Enemy') {
         super(x, y, type);
-        this.threatLevel = threatLevel; this.radius = 12; this.speed = 2.0; this.health = 30; this.maxHealth = 30; this.color = '#ff3355'; this.aggroRadius = 350; this.deAggroRadius = this.aggroRadius * 1.5;
+        this.threatLevel = threatLevel; this.radius = 12; this.speed = 2.0; this.health = 40; this.maxHealth = 40; this.color = '#ff3355'; this.aggroRadius = 350; this.deAggroRadius = this.aggroRadius * 1.5;
         this.wanderTarget = null; this.wanderTimer = 0;
         this.xpValue = 10 * threatLevel;
         this.applyThreatLevel();
@@ -447,7 +445,7 @@ class Enemy extends Entity {
                 if (!isSolid(getTile(nX, this.y))) this.x = nX;
                 if (!isSolid(getTile(this.x, nY))) this.y = nY;
             } else {
-                targetPlayer.takeDamage(10 * this.damageMultiplier * dt, this);
+                targetPlayer.takeDamage(12 * this.damageMultiplier * dt, this); // BUFFED from 10
             }
         } else {
             this.wanderTimer -= dt;
@@ -477,7 +475,6 @@ class Enemy extends Entity {
             }
             for (let i = 0; i < 2; i++) entities.push(new LootDrop(this.x, this.y, this.threatLevel));
 
-            // --- MODIFIED SECTION 2: ENEMY LOOT DROP ---
             // Drop chance starts at 1% and increases by 2.5% for each threat level
             const dropChance = 0.01 + (this.threatLevel * 0.025);
             if (Math.random() < dropChance) {
@@ -486,15 +483,14 @@ class Enemy extends Entity {
                 const itemTier = this.threatLevel + tierBonus;
                 entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(itemTier)));
             }
-            // --- END MODIFIED SECTION 2 ---
         }
     }
 }
-class Stinger extends Enemy { constructor(x, y, tL) { super(x, y, tL, 'Stinger'); this.radius = 10; this.speed = 3.5; this.health = this.maxHealth = 20; this.color = '#f07cff'; this.shootCooldown = 2; this.xpValue = 15 * tL; this.applyThreatLevel(); } update(dt) { super.update(dt); this.shootCooldown -= dt; if (this.shootCooldown <= 0) { this.shootCooldown = 2; for(const pid in players){ const player = players[pid]; if(!player.isDead && Math.hypot(player.x - this.x, player.y - this.y) < this.aggroRadius){ const p = { ownerId: this.id, angle: Math.atan2(player.y - this.y, player.x - this.x), color: this.color, damage: 5*this.damageMultiplier }; entities.push(new Projectile(this.x, this.y, p, 0.8)); break; } } } } }
+class Stinger extends Enemy { constructor(x, y, tL) { super(x, y, tL, 'Stinger'); this.radius = 10; this.speed = 3.5; this.health = this.maxHealth = 25; this.color = '#f07cff'; this.shootCooldown = 1.8; this.xpValue = 15 * tL; this.applyThreatLevel(); } update(dt) { super.update(dt); this.shootCooldown -= dt; if (this.shootCooldown <= 0) { this.shootCooldown = 1.8; for(const pid in players){ const player = players[pid]; if(!player.isDead && Math.hypot(player.x - this.x, player.y - this.y) < this.aggroRadius){ const p = { ownerId: this.id, angle: Math.atan2(player.y - this.y, player.x - this.x), color: this.color, damage: 8*this.damageMultiplier }; entities.push(new Projectile(this.x, this.y, p, 0.8)); break; } } } } }
 class VoidSwarmer extends Enemy {
     constructor(x, y, tL) {
         super(x, y, tL, 'VoidSwarmer');
-        this.radius = 8; this.speed = 4.5; this.health = this.maxHealth = 15; this.color = '#7d3c98';
+        this.radius = 8; this.speed = 4.5; this.health = this.maxHealth = 18; this.color = '#7d3c98';
         this.xpValue = 8 * tL;
         this.applyThreatLevel();
     }
@@ -502,8 +498,8 @@ class VoidSwarmer extends Enemy {
 class Warden extends Enemy {
     constructor(x, y, tL) {
         super(x, y, tL, 'Warden');
-        this.radius = 18; this.speed = 1.5; this.health = this.maxHealth = 150; this.color = '#e3d400';
-        this.abilityCooldown = 5; this.shield = 50; this.maxShield = 50;
+        this.radius = 18; this.speed = 1.5; this.health = this.maxHealth = 200; this.color = '#e3d400';
+        this.abilityCooldown = 5; this.shield = 75; this.maxShield = 75;
         this.xpValue = 50 * tL; this.applyThreatLevel();
     }
     update(dt) {
@@ -559,7 +555,6 @@ class WorldBoss extends Enemy {
             }
             bossRespawnTimers[this.bossName] = 300;
             
-            // --- MODIFIED SECTION 3: BOSS LOOT DROP ---
             // Guaranteed Drops
             entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(5)));
             entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(5)));
@@ -571,12 +566,11 @@ class WorldBoss extends Enemy {
                     entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(tier)));
                 }
             }
-            // --- END MODIFIED SECTION 3 ---
         }
     }
 }
 class Dreadnought extends WorldBoss {
-    constructor(x, y) { super(x, y, "DREADNOUGHT", '#ff6a00', 5000, "Dreadnought"); }
+    constructor(x, y) { super(x, y, "DREADNOUGHT", '#ff6a00', 6500, "Dreadnought"); }
     update(dt) {
         let targetPlayer = null;
         for(const pid in players) { const p = players[pid]; if(!p.isDead && Math.hypot(p.x - this.x, p.y - this.y) < this.aggroRadius) { targetPlayer = p; break; }}
@@ -585,7 +579,7 @@ class Dreadnought extends WorldBoss {
         if(dP > 400 && !isCity(this.x, this.y)) { this.x += (dX / dP) * this.speed * (dt * 60); this.y += (dY / dP) * this.speed * (dt * 60); }
         this.attackTimer -= dt;
         if(this.attackTimer <= 0) {
-            const p = { ownerId: this.id, angle: Math.atan2(dY, dX), color: this.color, damage: 10 };
+            const p = { ownerId: this.id, angle: Math.atan2(dY, dX), color: this.color, damage: 15 }; // BUFFED from 10
             switch(this.attackPhase) {
                 case 'idle': case 'barrage':
                     this.attackTimer = 3;
@@ -601,7 +595,7 @@ class Dreadnought extends WorldBoss {
 }
 class SerpentHead extends WorldBoss {
     constructor(x, y) {
-        super(x, y, "SERPENT", '#33ff99', 3000, "SerpentHead");
+        super(x, y, "SERPENT", '#33ff99', 4000, "SerpentHead");
         this.radius = 30;
         this.segments = [];
         let leader = this;
@@ -617,7 +611,7 @@ class SerpentHead extends WorldBoss {
         super.update(dt);
         this.attackTimer -= dt;
         if(this.attackTimer <= 0) {
-            this.attackTimer = 0.5;
+            this.attackTimer = 0.4; // BUFFED from 0.5
             const proj = { ownerId: this.id, angle: Math.atan2(targetPlayer.y-this.y, targetPlayer.x-this.x), color: this.color, damage: 15 };
             entities.push(new Projectile(this.x, this.y, proj, 1.2, 8));
         }
@@ -645,7 +639,7 @@ class SerpentBody extends Enemy {
         super(x, y, 5, 'SerpentBody');
         this.head = head;
         this.radius = 25;
-        this.health = this.maxHealth = 1000;
+        this.health = this.maxHealth = 1200; // BUFFED from 1000
         this.color = '#29cc7a';
         this.shootCooldown = Math.random() * 3 + 2;
         this.xpValue = 250;
@@ -673,14 +667,14 @@ class SerpentBody extends Enemy {
     }
 }
 class TheOracle extends WorldBoss {
-    constructor(x,y) { super(x,y, "THE ORACLE", '#a832a4', 8000, "TheOracle"); }
+    constructor(x,y) { super(x,y, "THE ORACLE", '#a832a4', 10000, "TheOracle"); } // BUFFED from 8000
     update(dt) {
         let targetPlayer = null; for(const pid in players) { const p = players[pid]; if(!p.isDead && Math.hypot(p.x-this.x, p.y-this.y) < this.aggroRadius) { targetPlayer = p; break; }}
         if (!targetPlayer) { this.attackPhase = 'idle'; return; }
 
         this.attackTimer -= dt;
         if(this.attackTimer <= 0) {
-            const p = { ownerId: this.id, color: this.color, damage: 20};
+            const p = { ownerId: this.id, color: this.color, damage: 25}; // BUFFED from 20
             switch(this.attackPhase) {
                 case 'idle': case 'barrage':
                     for(let i=0; i<12; i++) { p.angle = (i/12) * Math.PI*2 + Date.now()/1000; entities.push(new Projectile(this.x, this.y, p)); }
@@ -700,7 +694,7 @@ class TheOracle extends WorldBoss {
     }
 }
 class VoidHunter extends WorldBoss {
-    constructor(x, y) { super(x, y, "VOID HUNTER", '#1f283e', 4000, "aclysmHunter"); this.radius = 25; this.isInvisible = true; this.attackTimer = 3; }
+    constructor(x, y) { super(x, y, "VOID HUNTER", '#1f283e', 5000, "aclysmHunter"); this.radius = 25; this.isInvisible = true; this.attackTimer = 3; } // BUFFED from 4000
     update(dt) {
         let targetPlayer=null; for(const pid in players){const p=players[pid]; if(!p.isDead && Math.hypot(p.x-this.x,p.y-this.y) < this.aggroRadius){targetPlayer=p; break;}}
         if(!targetPlayer){this.isInvisible = true; return;}
@@ -716,7 +710,7 @@ class VoidHunter extends WorldBoss {
                     const currentTarget = players[Object.keys(players).find(id => players[id] === targetPlayer)];
                     if(!currentTarget) return;
                     for(let i=0; i<10; i++) {
-                        const proj = { ownerId: this.id, angle: Math.atan2(currentTarget.y-this.y, currentTarget.x-this.x) + (Math.random()-0.5)*0.8, color: '#ff3355', damage: 25};
+                        const proj = { ownerId: this.id, angle: Math.atan2(currentTarget.y-this.y, currentTarget.x-this.x) + (Math.random()-0.5)*0.8, color: '#ff3355', damage: 30}; // BUFFED from 25
                         entities.push(new Projectile(this.x, this.y, proj, 0.5));
                     }
                     setTimeout(() => {
