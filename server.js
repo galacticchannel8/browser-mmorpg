@@ -1,11 +1,30 @@
-// server.js
+// Copyright (c) 2025 GalacticChannel8.com
+// All Rights Reserved.
+const express = require('express');
+const path = require('path');
+const http = require('http');
+
+const app = express();
+const server = http.createServer(app); // Create an HTTP server
+
+// Serve the index.html file when someone visits the root URL
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+// --- END NEW CODE ---
+
+
 const WebSocket = require('ws');
 const fs = require('fs'); // We need the file system to save player data
 
 // --- SETUP ---
-const PORT = 8080;
+// Use the port the hosting service provides, or 8080 for local testing
+const PORT = process.env.PORT || 8080;
 const TICK_RATE = 30; // 30 updates per second
-const wss = new WebSocket.Server({ port: PORT });
+
+// Attach WebSocket server to our HTTP server
+const wss = new WebSocket.Server({ server });
+
 console.log(`[SERVER] Galactic OS server is operational on port ${PORT}`);
 
 // --- GAME STATE ---
@@ -676,7 +695,7 @@ function gameLoop() {
         }
     }
 
-    for (const entity of entities) { if (entity.type === 'LootDrop') { for (const pid in players) { const player = players[pid]; if (!player.isDead && Math.hypot(entity.x - player.x, entity.y - player.y) < player.radius + 30) { player.dataBits += entity.value; entity.isDead = true; break; } } } }
+    for (const entity of entities) { if (entity.type === 'LootDrop') { for (const pid in players) { const player = players[pid]; if (!player.isDead && Math.hypot(entity.x - player.x, entity.y - p.y) < player.radius + 30) { player.dataBits += entity.value; entity.isDead = true; break; } } } }
 
     for(const bossName in bossRespawnTimers) { if(bossRespawnTimers[bossName] > 0) { bossRespawnTimers[bossName] -= dt; if(bossRespawnTimers[bossName] <= 0) { const loc = BOSS_LOCATIONS[bossName]; const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter }; const BossClass = bossClasses[bossName]; if(BossClass) entities.push(new BossClass(loc.x, loc.y)); broadcastMessage({type: 'chat', sender: 'SYSTEM', message: `The ${bossName} has respawned!`, color: '#ff6a00'}); delete bossRespawnTimers[bossName]; } } }
 
@@ -827,4 +846,8 @@ wss.on('connection', (ws) => {
             delete players[ws.playerId];
         }
     });
+});
+
+server.listen(PORT, () => {
+    console.log(`Server started and listening on port ${PORT}`);
 });
