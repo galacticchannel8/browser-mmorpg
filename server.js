@@ -31,10 +31,10 @@ const players = {};
 let entities = [];
 const TILE_SIZE = 40;
 const CHUNK_SIZE = 16;
-const MAX_ENEMIES = 225;
+const MAX_ENEMIES = 225; // UPDATED: Increased mob cap
 const ENEMY_SPAWN_INTERVAL = 1;
-const DESPAWN_RADIUS = 2500; 
-const DESPAWN_TIME = 60; 
+const DESPAWN_RADIUS = 2500; // NEW: Radius outside which enemies are candidates for despawning
+const DESPAWN_TIME = 60; // NEW: Time in seconds an enemy must be outside the radius to despawn
 let enemySpawnTimer = ENEMY_SPAWN_INTERVAL;
 let lastTime = Date.now();
 const bossRespawnTimers = {};
@@ -226,13 +226,13 @@ class Player {
                 this.y = CITY_SPAWN_POINT.y;
                 this.teleportCooldown = this.teleportMaxCooldown;
                 broadcastMessage({type: 'sfx', effect: 'teleportEnd', x: this.x, y: this.y, color: this.color});
-                return;
             }
              if (this.inputs.w || this.inputs.a || this.inputs.s || this.inputs.d || this.inputs.space || this.inputs.mouse.down) {
                 this.isTeleporting = false;
             } else {
                 broadcastMessage({type: 'sfx', effect: 'teleportCharge', x: this.x, y: this.y, color: this.color});
             }
+            return; 
         }
 
         let currentSpeed = this.isSlowed ? this.stats.speed * 0.5 : this.stats.speed;
@@ -254,48 +254,27 @@ class Player {
             }
         }
         this.energy = Math.max(0, Math.min(this.stats.maxEnergy, this.energy));
-        
-        // Player movement is only blocked if they are teleporting AND not moving via inputs
-        if (!this.isTeleporting) {
-            const forward = (this.inputs.w ? 1 : 0) - (this.inputs.s ? 1 : 0); 
-            const strafe = (this.inputs.d ? 1 : 0) - (this.inputs.a ? 1 : 0); 
-            const moveX = Math.cos(this.angle) * forward - Math.sin(this.angle) * strafe; 
-            const moveY = Math.sin(this.angle) * forward + Math.cos(this.angle) * strafe; 
-            const mag = Math.hypot(moveX, moveY); 
-            if (mag > 0) { 
-                const timeAdjustedSpeed = currentSpeed * (dt * 60); 
-                const finalMoveX = mag > 1 ? (moveX / mag) * timeAdjustedSpeed : moveX * timeAdjustedSpeed; 
-                const finalMoveY = mag > 1 ? (moveY / mag) * timeAdjustedSpeed : moveY * timeAdjustedSpeed; 
-                const nX = this.x + finalMoveX; 
-                const nY = this.y + finalMoveY; 
-                if (!isSolid(getTile(nX, this.y))) this.x = nX; 
-                if (!isSolid(getTile(this.x, nY))) this.y = nY; 
-            }
-        }
+
+        const forward = (this.inputs.w ? 1 : 0) - (this.inputs.s ? 1 : 0); const strafe = (this.inputs.d ? 1 : 0) - (this.inputs.a ? 1 : 0); const moveX = Math.cos(this.angle) * forward - Math.sin(this.angle) * strafe; const moveY = Math.sin(this.angle) * forward + Math.cos(this.angle) * strafe; const mag = Math.hypot(moveX, moveY); if (mag > 0) { const timeAdjustedSpeed = currentSpeed * (dt * 60); const finalMoveX = mag > 1 ? (moveX / mag) * timeAdjustedSpeed : moveX * timeAdjustedSpeed; const finalMoveY = mag > 1 ? (moveY / mag) * timeAdjustedSpeed : moveY * timeAdjustedSpeed; const nX = this.x + finalMoveX; const nY = this.y + finalMoveY; if (!isSolid(getTile(nX, this.y))) this.x = nX; if (!isSolid(getTile(this.x, nY))) this.y = nY; }
         
         this.gunCooldown -= dt;
         this.meleeCooldown -= dt;
         this.teleportCooldown = Math.max(0, this.teleportCooldown - dt);
         this.abilityCooldown = Math.max(0, this.abilityCooldown - dt);
 
-        if (this.inputs.mouse.down && this.gunCooldown <= 0 && !this.isTeleporting) this.fireWeapon();
-        if (this.inputs.space && this.meleeCooldown <= 0 && !this.isTeleporting) this.fireMelee();
+        if (this.inputs.mouse.down && this.gunCooldown <= 0) this.fireWeapon();
+        if (this.inputs.space && this.meleeCooldown <= 0) this.fireMelee();
         if (this.inputs.h && this.teleportCooldown <= 0 && !this.isTeleporting) {
             this.isTeleporting = true;
             this.teleportTimer = this.TELEPORT_CHARGE_TIME;
         }
-        
         if (this.inputs.q) { this.useAbility(); }
         this.updateAbility(dt);
-
-        if (this.inputs.e && !this.isTeleporting) { 
-            this.attemptInteraction(); 
-            this.inputs.e = false; 
-        }
+        if (this.inputs.e) { this.attemptInteraction(); this.inputs.e = false; }
     }
 
     fireWeapon() {
-        if (this.trade.partnerId) return;
+        if (this.trade.partnerId || this.isTeleporting) return;
         const weapon = this.equipment.Weapon || { type: 'Default' };
         this.gunCooldown = 1 / this.stats.fireRate;
         const p = { ownerId: this.id, angle: this.angle, color: this.color, damage: this.stats.damage };
@@ -308,9 +287,9 @@ class Player {
     }
 
     fireMelee() {
-        if (this.trade.partnerId) return;
+        if (this.trade.partnerId || this.isTeleporting) return;
         this.meleeCooldown = 0.8;
-        const meleeDamage = this.stats.damage * 1.5;
+        const meleeDamage = this.stats.damage * 1.5; // Buffed from 1.2
         entities.push(new MeleeSlash(this.x, this.y, this.angle, this.id, meleeDamage, this.color));
     }
 
@@ -329,34 +308,28 @@ class Player {
     }
 
     die(killer = null) {
-        if (this.isDead) return;
+        if (this.isDead) return; // Prevent multiple death calls
 
         if (this.trade.partnerId) {
             cancelTrade(this.id, `${this.username} has disconnected.`);
         }
         this.isDead = true;
 
+        // Determine cause of death
         let causeOfDeath = 'The Void';
-        let finalKiller = killer;
-
-        if (killer && killer.ownerId) {
-            const owner = players[killer.ownerId] || entities.find(e => e.id === killer.ownerId);
-            if (owner) {
-                finalKiller = owner;
+        if (killer) {
+            if (killer.ownerId && players[killer.ownerId]) {
+                causeOfDeath = players[killer.ownerId].username;
+            } else if (killer.bossName) {
+                causeOfDeath = `the ${killer.bossName}`;
+            } else if (killer.type) {
+                // Make the name more readable
+                causeOfDeath = `a ${killer.type.replace(/([A-Z])/g, ' $1').trim()}`;
             }
         }
 
-        if (finalKiller) {
-            if (finalKiller.username) {
-                causeOfDeath = finalKiller.username;
-            } else if (finalKiller.bossName) {
-                causeOfDeath = `the ${finalKiller.bossName}`;
-            } else if (finalKiller.type) {
-                causeOfDeath = `a ${finalKiller.type.replace(/([A-Z])/g, ' $1').trim()}`;
-            }
-        }
-
-        entities.push(new Tombstone(this.x, this.y, this.username, causeOfDeath, this.color));
+        // Create Tombstone
+        entities.push(new Tombstone(this.x, this.y, this.username, causeOfDeath));
         
         const droppedItems = [...Object.values(this.equipment), ...this.inventory].filter(item => item !== null);
         const droppedBits = Math.floor(this.dataBits * 0.8);
@@ -372,7 +345,7 @@ class Player {
         this.equipment = { Weapon: null, Module: null, Plating: null, Utility: null };
         this.inventory = Array(12).fill(null);
         this.dataBits = 0;
-        this.level = 1;
+        this.level = 1; // Permadeath
         this.xp = 0;
         this.xpToNextLevel = this.calculateXpToNextLevel();
         this.recalculateStats();
@@ -473,7 +446,7 @@ class Enemy extends Entity {
         this.color = '#ff3355'; this.aggroRadius = 350; this.deAggroRadius = this.aggroRadius * 1.5;
         this.wanderTarget = null; this.wanderTimer = 0;
         this.xpValue = 15 * threatLevel;
-        this.timeOutsidePlayerRange = 0;
+        this.timeOutsidePlayerRange = 0; // NEW: Timer for despawning
         this.applyThreatLevel();
     }
     applyThreatLevel() { this.health = this.maxHealth = this.health * (1 + (this.threatLevel-1)*0.6); this.damageMultiplier = 1 + (this.threatLevel-1)*0.4; }
@@ -482,7 +455,7 @@ class Enemy extends Entity {
         let closestDist = Infinity;
         for(const pid in players){
             const player = players[pid];
-            if (player.isDead || player.isInvisible || player.trade.partnerId) continue;
+            if (player.isDead || player.isInvisible || player.trade.partnerId || player.isTeleporting) continue;
             const dist = Math.hypot(player.x - this.x, player.y - this.y);
             if(dist < closestDist){
                 closestDist = dist;
@@ -594,9 +567,8 @@ class GravityWell extends Enemy {
         this.health = this.maxHealth = 999999;
         this.color = '#1a1a1a';
         this.xpValue = 0;
-        this.pullRadius = 600; 
-        this.eventHorizonRadius = this.pullRadius / 2;
-        this.pullStrength = 300000;
+        this.pullRadius = 300;
+        this.pullStrength = 25;
     }
     update(dt) {
         for (const pid in players) {
@@ -608,13 +580,11 @@ class GravityWell extends Enemy {
                 continue;
             }
             
-            if (!player.isDead && dist < this.pullRadius) {
-                const pullForce = this.pullStrength / (dist * dist);
-                const boostModifier = player.isBoosting ? (dist > this.eventHorizonRadius ? 0.6 : 0.85) : 1.0; 
+            if (!player.isDead && !player.isTeleporting && dist < this.pullRadius) {
+                const pullForce = (1 - (dist / this.pullRadius)) * this.pullStrength;
                 const angle = Math.atan2(this.y - player.y, this.x - player.x);
-                
-                const moveX = Math.cos(angle) * pullForce * boostModifier;
-                const moveY = Math.sin(angle) * pullForce * boostModifier;
+                let moveX = Math.cos(angle) * pullForce * (player.isBoosting ? 0.5 : 1);
+                let moveY = Math.sin(angle) * pullForce * (player.isBoosting ? 0.5 : 1);
 
                 const nX = player.x + moveX;
                 const nY = player.y + moveY;
@@ -861,12 +831,11 @@ class EquipmentDrop extends Entity { constructor(x, y, item) { super(x + Math.ra
 class PlayerLootBag extends Entity { constructor(x, y, items, bits, color) { super(x, y, 'PlayerLootBag'); this.item = { color: color }; this.items = items; this.bits = bits; this.life = 180; this.pickupDelay = 3; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0 || (this.bits <= 0 && this.items.every(i => i === null))) this.isDead = true; } }
 class FloatingText extends Entity { constructor(x, y, text, color = '#ff8888') { super(x, y, 'floatingText'); this.text = text; this.color = color; this.life = 1; } update(dt) { this.y -= 20 * dt; this.life -= dt; if (this.life <= 0) this.isDead = true; } }
 class Tombstone extends Entity {
-    constructor(x, y, playerName, causeOfDeath, playerColor) {
+    constructor(x, y, playerName, causeOfDeath) {
         super(x, y, 'Tombstone');
         this.playerName = playerName;
         this.causeOfDeath = causeOfDeath;
-        this.playerColor = playerColor;
-        this.life = 180;
+        this.life = 180; // Despawns after 3 minutes
     }
     update(dt) {
         this.life -= dt;
@@ -908,6 +877,7 @@ function gameLoop() {
         if (entity.isDead) { entities.splice(i, 1); continue; }
     }
 
+    // NEW: Despawn distant enemies
     const playerIds = Object.keys(players);
     if (playerIds.length > 0) {
         for (let i = entities.length - 1; i >= 0; i--) {
@@ -916,7 +886,7 @@ function gameLoop() {
                 let isNearPlayer = false;
                 for (const pid of playerIds) {
                     const player = players[pid];
-                    if (!player || player.isDead) continue;
+                    if (player.isDead) continue;
                     if (Math.hypot(entity.x - player.x, entity.y - player.y) < DESPAWN_RADIUS) {
                         isNearPlayer = true;
                         break;
@@ -1057,8 +1027,8 @@ function gameLoop() {
                 
                 const distFromCenter = Math.hypot(player.x, player.y) / TILE_SIZE;
                 const angle = Math.random() * Math.PI * 2;
-                const spawnX = player.x + Math.cos(angle) * (Math.random() * 500 + 800);
-                const spawnY = player.y + Math.sin(angle) * (Math.random() * 500 + 800);
+                const spawnX = player.x + Math.cos(angle) * 1000;
+                const spawnY = player.y + Math.sin(angle) * 1000;
                 
                 if(!isCity(spawnX, spawnY) && !isSolid(getTile(spawnX, spawnY))){
                      const threat = getThreatLevel(spawnX, spawnY);
