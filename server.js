@@ -69,8 +69,10 @@ function saveData(filename, data) {
 const Perlin=function(t){this.seed=t||Math.random();const r=new Uint8Array(512);for(let t=0;t<256;t++)r[t]=t;let n=0;for(let t=255;t>0;t--)n=Math.floor((t+1)*(this.seed=(48271*this.seed)%2147483647)/2147483647),[r[t],r[n]]=[r[n],r[t]];for(let t=0;t<256;t++)r[t+256]=r[t];const e=t=>t*t*t*(t*(6*t-15)+10),o=(t,r,n)=>r+t*(n-r),s=(t,r,n,s)=>{const i=15&t,a=i<8?r:n,h=i<4?n:12===i||14===i?r:s;return((1&i)==0?a:-a)+((2&i)==0?h:-h)};this.get=(t,n,i=0)=>{const a=Math.floor(t)&255,h=Math.floor(n)&255,c=Math.floor(i)&255;t-=Math.floor(t),n-=Math.floor(n),i-=Math.floor(i);const u=e(t),l=e(n),f=e(i),d=r[a]+h,p=r[d]+c,g=r[d+1]+c,m=r[a+1]+h,C=r[m]+c,w=r[m+1]+h;return o(f,o(l,o(u,s(r[p],t,n,i),s(r[C],t-1,n,i)),o(u,s(r[g],t,n-1,i),s(r[w],t-1,n-1,i))),o(l,o(u,s(r[p+1],t,n,i-1),s(r[C+1],t-1,n,i-1)),o(u,s(r[g+1],t,n-1,i-1),s(r[w+1],t-1,n-1,i-1))))}};
 const MAP_SEED = 'galactic_os_final_frontier';
 const perlin = new Perlin(MAP_SEED), biomeNoise = new Perlin(MAP_SEED + '_biomes');
-const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
-const cityData = [[11,11,11,11,11,11,11,14,14,11,11,11,11,11,11,11],[11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],[11,10,11,11,11,10,11,11,11,11,10,11,11,11,10,11],[11,10,11,10,10,10,10,10,10,10,10,10,10,11,10,11],[11,10,11,10,11,11,11,11,11,11,11,10,11,11,10,11],[14,10,10,10,11,10,10,10,10,10,10,10,11,10,10,14],[14,10,10,10,11,10,11,10,10,11,10,11,11,10,10,14],[11,10,11,10,11,10,10,10,10,10,10,10,11,10,10,11],[11,10,11,10,10,10,11,11,11,11,10,10,11,10,10,11],[11,10,11,11,11,10,10,10,10,10,10,11,11,11,10,11],[11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],[11,11,11,11,11,11,11,14,14,11,11,11,11,11,11,11]];
+// MODIFIED: Added tile type 15 for Doors. Client will need to render this tile type specially (e.g., with transparency).
+const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'}, 15:{n:'D', c:'#00f0ff'} };
+// MODIFIED: Replaced the '14' tiles at the exits with the new '15' Door tile type.
+const cityData = [[11,11,11,11,11,11,11,15,15,11,11,11,11,11,11,11],[11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],[11,10,11,11,11,10,11,11,11,11,10,11,11,11,10,11],[11,10,11,10,10,10,10,10,10,10,10,10,10,11,10,11],[11,10,11,10,11,11,11,11,11,11,11,10,11,11,10,11],[15,10,10,10,11,10,10,10,10,10,10,10,11,10,10,15],[15,10,10,10,11,10,11,10,10,11,10,11,11,10,10,15],[11,10,11,10,11,10,10,10,10,10,10,10,11,10,10,11],[11,10,11,10,10,10,11,11,11,11,10,10,11,10,10,11],[11,10,11,11,11,10,10,10,10,10,10,11,11,11,10,11],[11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],[11,11,11,11,11,11,11,15,15,11,11,11,11,11,11,11]];
 const CITY_SPAWN_POINT = { x: 8 * TILE_SIZE, y: 8 * TILE_SIZE };
 const BOSS_LOCATIONS = { DREADNOUGHT: {x: 150*TILE_SIZE, y: 150*TILE_SIZE}, SERPENT: {x: -150*TILE_SIZE, y: -150*TILE_SIZE}, ORACLE: {x: 0, y: 300*TILE_SIZE}, VOID_HUNTER: {x: 300*TILE_SIZE, y: 0} };
 const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
@@ -123,7 +125,35 @@ const shopInventories = {
 };
 
 const localWorld = {};
-function generateChunk(chunkX, chunkY) { const key = `${chunkX},${chunkY}`; if (localWorld[key]) return; const chunk = { tiles: Array(CHUNK_SIZE * CHUNK_SIZE).fill(1) }; for(const bossName in BOSS_LOCATIONS) { const loc = BOSS_LOCATIONS[bossName]; const bossChunkX = Math.floor(loc.x / TILE_SIZE / CHUNK_SIZE); const bossChunkY = Math.floor(loc.y / TILE_SIZE / CHUNK_SIZE); if(chunkX === bossChunkX && chunkY === bossChunkY){ for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { const worldX = (chunkX * CHUNK_SIZE + x) * TILE_SIZE; const worldY = (chunkY * CHUNK_SIZE + y) * TILE_SIZE; const dist = Math.hypot(worldX - loc.x, worldY - loc.y); if (dist < 10 * TILE_SIZE) chunk.tiles[y * CHUNK_SIZE + x] = 13; if (dist > 9 * TILE_SIZE && dist < 10 * TILE_SIZE) chunk.tiles[y * CHUNK_SIZE + x] = 12; } localWorld[key] = chunk; broadcastMessage({type: 'worldChunkUpdate', key: key, chunk: chunk}); return;} } if (chunkX === 0 && chunkY === 0) { for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { chunk.tiles[y * CHUNK_SIZE + x] = cityData[y]?.[x] ?? 10; } } else { for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { const wX = chunkX * CHUNK_SIZE + x, wY = chunkY * CHUNK_SIZE + y; const bV = (biomeNoise.get(wX / 200, wY / 200) + 1) / 2; let t = 1; if (bV < 0.4) t = 2; else if (bV > 0.85) t = 3; if ((t === 2 || t === 3) && (perlin.get(wX / 25, wY / 25) + 1) / 2 > 0.55) t -= 1; chunk.tiles[y * CHUNK_SIZE + x] = t; } } localWorld[key] = chunk; broadcastMessage({type: 'worldChunkUpdate', key: key, chunk: chunk}); }
+function generateChunk(chunkX, chunkY) { const key = `${chunkX},${chunkY}`; if (localWorld[key]) return; const chunk = { tiles: Array(CHUNK_SIZE * CHUNK_SIZE).fill(1) }; for(const bossName in BOSS_LOCATIONS) { const loc = BOSS_LOCATIONS[bossName]; const bossChunkX = Math.floor(loc.x / TILE_SIZE / CHUNK_SIZE); const bossChunkY = Math.floor(loc.y / TILE_SIZE / CHUNK_SIZE); if(chunkX === bossChunkX && chunkY === bossChunkY){ for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { const worldX = (chunkX * CHUNK_SIZE + x) * TILE_SIZE; const worldY = (chunkY * CHUNK_SIZE + y) * TILE_SIZE; const dist = Math.hypot(worldX - loc.x, worldY - loc.y); if (dist < 10 * TILE_SIZE) chunk.tiles[y * CHUNK_SIZE + x] = 13; if (dist > 9 * TILE_SIZE && dist < 10 * TILE_SIZE) chunk.tiles[y * CHUNK_SIZE + x] = 12; } localWorld[key] = chunk; broadcastMessage({type: 'worldChunkUpdate', key: key, chunk: chunk}); return;} } if (chunkX === 0 && chunkY === 0) { for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { chunk.tiles[y * CHUNK_SIZE + x] = cityData[y]?.[x] ?? 10; } } else {
+        // --- MODIFIED: World Generation Logic ---
+        // This new logic creates more geometric, maze-like structures instead of organic "blobs".
+        for (let y = 0; y < CHUNK_SIZE; y++) {
+            for (let x = 0; x < CHUNK_SIZE; x++) {
+                const wX = chunkX * CHUNK_SIZE + x, wY = chunkY * CHUNK_SIZE + y;
+                const bV = (biomeNoise.get(wX / 200, wY / 200) + 1) / 2; // Biome noise
+                const structureNoise = (perlin.get(wX / 30, wY / 30) + 1) / 2; // Structure noise
+
+                let t = 1; // Default to Path (type 1)
+                let wallType = 0;
+
+                if (bV < 0.4) wallType = 2; // Forest biome walls are type 2
+                else if (bV > 0.85) wallType = 3; // Crystal biome walls are type 3
+
+                // If we're in a biome that should have structures, check the noise
+                if (wallType !== 0) {
+                    // Create walls when noise is in a narrow band around the midpoint.
+                    // This creates winding, corridor-like structures.
+                    if (structureNoise > 0.45 && structureNoise < 0.55) {
+                        t = wallType;
+                    } else {
+                        t = 1; // Otherwise, it's a path.
+                    }
+                }
+                chunk.tiles[y * CHUNK_SIZE + x] = t;
+            }
+        }
+    } localWorld[key] = chunk; broadcastMessage({type: 'worldChunkUpdate', key: key, chunk: chunk}); }
 function getTile(worldX, worldY) { const cX = Math.floor(worldX / TILE_SIZE); const cY = Math.floor(worldY / TILE_SIZE); const chX = Math.floor(cX / CHUNK_SIZE); const chY = Math.floor(cY / CHUNK_SIZE); const key = `${chX},${chY}`; if (!localWorld[key]) generateChunk(chX, chY); const chunk = localWorld[key]; const tX = (cX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; const tY = (cY % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; return chunk.tiles[tY * CHUNK_SIZE + tX]; }
 function isSolid(tileType) { return TILE_TYPES[tileType]?.wc !== undefined; }
 function isCity(worldX, worldY) { return Math.floor(worldX / TILE_SIZE / CHUNK_SIZE) === 0 && Math.floor(worldY / TILE_SIZE / CHUNK_SIZE) === 0; }
@@ -161,6 +191,10 @@ class Player {
         this.timeSinceLastHit = 0;
         this.REGEN_DELAY = 15;
         
+        // MODIFIED: Added default values for robustness. This helps prevent 'undefined' issues.
+        this.isInvisible = false;
+        this.shieldActive = false;
+
         this.isTeleporting = false;
         this.teleportTimer = 0;
         this.TELEPORT_CHARGE_TIME = 5;
@@ -328,8 +362,8 @@ class Player {
             }
         }
 
-        // Create Tombstone
-        entities.push(new Tombstone(this.x, this.y, this.username, causeOfDeath));
+        // MODIFIED: Pass the player's color to the Tombstone for improved client-side rendering.
+        entities.push(new Tombstone(this.x, this.y, this.username, causeOfDeath, this.color));
         
         const droppedItems = [...Object.values(this.equipment), ...this.inventory].filter(item => item !== null);
         const droppedBits = Math.floor(this.dataBits * 0.8);
@@ -830,11 +864,13 @@ class LootDrop extends Entity { constructor(x,y,v){ super(x + Math.random()*20-1
 class EquipmentDrop extends Entity { constructor(x, y, item) { super(x + Math.random()*20-10, y+Math.random()*20-10, 'EquipmentDrop'); this.item = item; this.radius = 8; this.color = TIER_COLORS[item.tier] || '#fff'; this.life = 60; this.pickupDelay = 0.5; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0) this.isDead = true; } }
 class PlayerLootBag extends Entity { constructor(x, y, items, bits, color) { super(x, y, 'PlayerLootBag'); this.item = { color: color }; this.items = items; this.bits = bits; this.life = 180; this.pickupDelay = 3; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0 || (this.bits <= 0 && this.items.every(i => i === null))) this.isDead = true; } }
 class FloatingText extends Entity { constructor(x, y, text, color = '#ff8888') { super(x, y, 'floatingText'); this.text = text; this.color = color; this.life = 1; } update(dt) { this.y -= 20 * dt; this.life -= dt; if (this.life <= 0) this.isDead = true; } }
+// MODIFIED: Tombstone now accepts a playerColor to allow for better client-side rendering.
 class Tombstone extends Entity {
-    constructor(x, y, playerName, causeOfDeath) {
+    constructor(x, y, playerName, causeOfDeath, playerColor) {
         super(x, y, 'Tombstone');
         this.playerName = playerName;
         this.causeOfDeath = causeOfDeath;
+        this.playerColor = playerColor; // Store player's color
         this.life = 180; // Despawns after 3 minutes
     }
     update(dt) {

@@ -220,7 +220,8 @@ All Rights Reserved.
 
     const TILE_SIZE = 40, CHUNK_SIZE = 16;
     const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
-    const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
+    // MODIFIED: Added tile type 15 for the new transparent doors.
+    const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'}, 15:{n:'D', c:'#00f0ff'} };
     let particles = [];
     let gameStars = [];
     let loginStars = [];
@@ -341,8 +342,14 @@ All Rights Reserved.
                     canvas.oncontextmenu = (e) => showPlayerContextMenu(e, p);
                 }
             }
-
+            
             ctx.save();
+            
+            // MODIFIED: Invisibility effect implemented here
+            if (p.isInvisible) {
+                ctx.globalAlpha = 0.3;
+            }
+
             ctx.translate(p.x, p.y);
             
             // Draw name with outline
@@ -366,7 +373,9 @@ All Rights Reserved.
             ctx.lineTo(-r / 2, r / 2);
             ctx.closePath();
             ctx.fill();
-            ctx.restore();
+            
+            ctx.restore(); // Restore context to remove alpha changes and transformations
+
             if (p.isBoosting && p.id === myPlayerId) {
                 const angle = p.angle + Math.PI + (Math.random() - 0.5) * 0.5;
                 const x = p.x + Math.cos(angle) * (r - 2);
@@ -387,7 +396,6 @@ All Rights Reserved.
                 ctx.arc(p.x, p.y, p.radius + 10, -Math.PI / 2, (-Math.PI / 2) + (chargePercent * Math.PI * 2));
                 ctx.stroke();
             }
-            ctx.globalAlpha = 1;
         },
         'MeleeSlash': (s) => {
             const owner = gameState.players[s.ownerId] || gameState.entities.find(e => e.id === s.ownerId);
@@ -470,46 +478,61 @@ All Rights Reserved.
         'LootDrop': (l) => { ctx.fillStyle=l.color; ctx.shadowColor=l.color; ctx.shadowBlur=10; ctx.fillRect(l.x-l.radius,l.y-l.radius,l.radius*2,l.radius*2)},
         'EquipmentDrop': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.color; ctx.shadowColor = d.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, d.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
         'PlayerLootBag': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.item.color || TIER_COLORS[6]; ctx.shadowColor = d.item.color || TIER_COLORS[6]; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, 12, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
+        // MODIFIED: Complete redesign of the Tombstone to look like wreckage with a hologram.
         'Tombstone': (t) => {
             ctx.save();
             ctx.translate(t.x, t.y);
-            ctx.globalAlpha = 0.5 + (t.life / 180) * 0.5;
+            ctx.globalAlpha = Math.max(0, t.life / 180); // Fade out over time
 
-            // Draw shipwreck debris
-            ctx.fillStyle = '#495057';
+            // Draw main wreckage piece
+            ctx.fillStyle = '#4a4a52';
             ctx.strokeStyle = '#212529';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(-25, -20);
-            ctx.lineTo(20, -30);
-            ctx.lineTo(30, 25);
-            ctx.lineTo(-20, 30);
+            ctx.moveTo(-20, -15);
+            ctx.lineTo(25, -20);
+            ctx.lineTo(20, 20);
+            ctx.lineTo(-25, 18);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Draw a smaller overlapping piece
+            ctx.fillStyle = '#3a3a3e';
+             ctx.beginPath();
+            ctx.moveTo(5, -5);
+            ctx.lineTo(15, 18);
+            ctx.lineTo(-15, 22);
+            ctx.lineTo(-8, 0);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
 
             // Draw flickering light
             ctx.fillStyle = t.playerColor;
-            ctx.globalAlpha *= (0.7 + Math.sin(Date.now() / 100) * 0.3);
+            ctx.globalAlpha *= (0.6 + Math.sin(Date.now() / 150) * 0.4); // Flicker effect
             ctx.shadowColor = t.playerColor;
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = 20;
             ctx.beginPath();
-            ctx.arc(-15, -12, 3, 0, Math.PI * 2);
+            ctx.arc(-15, -12, 4, 0, Math.PI * 2);
             ctx.fill();
-
-            // Draw hologram projector and text
-            ctx.fillStyle = 'rgba(108, 117, 125, 0.8)';
-            ctx.fillRect(-22, -2, 44, 24);
-            ctx.fillStyle = '#e9ecef';
-            ctx.shadowColor = '#000';
-            ctx.shadowBlur = 3;
-            ctx.textAlign = 'center';
-            ctx.font = 'bold 8px "Consolas",monospace';
-            ctx.fillText(t.playerName, 0, 6);
-            ctx.font = '7px "Consolas",monospace';
-            ctx.fillText(`Destroyed by`, 0, 14);
-            ctx.fillText(t.causeOfDeath, 0, 21);
             
+            // Reset alpha and shadow for text
+            ctx.globalAlpha = Math.max(0, t.life / 180);
+            ctx.shadowBlur = 0;
+
+            // Draw hologram text
+            ctx.textAlign = 'center';
+            ctx.fillStyle = t.playerColor;
+            ctx.shadowColor = t.playerColor;
+            ctx.shadowBlur = 8;
+            ctx.font = 'bold 9px "Consolas",monospace';
+            ctx.fillText(`R.I.P. ${t.playerName}`, 0, -35);
+            ctx.font = '8px "Consolas",monospace';
+            ctx.globalAlpha *= 0.8;
+            ctx.fillText(`Disconnected by`, 0, -25);
+            ctx.fillText(`${t.causeOfDeath}`, 0, -16);
+
             ctx.restore();
         },
         'floatingText': (ft) => { ctx.font = 'bold 18px "Consolas",monospace'; ctx.fillStyle = ft.color || 'rgba(255,255,100,0.8)'; ctx.globalAlpha = ft.life; ctx.textAlign = 'center'; ctx.fillText(ft.text, ft.x, ft.y); ctx.globalAlpha = 1; },
@@ -613,7 +636,17 @@ All Rights Reserved.
                 const tileId = getTile(tX, tY);
                 const tile = TILE_TYPES[tileId];
 
-                if (tile && tileId !== 1) { // Only draw non-empty space tiles
+                // MODIFIED: Added specific drawing logic for transparent doors (tile 15)
+                if (tileId === 15) {
+                    // Draw the floor underneath first
+                    ctx.fillStyle = TILE_TYPES[10].c;
+                    ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
+                    // Then draw the semi-transparent door effect
+                    ctx.fillStyle = 'rgba(0, 240, 255, 0.2)';
+                    ctx.shadowColor = 'rgba(0, 240, 255, 0.5)';
+                    ctx.shadowBlur = 10;
+                    ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
+                } else if (tile && tileId !== 1) { // Only draw other non-empty space tiles
                     if (tile.wc) { // It's a wall
                         const floorTile = TILE_TYPES[tileId - 1] || TILE_TYPES[1];
                         ctx.fillStyle = floorTile.c;
@@ -627,7 +660,6 @@ All Rights Reserved.
                     }
                     ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
                     
-                    // Draw tech pattern on city floors and boss floors
                     if (tileId === 10 || tileId === 13) {
                          drawTechPattern(tX + TILE_SIZE / 2, tY + TILE_SIZE / 2);
                     }
