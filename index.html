@@ -191,23 +191,6 @@ All Rights Reserved.
     const minimapCanvas = document.getElementById('minimapCanvas'), minimapCtx = minimapCanvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
-    // --- MODIFIED: Added a function to properly scale a canvas for High-DPI displays ---
-    function setupHiDPICanvas(canvas) {
-        const dpr = window.devicePixelRatio || 1;
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-        const ctx = canvas.getContext('2d');
-        ctx.scale(dpr, dpr);
-        return ctx;
-    }
-
-    // --- MODIFIED: Call the HiDPI setup for both canvases ---
-    setupHiDPICanvas(canvas);
-    // We re-assign minimapCtx to the new, scaled context.
-    const scaledMinimapCtx = setupHiDPICanvas(minimapCanvas);
-
-
     const loginContainer = document.getElementById('login-container');
     const classSelectionPanel = document.getElementById('class-selection');
     const shipSelectionPanel = document.getElementById('ship-selection');
@@ -246,8 +229,8 @@ All Rights Reserved.
         gameStars = [];
         for (let i = 0; i < 500; i++) {
             gameStars.push({
-                x: Math.random() * window.innerWidth * 3 - window.innerWidth * 1.5,
-                y: Math.random() * window.innerHeight * 3 - window.innerHeight * 1.5,
+                x: Math.random() * canvas.width * 3 - canvas.width * 1.5,
+                y: Math.random() * canvas.height * 3 - canvas.height * 1.5,
                 size: Math.random() * 2 + 0.5,
                 depth: Math.random() * 0.8 + 0.1 
             });
@@ -258,8 +241,8 @@ All Rights Reserved.
         loginStars = [];
         for (let i = 0; i < 200; i++) {
             loginStars.push({
-                x: Math.random() * window.innerWidth,
-                y: Math.random() * window.innerHeight,
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
                 size: Math.random() * 1.5 + 0.5,
                 alpha: Math.random() * 0.5 + 0.2,
                 twinkleSpeed: Math.random() * 0.02
@@ -551,19 +534,16 @@ All Rights Reserved.
         const myPlayer = gameState.players[myPlayerId];
         if (!myPlayer) return;
 
-        const dpr = window.devicePixelRatio || 1;
         ctx.save();
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // Use the real canvas size
         ctx.fillStyle = '#fff';
         gameStars.forEach(star => {
-            // Adjust calculations to use CSS size (window.innerWidth/Height)
-            const screenX = window.innerWidth / 2 + (star.x - camera.x * star.depth);
-            const screenY = window.innerHeight / 2 + (star.y - camera.y * star.depth);
+            const screenX = canvas.width / 2 + (star.x - camera.x * star.depth);
+            const screenY = canvas.height / 2 + (star.y - camera.y * star.depth);
 
-            if (screenX < -window.innerWidth) star.x += window.innerWidth * 2.5;
-            if (screenX > window.innerWidth*2) star.x -= window.innerWidth * 2.5;
-            if (screenY < -window.innerHeight) star.y += window.innerHeight * 2.5;
-            if (screenY > window.innerHeight*2) star.y -= window.innerHeight * 2.5;
+            if (screenX < -canvas.width) star.x += canvas.width * 2.5;
+            if (screenX > canvas.width*2) star.x -= canvas.width * 2.5;
+            if (screenY < -canvas.height) star.y += canvas.height * 2.5;
+            if (screenY > canvas.height*2) star.y -= canvas.height * 2.5;
             
             ctx.globalAlpha = star.depth * 0.7;
             ctx.fillRect(screenX, screenY, star.size, star.size);
@@ -572,10 +552,7 @@ All Rights Reserved.
     }
     
     function drawLoginBackground() {
-        const dpr = window.devicePixelRatio || 1;
-        ctx.save();
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // Use the real canvas size
-        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#fff';
         loginStars.forEach(star => {
             star.alpha += star.twinkleSpeed;
@@ -585,16 +562,16 @@ All Rights Reserved.
             ctx.globalAlpha = star.alpha;
             ctx.fillRect(star.x, star.y, star.size, star.size);
         });
-        ctx.restore();
+        ctx.globalAlpha = 1;
     }
 
     function drawGrid() {
         ctx.strokeStyle = 'rgba(40, 45, 60, 0.5)';
         ctx.lineWidth = 1;
-        const startX = Math.floor((camera.x - (window.innerWidth / 2) / camera.zoom) / TILE_SIZE) * TILE_SIZE;
-        const startY = Math.floor((camera.y - (window.innerHeight / 2) / camera.zoom) / TILE_SIZE) * TILE_SIZE;
-        const endX = Math.ceil((camera.x + (window.innerWidth / 2) / camera.zoom) / TILE_SIZE) * TILE_SIZE;
-        const endY = Math.ceil((camera.y + (window.innerHeight / 2) / camera.zoom) / TILE_SIZE) * TILE_SIZE;
+        const startX = Math.floor((camera.x - canvas.width / 2 / camera.zoom) / TILE_SIZE) * TILE_SIZE;
+        const startY = Math.floor((camera.y - canvas.height / 2 / camera.zoom) / TILE_SIZE) * TILE_SIZE;
+        const endX = Math.ceil((camera.x + canvas.width / 2 / camera.zoom) / TILE_SIZE) * TILE_SIZE;
+        const endY = Math.ceil((camera.y + canvas.height / 2 / camera.zoom) / TILE_SIZE) * TILE_SIZE;
 
         ctx.beginPath();
         for (let x = startX; x <= endX; x += TILE_SIZE) {
@@ -630,38 +607,30 @@ All Rights Reserved.
         }
 
         if (!myPlayer) {
-            ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             return;
         }
-        
-        ctx.save();
-        // Clear the canvas based on its CSS dimensions
-        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-        
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawGameStars();
 
         camera.x = myPlayer.x; camera.y = myPlayer.y;
         
-        ctx.translate(window.innerWidth / 2, window.innerHeight / 2); 
-        ctx.scale(camera.zoom, camera.zoom); 
-        ctx.translate(-camera.x, -camera.y);
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
         
         drawGrid();
 
-        const b = { 
-            l: Math.floor((camera.x - (window.innerWidth / 2) / camera.zoom) / TILE_SIZE) - 1, 
-            r: Math.ceil((camera.x + (window.innerWidth / 2) / camera.zoom) / TILE_SIZE) + 1, 
-            t: Math.floor((camera.y - (window.innerHeight / 2) / camera.zoom) / TILE_SIZE) - 1, 
-            b: Math.ceil((camera.y + (window.innerHeight / 2) / camera.zoom) / TILE_SIZE) + 1, 
-        };
+        const b = { l: Math.floor((camera.x-canvas.width/2/camera.zoom)/TILE_SIZE)-1, r: Math.ceil((camera.x+canvas.width/2/camera.zoom)/TILE_SIZE)+1, t: Math.floor((camera.y-canvas.height/2/camera.zoom)/TILE_SIZE)-1, b: Math.ceil((camera.y+canvas.height/2/camera.zoom)/TILE_SIZE)+1, };
         for (let y = b.t; y < b.b; y++) {
             for (let x = b.l; x < b.r; x++) {
                 const tX = x * TILE_SIZE, tY = y * TILE_SIZE;
                 const tileId = getTile(tX, tY);
                 const tile = TILE_TYPES[tileId];
 
-                if (tileId === 15) { 
-                    ctx.fillStyle = TILE_TYPES[10].c; 
+                // --- MODIFIED: Wall and Door Rendering ---
+                if (tileId === 15) { // Draw animated energy door
+                    ctx.fillStyle = TILE_TYPES[10].c; // Floor underneath
                     ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
                     ctx.fillStyle = 'rgba(0, 240, 255, 0.15)';
                     ctx.shadowColor = 'rgba(0, 240, 255, 0.5)';
@@ -673,7 +642,7 @@ All Rights Reserved.
                     ctx.shadowBlur = 10;
                     ctx.fillRect(tX, scanLineY, TILE_SIZE, 2);
                 } else if (tile && tileId !== 1) { 
-                    if (tile.wc) { 
+                    if (tile.wc) { // Draw detailed wall
                         const floorTile = TILE_TYPES[tileId - 1] || TILE_TYPES[1];
                         ctx.fillStyle = floorTile.c;
                         ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
@@ -685,7 +654,7 @@ All Rights Reserved.
                         ctx.strokeStyle = 'rgba(0,0,0,0.4)';
                         ctx.lineWidth = 2;
                         ctx.strokeRect(tX + 1, tY + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-                    } else { 
+                    } else { // Draw normal floor
                         ctx.fillStyle = tile.c;
                         ctx.shadowBlur = 0;
                         ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
@@ -718,8 +687,8 @@ All Rights Reserved.
         if (isGameRunning && myPlayerId && gameState.players[myPlayerId] && !isShopOpen && !isBankOpen && !isTrading) { 
             const myPlayer = gameState.players[myPlayerId];
             if (!myPlayer.isDead) {
-                const worldMouseX = (inputs.mouse.x - window.innerWidth / 2) / camera.zoom + myPlayer.x;
-                const worldMouseY = (inputs.mouse.y - window.innerHeight / 2) / camera.zoom + myPlayer.y;
+                const worldMouseX = (inputs.mouse.x - canvas.width / 2) / camera.zoom + myPlayer.x;
+                const worldMouseY = (inputs.mouse.y - canvas.height / 2) / camera.zoom + myPlayer.y;
                 const angle = Math.atan2(worldMouseY - myPlayer.y, worldMouseX - myPlayer.x);
                 sendToServer({ type: 'input', inputs, angle });
             }
@@ -783,11 +752,8 @@ All Rights Reserved.
     
     function drawMinimap(player) {
         const mapSize = 220, viewDist = 25 * TILE_SIZE;
-        // Use the scaled context for all drawing on the minimap
-        const ctx = scaledMinimapCtx;
-
-        ctx.fillStyle = '#05060a';
-        ctx.fillRect(0, 0, mapSize, mapSize);
+        minimapCtx.fillStyle = '#05060a';
+        minimapCtx.fillRect(0, 0, mapSize, mapSize);
         const scale = mapSize / (viewDist * 2);
 
         for(let y = -viewDist; y < viewDist; y += TILE_SIZE) {
@@ -795,8 +761,8 @@ All Rights Reserved.
                 const tileId = getTile(player.x + x, player.y + y);
                 const tile = TILE_TYPES[tileId] || TILE_TYPES[1];
                 if(tile) {
-                    ctx.fillStyle = tile.wc || tile.c;
-                    ctx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, Math.ceil(TILE_SIZE * scale) + 1, Math.ceil(TILE_SIZE * scale) + 1);
+                    minimapCtx.fillStyle = tile.wc || tile.c;
+                    minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, Math.ceil(TILE_SIZE * scale) + 1, Math.ceil(TILE_SIZE * scale) + 1);
                 }
             }
         }
@@ -808,8 +774,8 @@ All Rights Reserved.
                 let size = 3;
                 if (e.isBoss) size = 6;
                 else if (e.type === 'GravityWell') size = 4;
-                ctx.fillStyle = e.color;
-                ctx.fillRect(mapSize / 2 + dX * scale - size/2, mapSize / 2 + dY * scale - size/2, size, size);
+                minimapCtx.fillStyle = e.color;
+                minimapCtx.fillRect(mapSize / 2 + dX * scale - size/2, mapSize / 2 + dY * scale - size/2, size, size);
             }
         }
 
@@ -819,15 +785,15 @@ All Rights Reserved.
             const dX = p.x - player.x;
             const dY = p.y - player.y;
             if (Math.abs(dX) < viewDist && Math.abs(dY) < viewDist) {
-                ctx.fillStyle = p.color;
-                ctx.beginPath();
-                ctx.arc(mapSize / 2 + dX * scale, mapSize / 2 + dY * scale, 3, 0, Math.PI * 2);
-                ctx.fill();
+                minimapCtx.fillStyle = p.color;
+                minimapCtx.beginPath();
+                minimapCtx.arc(mapSize / 2 + dX * scale, mapSize / 2 + dY * scale, 3, 0, Math.PI * 2);
+                minimapCtx.fill();
             }
         }
         
-        ctx.fillStyle = player.color || '#00ff00';
-        ctx.fillRect(mapSize/2 - 2, mapSize/2 - 2, 4, 4);
+        minimapCtx.fillStyle = player.color || '#00ff00';
+        minimapCtx.fillRect(mapSize/2 - 2, mapSize/2 - 2, 4, 4);
     }
 
     function updateInventoryAndEquipUI(player) {
@@ -892,8 +858,8 @@ All Rights Reserved.
     function showGroundContextMenu(event) {
         event.preventDefault();
         hideAllContextMenus();
-        const worldMouseX = (event.clientX - window.innerWidth / 2) / camera.zoom + camera.x;
-        const worldMouseY = (event.clientY - window.innerHeight / 2) / camera.zoom + camera.y;
+        const worldMouseX = (event.clientX - canvas.width / 2) / camera.zoom + camera.x;
+        const worldMouseY = (event.clientY - canvas.height / 2) / camera.zoom + camera.y;
         const pickupRadius = 40;
         const itemsToShow = gameState.entities.filter(e => (e.type === 'EquipmentDrop' || e.type === 'PlayerLootBag') && e.pickupDelay <= 0 && Math.hypot(e.x - worldMouseX, e.y - worldMouseY) < pickupRadius);
         groundContextMenu.innerHTML = '';
@@ -1226,9 +1192,6 @@ All Rights Reserved.
     window.addEventListener('resize', () => {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        // --- MODIFIED: Re-scale canvases on window resize ---
-        setupHiDPICanvas(canvas);
-        setupHiDPICanvas(minimapCanvas);
         initGameStars();
         initLoginStars();
     });
