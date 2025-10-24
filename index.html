@@ -226,7 +226,7 @@ All Rights Reserved.
             const data = JSON.parse(message.data);
             if (data.type === 'sfx') {
                 if (data.effect === 'blink') {
-                    for(let i=0; i<20; i++) particles.push({x: data.x, y: data.y, life: 1, size: Math.random()*3+1, color: data.color});
+                    for(let i=0; i<20; i++) particles.push({x: data.x, y: data.y, life: 1, size: Math.random()*3+1, color: data.color, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2});
                 } else if (data.effect === 'teleportCharge') {
                     for(let i=0; i<2; i++) {
                         const angle = Math.random() * Math.PI * 2;
@@ -357,13 +357,13 @@ All Rights Reserved.
             ctx.globalAlpha = 1;
         },
         'MeleeSlash': (s) => {
-            const owner = gameState.players[s.ownerId];
+            const owner = gameState.players[s.ownerId] || gameState.entities.find(e => e.id === s.ownerId);
             if (!owner) return;
             ctx.save();
             ctx.translate(owner.x, owner.y);
             ctx.rotate(s.angle);
             ctx.fillStyle = s.color;
-            ctx.globalAlpha = s.life * 2.5;
+            ctx.globalAlpha = s.life * 5; // Make it more visible
             ctx.shadowColor = s.color;
             ctx.shadowBlur = 15;
             ctx.beginPath();
@@ -377,7 +377,27 @@ All Rights Reserved.
         'Stinger': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 3; const r = e.radius; ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0); ctx.closePath(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
         'VoidSwarmer': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; const r = e.radius; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-r-15; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
         'Warden': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 4; const r = e.radius; ctx.beginPath(); for (let i = 0; i < 5; i++) ctx.lineTo(r*Math.cos(i*2*Math.PI/5), r*Math.sin(i*2*Math.PI/5)); ctx.closePath(); ctx.stroke(); ctx.restore(); if (e.shield > 0) { ctx.fillStyle = `rgba(227, 212, 0, ${0.1 + (e.shield / e.maxShield) * 0.3})`; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 8, 0, Math.PI*2); ctx.fill(); } if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
-        'GravityWell': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = '#fff'; ctx.shadowBlur = e.radius; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI * 2); ctx.fill(); const rotation = (Date.now() / 3000) % (Math.PI*2); for(let i=0; i<3; i++) { ctx.rotate(rotation + i * Math.PI*2/3); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0, e.pullRadius * 0.3, Math.PI*0.1, Math.PI*0.9); ctx.stroke(); ctx.beginPath(); ctx.arc(0,0, e.pullRadius * 0.7, Math.PI*0.1, Math.PI*0.9); ctx.stroke(); } ctx.restore(); },
+        'GravityWell': (e) => {
+            ctx.save();
+            ctx.translate(e.x, e.y);
+            const pulse = 0.9 + Math.sin(Date.now() / 500) * 0.1;
+            ctx.fillStyle = e.color;
+            ctx.shadowColor = '#fff';
+            ctx.shadowBlur = e.radius * pulse;
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius * pulse, 0, Math.PI * 2);
+            ctx.fill();
+            const rotation = (Date.now() / 3000) % (Math.PI * 2);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.2 + Math.sin(Date.now() / 300) * 0.1})`;
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.arc(0, 0, e.radius + i * 20, rotation + i * (Math.PI / 1.5), rotation + i * (Math.PI / 1.5) + Math.PI);
+                ctx.stroke();
+            }
+            ctx.restore();
+            if (e.health < e.maxHealth) { const barW = 40, barH = 6, barX = e.x - barW / 2, barY = e.y - e.radius - 20; ctx.fillStyle = 'rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX, barY, barW, barH); ctx.fillStyle = '#999'; ctx.fillRect(barX, barY, barW * (e.health / e.maxHealth), barH); }
+        },
         'Dreadnought': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 30; ctx.beginPath(); ctx.rect(-e.radius, -e.radius/2, e.radius*2, e.radius); ctx.fill(); ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.rect(-e.radius/2, -e.radius/1.5, e.radius, e.radius*1.3); ctx.fill(); ctx.restore(); drawBossHealthbar(e); },
         'SerpentHead': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 20; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); drawBossHealthbar(e); e.segments.forEach(seg => drawFunctions['SerpentBody'](seg)); },
         'SerpentBody': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.shadowColor = e.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-e.radius-10; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
@@ -392,6 +412,31 @@ All Rights Reserved.
         'LootDrop': (l) => { ctx.fillStyle=l.color; ctx.shadowColor=l.color; ctx.shadowBlur=10; ctx.fillRect(l.x-l.radius,l.y-l.radius,l.radius*2,l.radius*2)},
         'EquipmentDrop': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.color; ctx.shadowColor = d.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, d.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
         'PlayerLootBag': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.item.color || TIER_COLORS[6]; ctx.shadowColor = d.item.color || TIER_COLORS[6]; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, 12, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
+        'Tombstone': (t) => {
+            ctx.save();
+            ctx.translate(t.x, t.y);
+            const tombstoneWidth = 40;
+            const tombstoneHeight = 50;
+            ctx.fillStyle = '#6c757d';
+            ctx.strokeStyle = '#343a40';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-tombstoneWidth / 2, tombstoneHeight / 2);
+            ctx.lineTo(-tombstoneWidth / 2, -tombstoneHeight / 4);
+            ctx.arc(0, -tombstoneHeight / 4, tombstoneWidth / 2, Math.PI, 0);
+            ctx.lineTo(tombstoneWidth / 2, tombstoneHeight / 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#e9ecef';
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 10px "Consolas",monospace';
+            ctx.fillText(t.playerName, 0, -10);
+            ctx.font = '8px "Consolas",monospace';
+            ctx.fillText(`Destroyed by`, 0, 2);
+            ctx.fillText(t.causeOfDeath, 0, 12);
+            ctx.restore();
+        },
         'floatingText': (ft) => { ctx.font = 'bold 18px "Consolas",monospace'; ctx.fillStyle = ft.color || 'rgba(255,255,100,0.8)'; ctx.globalAlpha = ft.life; ctx.textAlign = 'center'; ctx.fillText(ft.text, ft.x, ft.y); ctx.globalAlpha = 1; },
     };
 
@@ -889,31 +934,37 @@ All Rights Reserved.
     }
 
     document.addEventListener('keydown', e => {
-        const key = e.key.toLowerCase();
-        if (key === 'escape') {
-            closeAllPanels();
-        }
         if (isChatting) {
-            if(key === 'enter') {
+            if (e.key === 'Enter') {
                 const msg = chatInput.value.trim();
-                if(msg) sendToServer({type: 'chat', message: msg});
+                if (msg) sendToServer({ type: 'chat', message: msg });
                 chatInput.value = '';
                 chatInput.blur();
             }
             return;
         }
-        
-        if (key === 'enter') {
+
+        if (e.key === 'Enter') {
             e.preventDefault();
             chatInput.focus();
-        } else if (inputs.hasOwnProperty(key) && !isShopOpen && !isBankOpen && !isTrading) {
+            return;
+        }
+        
+        if (isShopOpen || isBankOpen || isTrading) return;
+
+        const key = e.key.toLowerCase();
+        if (e.code === 'Space') {
+            inputs.space = true;
+        } else if (inputs.hasOwnProperty(key)) {
             inputs[key] = true;
         }
     });
 
     document.addEventListener('keyup', e => {
         const key = e.key.toLowerCase();
-        if (inputs.hasOwnProperty(key)) {
+        if (e.code === 'Space') {
+            inputs.space = false;
+        } else if (inputs.hasOwnProperty(key)) {
             inputs[key] = false;
         }
     });
@@ -942,4 +993,4 @@ All Rights Reserved.
     gameLoop();
 </script>
 </body>
-</html>"
+</html>
