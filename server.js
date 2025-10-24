@@ -31,12 +31,14 @@ const players = {};
 let entities = [];
 const TILE_SIZE = 40;
 const CHUNK_SIZE = 16;
-const MAX_ENEMIES = 80;
+const MAX_ENEMIES = 225; // UPDATED: Increased mob cap
 const ENEMY_SPAWN_INTERVAL = 1;
+const DESPAWN_RADIUS = 2500; // NEW: Radius outside which enemies are candidates for despawning
+const DESPAWN_TIME = 60; // NEW: Time in seconds an enemy must be outside the radius to despawn
 let enemySpawnTimer = ENEMY_SPAWN_INTERVAL;
 let lastTime = Date.now();
 const bossRespawnTimers = {};
-const activeTrades = {}; // NEW: To manage trade sessions
+const activeTrades = {};
 
 // --- PERSISTENT DATA ---
 const banks = loadData('banks.json');
@@ -444,6 +446,7 @@ class Enemy extends Entity {
         this.color = '#ff3355'; this.aggroRadius = 350; this.deAggroRadius = this.aggroRadius * 1.5;
         this.wanderTarget = null; this.wanderTimer = 0;
         this.xpValue = 15 * threatLevel;
+        this.timeOutsidePlayerRange = 0; // NEW: Timer for despawning
         this.applyThreatLevel();
     }
     applyThreatLevel() { this.health = this.maxHealth = this.health * (1 + (this.threatLevel-1)*0.6); this.damageMultiplier = 1 + (this.threatLevel-1)*0.4; }
@@ -493,7 +496,6 @@ class Enemy extends Entity {
     }
     takeDamage(amount, damager) {
         this.health -= amount;
-        // NEW: Add floating damage text for enemies
         entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(amount)}`, '#ffffff'));
         if (this.health <= 0 && !this.isDead) {
             this.isDead = true;
@@ -546,7 +548,6 @@ class Warden extends Enemy {
     takeDamage(amount, damager = null) {
         if (this.shield > 0) {
             this.shield -= amount;
-             // NEW: Show shield damage text
             entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(amount)}`, '#e3d400'));
             if (this.shield < 0) {
                 const overflowDamage = -this.shield;
@@ -562,23 +563,21 @@ class GravityWell extends Enemy {
     constructor(x, y, tL) {
         super(x, y, tL, 'GravityWell');
         this.radius = 20;
-        this.speed = 0; // NEW: GravityWells are stationary
+        this.speed = 0;
         this.health = this.maxHealth = 999999;
         this.color = '#1a1a1a';
-        this.xpValue = 0; // NEW: No XP for an unkillable entity
+        this.xpValue = 0;
         this.pullRadius = 300;
-        this.pullStrength = 25; // NEW: 10x pull strength
+        this.pullStrength = 25;
     }
     update(dt) {
-        // Player pull and kill logic
         for (const pid in players) {
             const player = players[pid];
             const dist = Math.hypot(player.x - this.x, player.y - this.y);
 
-            // NEW: Kill players who get too close
             if (dist < this.radius && !player.isDead) {
                 player.die(this);
-                continue; // Skip to next player
+                continue;
             }
             
             if (!player.isDead && !player.isTeleporting && dist < this.pullRadius) {
@@ -594,20 +593,18 @@ class GravityWell extends Enemy {
             }
         }
 
-        // NEW: Destroy other entities that get too close
         for (const entity of entities) {
             if (entity === this || entity.isDead) continue;
             const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
             if (dist < this.radius) {
                 if (entity instanceof Enemy && !entity.isBoss) {
-                    entity.isDead = true; // Destroy other enemies
+                    entity.isDead = true;
                 } else if (entity.type === 'Projectile' || entity.type === 'Grenade' || entity.type === 'LootDrop' || entity.type === 'EquipmentDrop') {
-                    entity.isDead = true; // Destroy projectiles and loot
+                    entity.isDead = true;
                 }
             }
         }
     }
-    // NEW: GravityWells are indestructible
     takeDamage(amount, damager = null) {
         return;
     }
@@ -833,7 +830,6 @@ class LootDrop extends Entity { constructor(x,y,v){ super(x + Math.random()*20-1
 class EquipmentDrop extends Entity { constructor(x, y, item) { super(x + Math.random()*20-10, y+Math.random()*20-10, 'EquipmentDrop'); this.item = item; this.radius = 8; this.color = TIER_COLORS[item.tier] || '#fff'; this.life = 60; this.pickupDelay = 0.5; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0) this.isDead = true; } }
 class PlayerLootBag extends Entity { constructor(x, y, items, bits, color) { super(x, y, 'PlayerLootBag'); this.item = { color: color }; this.items = items; this.bits = bits; this.life = 180; this.pickupDelay = 3; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0 || (this.bits <= 0 && this.items.every(i => i === null))) this.isDead = true; } }
 class FloatingText extends Entity { constructor(x, y, text, color = '#ff8888') { super(x, y, 'floatingText'); this.text = text; this.color = color; this.life = 1; } update(dt) { this.y -= 20 * dt; this.life -= dt; if (this.life <= 0) this.isDead = true; } }
-// NEW: Tombstone entity for player deaths
 class Tombstone extends Entity {
     constructor(x, y, playerName, causeOfDeath) {
         super(x, y, 'Tombstone');
@@ -879,6 +875,34 @@ function gameLoop() {
         const entity = entities[i];
         if (entity.update) entity.update(dt);
         if (entity.isDead) { entities.splice(i, 1); continue; }
+    }
+
+    // NEW: Despawn distant enemies
+    const playerIds = Object.keys(players);
+    if (playerIds.length > 0) {
+        for (let i = entities.length - 1; i >= 0; i--) {
+            const entity = entities[i];
+            if (entity instanceof Enemy && !entity.isBoss) {
+                let isNearPlayer = false;
+                for (const pid of playerIds) {
+                    const player = players[pid];
+                    if (player.isDead) continue;
+                    if (Math.hypot(entity.x - player.x, entity.y - player.y) < DESPAWN_RADIUS) {
+                        isNearPlayer = true;
+                        break;
+                    }
+                }
+
+                if (isNearPlayer) {
+                    entity.timeOutsidePlayerRange = 0;
+                } else {
+                    entity.timeOutsidePlayerRange += dt;
+                    if (entity.timeOutsidePlayerRange > DESPAWN_TIME) {
+                        entity.isDead = true;
+                    }
+                }
+            }
+        }
     }
 
     // Handle Collisions
@@ -928,7 +952,6 @@ function gameLoop() {
                         if (angleDiff < entity.arc / 2) {
                             other.takeDamage(entity.damage, { ownerId: entity.ownerId });
                             entity.hitTargets.push(other.id);
-                             // NEW: Add a small knockback for more impact
                             if (other instanceof Enemy && !other.isBoss) {
                                 const knockbackStrength = 15;
                                 const knockbackAngle = entity.angle;
