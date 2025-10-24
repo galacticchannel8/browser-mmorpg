@@ -33,7 +33,7 @@ All Rights Reserved.
         .login-form button:disabled, .trade-button:disabled { background: #555; cursor: default; }
         #login-error { color: #ff3355; margin-top: 10px; height: 20px; }
         .login-toggle { color: #00f0ff; cursor: pointer; text-decoration: underline; margin-top: 15px; }
-        #right-ui-container { position: fixed; top: 20px; right: 20px; width: 220px; z-index: 15; }
+        #right-ui-container { display: none; position: fixed; top: 20px; right: 20px; width: 220px; z-index: 15; }
         #minimap-container { border: 2px solid #00f0ff; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); margin-bottom: 10px; }
         #coords { text-align: center; font-size: 16px; margin-bottom: 10px; color: #00f0ff; }
         #equipment-panel { text-align: left; margin-bottom: 10px; }
@@ -67,13 +67,10 @@ All Rights Reserved.
         #market-sell-panel { margin-top: 15px; border-top: 1px solid #555; padding-top: 10px; }
         #market-sell-panel select, #market-sell-panel input { background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; font-family: inherit; margin: 0 5px; }
         #market-sell-panel button { background: #00f0ff; color: #05060a; border: none; padding: 8px 15px; cursor: pointer; font-family: inherit; }
-        
-        /* --- UI STYLES --- */
-        #left-ui-container { position: fixed; top: 20px; left: 20px; width: 300px; z-index: 15; display: none; }
-        #portrait-container { width: 100px; height: 100px; border: 2px solid #00f0ff; background-color: #05060a; margin-bottom: 10px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); /* Placeholder for character portrait */ }
+        #left-ui-container { display: none; position: fixed; top: 20px; left: 20px; width: 300px; z-index: 15; }
         #hud-container { text-align: left; font-size: 16px; }
-        #hud-info p { margin: 6px 0; }
-        #hud-info strong { color: #ffff00; display: inline-block; width: 80px; }
+        #hud-info .hud-line { display: flex; align-items: center; justify-content: space-between; margin: 6px 0; }
+        #hud-info strong { color: #ffff00; }
         .hud-bar { width: 100%; height: 15px; background-color: rgba(0,0,0,0.5); border: 1px solid #555; margin-top: 2px; }
         .hud-bar > div { height: 100%; transition: width 0.3s ease; }
         #health-bar-fill { background-color: #ff3355; }
@@ -81,6 +78,10 @@ All Rights Reserved.
         #keybind-info { font-size: 12px; color: #999; margin-top: 15px; border-top: 1px solid #333; padding-top: 10px; }
         #keybind-info p { margin: 4px 0; }
         #keybind-info strong { color: #00f0ff; }
+        #portrait-container { width: 220px; height: 100px; border: 1px solid #00f0ff; background-color: rgba(5, 6, 10, 0.85); margin-top: 10px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); box-sizing: border-box; }
+        .npc-trade-columns { display: flex; justify-content: space-between; gap: 15px; }
+        #npc-buy-panel, #npc-sell-panel { width: 48%; }
+        #npc-buy-panel h3, #npc-sell-panel h3 { margin-top: 0; text-align: center; color: #ffff00; }
         #trade-container { width: 550px; padding: 15px; }
         #trade-header { margin-bottom: 15px; font-size: 1.2em; }
         .trade-window { display: flex; justify-content: space-between; gap: 10px; }
@@ -92,21 +93,12 @@ All Rights Reserved.
         #trade-status { margin-top: 15px; height: 20px; color: #ffff00; font-weight: bold; }
         #trade-buttons { margin-top: 10px; display: flex; gap: 10px; }
         .trade-slot.offered::after { content: '✓'; position: absolute; top: 0; right: 2px; color: #33ff99; font-weight: bold; }
-
-        /* --- MODIFIED SECTION 2: SHOP UI TWEAK --- */
-        .npc-trade-columns { display: flex; justify-content: space-between; gap: 15px; }
-        #npc-buy-panel, #npc-sell-panel { width: 48%; }
-        #npc-buy-panel h3, #npc-sell-panel h3 { margin-top: 0; text-align: center; color: #ffff00; }
-        /* --- END MODIFIED SECTION 2 --- */
-
     </style>
 </head>
 
 <body>
     <canvas id="gameCanvas"></canvas>
-    <ul id="item-context-menu" class="context-menu">
-        <!-- Options will be added dynamically by JS -->
-    </ul>
+    <ul id="item-context-menu" class="context-menu"></ul>
     <ul id="ground-item-context-menu" class="context-menu"></ul>
     <ul id="player-context-menu" class="context-menu"></ul>
 
@@ -116,21 +108,14 @@ All Rights Reserved.
     <div id="ship-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR SHIP COLOR</h2><div id="color-grid"><div class="color-option" style="background-color: #00f0ff;" onclick="chooseColor('#00f0ff')"></div><div class="color-option" style="background-color: #33ff99;" onclick="chooseColor('#33ff99')"></div><div class="color-option" style="background-color: #f07cff;" onclick="chooseColor('#f07cff')"></div><div class="color-option" style="background-color: #ff3355;" onclick="chooseColor('#ff3355')"></div><div class="color-option" style="background-color: #e3d400;" onclick="chooseColor('#e3d400')"></div><div class="color-option" style="background-color: #ffffff;" onclick="chooseColor('#ffffff')"></div></div></div>
     
     <div id="left-ui-container">
-        <div id="portrait-container">
-            <!-- Character animations will be controlled here via JS -->
-        </div>
         <div id="hud-container" class="ui-panel">
-            <div id="hud-info">
-                <!-- Player stats and info will be injected here by JS -->
-            </div>
-            <!-- --- MODIFIED SECTION 3: KEYBINDS UI TWEAK --- -->
+            <div id="hud-info"></div>
             <div id="keybind-info">
                 <p><strong>[E]</strong> Interact / <strong>[RMB]</strong> Loot Menu</p>
                 <p><strong>[H]</strong> Home / <strong>[Shift]</strong> Boost</p>
                 <p><strong>[Space]</strong> Melee / <strong>[LMB]</strong> Range</p>
                 <p><strong>[Q]</strong> Class Ability</p>
             </div>
-            <!-- --- END MODIFIED SECTION 3 --- -->
         </div>
     </div>
 
@@ -139,6 +124,7 @@ All Rights Reserved.
         <div id="coords"></div>
         <div id="equipment-panel" class="ui-panel"><h3>EQUIPMENT</h3><div id="equip-slot-Weapon" class="equip-slot" data-slot-type="Weapon"><strong data-slot="Weapon">Weapon:</strong> <span id="equip-Weapon">None</span></div><div id="equip-slot-Module" class="equip-slot" data-slot-type="Module"><strong data-slot="Module">Module:</strong> <span id="equip-Module">None</span></div><div id="equip-slot-Plating" class="equip-slot" data-slot-type="Plating"><strong data-slot="Plating">Plating:</strong> <span id="equip-Plating">None</span></div><div id="equip-slot-Utility" class="equip-slot" data-slot-type="Utility"><strong data-slot="Utility">Utility:</strong> <span id="equip-Utility">None</span></div></div>
         <div id="inventory-panel" class="ui-panel"><h3>INVENTORY</h3><div id="inventory-grid"></div></div>
+        <div id="portrait-container"></div>
     </div>
 
     <div id="bank-container" class="ui-panel">
@@ -152,7 +138,6 @@ All Rights Reserved.
             <div class="shop-tab active" id="shop-tab-npc">NPC Trade</div>
             <div class="shop-tab" id="shop-tab-market">Galactic Market</div>
         </div>
-        <!-- --- MODIFIED SECTION 2: SHOP UI TWEAK --- -->
         <div id="npc-trade-content" class="shop-content active">
             <div class="npc-trade-columns">
                 <div id="npc-buy-panel">
@@ -165,7 +150,6 @@ All Rights Reserved.
                 </div>
             </div>
         </div>
-        <!-- --- END MODIFIED SECTION 2 --- -->
         <div id="market-content" class="shop-content">
             <div class="shop-grid" id="market-buy-grid"></div>
             <div id="market-sell-panel">
@@ -206,7 +190,6 @@ All Rights Reserved.
     const minimapCanvas = document.getElementById('minimapCanvas'), minimapCtx = minimapCanvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
-    // --- DOM Element References ---
     const loginContainer = document.getElementById('login-container');
     const classSelectionPanel = document.getElementById('class-selection');
     const shipSelectionPanel = document.getElementById('ship-selection');
@@ -223,9 +206,8 @@ All Rights Reserved.
     const groundContextMenu = document.getElementById('ground-item-context-menu');
     const playerContextMenu = document.getElementById('player-context-menu');
 
-    // --- WebSocket & Game State ---
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const ws = new WebSocket(`${protocol}//${window.location.host}`);
+    const ws = new WebSocket(`${protocol}//${window.location.host}`);
     let myPlayerId = null, localWorld = {}, gameState = { players: {}, entities: [] };
     let camera = { x: 0, y: 0, zoom: 1 };
     let inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, space: false, mouse: { x: 0, y: 0, down: false } };
@@ -234,13 +216,11 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
     let currentShopName = null;
     let currentTradeData = { myOfferItems: [], myOfferBits: 0 };
 
-    // --- Constants ---
     const TILE_SIZE = 40, CHUNK_SIZE = 16;
     const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
     const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
     let particles = [];
 
-    // --- WebSocket Handler ---
     ws.onmessage = (message) => {
         try {
             const data = JSON.parse(message.data);
@@ -257,9 +237,8 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
             else if (data.type === 'openBank') { openBank(data.bank); }
             else if (data.type === 'marketUpdate') { if(isShopOpen) updateMarketView(data.marketListings); }
             else if (data.type === 'worldChunkUpdate') { localWorld[data.key] = data.chunk; }
-            // Trade Handlers
             else if (data.type === 'tradeRequest') {
-                if (isTrading) return; // Ignore if already busy
+                if (isTrading) return;
                 if(confirm(`${data.from.username} wants to trade with you. Accept?`)) {
                     sendToServer({ type: 'tradeResponse', requesterId: data.from.id, accepted: true });
                 }
@@ -274,7 +253,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
     };
     function sendToServer(data) { if(ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data)); }
 
-    // --- Render & Game Loop ---
     function getTile(worldX, worldY) { const cX = Math.floor(worldX / TILE_SIZE), cY = Math.floor(worldY / TILE_SIZE); const chX = Math.floor(cX / CHUNK_SIZE), chY = Math.floor(cY / CHUNK_SIZE); const key = `${chX},${chY}`; const chunk = localWorld[key]; if (!chunk) return 1; const tX = (cX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; const tY = (cY % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; return chunk.tiles[tY * CHUNK_SIZE + tX]; }
 
     function drawBossHealthbar(boss) {
@@ -299,7 +277,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
         'Player': (p) => {
             if (p.isDead) return;
 
-            // NEW: Add context menu for other players
             if (p.id !== myPlayerId) {
                 const screenX = (p.x - camera.x) * camera.zoom + canvas.width / 2;
                 const screenY = (p.y - camera.y) * camera.zoom + canvas.height / 2;
@@ -312,14 +289,12 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
             ctx.save();
             ctx.globalAlpha = p.isInvisible ? 0.3 : 1;
             ctx.translate(p.x, p.y);
-            // Draw Player Name and Level
             ctx.font = '12px "Consolas",monospace';
             ctx.textAlign = 'center';
             ctx.fillStyle = '#fff';
             ctx.shadowColor = '#000';
             ctx.shadowBlur = 5;
             ctx.fillText(`[Lvl ${p.level}] ${p.username}`, 0, -25);
-            // Draw Ship
             ctx.rotate(p.angle);
             ctx.fillStyle = p.color;
             ctx.shadowColor = p.color;
@@ -332,7 +307,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
             ctx.closePath();
             ctx.fill();
             ctx.restore();
-            // Draw Effects
             if (p.isBoosting && p.id === myPlayerId) {
                 const angle = p.angle + Math.PI + (Math.random() - 0.5) * 0.5;
                 const x = p.x + Math.cos(angle) * (r - 2);
@@ -340,11 +314,18 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
                 particles.push({x: x, y: y, life: 1, size: Math.random() * 3 + 2, color: p.color});
             }
             if(p.shieldActive){ctx.fillStyle=`rgba(51, 255, 153, 0.4)`; ctx.beginPath(); ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2); ctx.fill();}
-            // Draw Health Bar for other players
             if (p.id !== myPlayerId && p.health < p.stats.maxHealth) {
                 const barW = 40, barH = 5, barX = p.x - barW / 2, barY = p.y - r - 15;
                 ctx.fillStyle = 'rgba(255, 51, 85, 0.7)'; ctx.fillRect(barX, barY, barW, barH);
                 ctx.fillStyle = p.color; ctx.fillRect(barX, barY, barW * (p.health / p.stats.maxHealth), barH);
+            }
+            if (p.id === myPlayerId && p.isTeleporting) {
+                const chargePercent = 1 - (p.teleportTimer / p.TELEPORT_CHARGE_TIME);
+                ctx.strokeStyle = '#00f0ff';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius + 10, -Math.PI / 2, (-Math.PI / 2) + (chargePercent * Math.PI * 2));
+                ctx.stroke();
             }
             ctx.globalAlpha = 1;
         },
@@ -355,7 +336,7 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
             ctx.translate(owner.x, owner.y);
             ctx.rotate(s.angle);
             ctx.fillStyle = s.color;
-            ctx.globalAlpha = s.life * 2.5; // Fade out effect
+            ctx.globalAlpha = s.life * 2.5;
             ctx.shadowColor = s.color;
             ctx.shadowBlur = 15;
             ctx.beginPath();
@@ -391,7 +372,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
         const myPlayer = gameState.players[myPlayerId];
         if (!isGameRunning || !myPlayer) return;
         
-        leftUI.style.display = 'block'; // Make sure left UI is visible
         camera.x = myPlayer.x; camera.y = myPlayer.y;
         
         ctx.save();
@@ -403,7 +383,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
         
         particles.forEach(p => { p.life -= 0.05; p.x += (Math.random() - 0.5)*2; p.y += (Math.random() - 0.5)*2; ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); }); particles = particles.filter(p => p.life > 0); ctx.globalAlpha = 1;
         
-        // Default cursor and context menu
         canvas.style.cursor = 'crosshair';
         canvas.oncontextmenu = showGroundContextMenu;
 
@@ -432,7 +411,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
         requestAnimationFrame(gameLoop);
     }
 
-    // --- UI & Screen Management ---
     function showLoginScreen() {
         loginContainer.style.display = 'block';
         classSelectionPanel.style.display = 'none';
@@ -465,16 +443,13 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
     function handleRegister() { const u=document.getElementById('register-username').value, p=document.getElementById('register-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} if(u.length<3){e.textContent='Username must be at least 3 characters.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]){e.textContent='Username already taken.'}else{users[u]=p;localStorage.setItem('galactic_os_users',JSON.stringify(users));loggedInUser=u;showClassSelection()} }
     function toggleLoginRegister(showLogin) { document.getElementById('login-form').style.display=showLogin?'block':'none';document.getElementById('register-form').style.display=showLogin?'none':'block';document.getElementById('login-error').textContent=''; }
 
-    // NEW: Rewritten drawUI function to use DOM elements
     function drawUI(player) {
         if (!player || !player.stats) return;
-
         const abilityName = player.className === 'Operator' ? 'Invis' : (player.className === 'Guardian' ? 'Shield' : 'Blink');
-
         hudInfo.innerHTML = `
-            <p><strong>Data Bits:</strong> ${player.dataBits}</p>
-            <p><strong>Ability:</strong> <span style="color: ${player.abilityCooldown > 0 ? '#777' : '#00f0ff'}">${abilityName} ${player.abilityCooldown > 0 ? player.abilityCooldown.toFixed(1) + 's' : 'READY'}</span></p>
-            <p><strong>Teleport:</strong> <span style="color: ${player.teleportCooldown > 0 ? '#777' : '#00f0ff'}">${player.teleportCooldown > 0 ? (player.teleportCooldown/60).toFixed(1) + 'm' : 'READY'}</span></p>
+            <div class="hud-line"><strong>Data Bits:</strong> <span>${player.dataBits}</span></div>
+            <div class="hud-line"><strong>Ability:</strong> <span style="color: ${player.abilityCooldown > 0 ? '#777' : '#00f0ff'}">${player.abilityCooldown > 0 ? player.abilityCooldown.toFixed(1) + 's' : 'READY'}</span></div>
+            <div class="hud-line"><strong>Teleport:</strong> <span style="color: ${player.teleportCooldown > 0 ? '#777' : '#00f0ff'}">${player.teleportCooldown > 0 ? (player.teleportCooldown/60).toFixed(1) + 'm' : (player.isTeleporting ? `CHARGING...` : 'READY')}</span></div>
             <div class="hud-bar"><div id="health-bar-fill" style="width: ${player.health / player.stats.maxHealth * 100}%;"></div></div>
             <p style="text-align: center; font-size: 12px;">HP: ${Math.ceil(player.health)} / ${player.stats.maxHealth}</p>
             <div class="hud-bar"><div id="energy-bar-fill" style="width: ${player.energy / player.stats.maxEnergy * 100}%;"></div></div>
@@ -486,24 +461,23 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
         updateInventoryAndEquipUI(player);
     }
     
-    // --- MODIFIED SECTION 1: MINIMAP FIX ---
     function drawMinimap(player) {
         const mapSize = 220, viewDist = 25 * TILE_SIZE;
         minimapCtx.fillStyle = '#05060a';
         minimapCtx.fillRect(0, 0, mapSize, mapSize);
         const scale = mapSize / (viewDist * 2);
 
-        for(let y = -viewDist; y < viewDist; y += TILE_SIZE) for(let x = -viewDist; x < viewDist; x += TILE_SIZE) {
-            const tileId = getTile(player.x + x, player.y + y);
-            const tile = TILE_TYPES[tileId] || TILE_TYPES[1];
-            if(tile) {
-                minimapCtx.fillStyle = tile.wc || tile.c;
-                // Using Math.ceil() prevents 1px gaps between tiles from rounding errors
-                minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, Math.ceil(TILE_SIZE * scale), Math.ceil(TILE_SIZE * scale));
+        for(let y = -viewDist; y < viewDist; y += TILE_SIZE) {
+            for(let x = -viewDist; x < viewDist; x += TILE_SIZE) {
+                const tileId = getTile(player.x + x, player.y + y);
+                const tile = TILE_TYPES[tileId] || TILE_TYPES[1];
+                if(tile) {
+                    minimapCtx.fillStyle = tile.wc || tile.c;
+                    minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, Math.ceil(TILE_SIZE * scale) + 1, Math.ceil(TILE_SIZE * scale) + 1);
+                }
             }
         }
         
-        // Draw other entities
         for (const e of gameState.entities) {
             const dX = e.x - player.x;
             const dY = e.y - player.y;
@@ -518,7 +492,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
             }
         }
 
-        // Draw other players
         for (const id in gameState.players) {
             if (id === myPlayerId) continue;
             const p = gameState.players[id];
@@ -532,11 +505,9 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
             }
         }
         
-        // Draw self
         minimapCtx.fillStyle = player.color || '#00ff00';
         minimapCtx.fillRect(mapSize/2 - 2, mapSize/2 - 2, 4, 4);
     }
-    // --- END MODIFIED SECTION 1 ---
 
     function updateInventoryAndEquipUI(player) {
         for(const slot in player.equipment) {
@@ -569,7 +540,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
         });
     }
 
-    // --- Context Menus ---
     function showItemContextMenu(event, source, index, item) {
         event.preventDefault();
         if (!item) return;
@@ -661,7 +631,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
         playerContextMenu.style.display = 'none';
     }
 
-    // --- Panel Management (Shop, Bank, Trade) ---
     function closeAllPanels() {
         closeShop();
         closeBank();
@@ -695,7 +664,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
         bankContainer.style.display = 'none';
     }
     
-    // NEW: Trade Window Functions
     function openTradeWindow(partnerData) {
         closeAllPanels();
         isTrading = true;
@@ -706,7 +674,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
         document.getElementById('trade-accept-btn').textContent = 'ACCEPT';
         document.getElementById('trade-status').textContent = '';
         
-        // Add event listeners
         document.getElementById('trade-cancel-btn').onclick = () => sendToServer({ type: 'tradeCancel' });
         document.getElementById('trade-accept-btn').onclick = () => {
             document.getElementById('trade-status').textContent = 'Waiting for partner...';
@@ -716,7 +683,7 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
         document.getElementById('my-trade-bits').onkeyup = updateMyTradeOffer;
 
         renderMyTradeOffer();
-        updateOtherTradeOffer({ offer: [], offerBits: 0 }); // Clear other's offer initially
+        updateOtherTradeOffer({ offer: [], offerBits: 0 });
     }
     function closeTradeWindow() {
         isTrading = false;
@@ -775,7 +742,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
             slot.oncontextmenu = (e) => showItemContextMenu(e, 'trade', index, offerItem.item);
             grid.appendChild(slot);
         });
-        // Also update inventory to show which items are offered
         myPlayer.inventory.forEach((item, index) => {
             const slot = document.querySelector(`#inventory-grid .inventory-slot:nth-child(${index + 1})`);
             if (slot) {
@@ -884,7 +850,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
         return (item.tier * item.tier) * 20;
     }
 
-    // --- Chat ---
     chatInput.addEventListener('focus', () => { isChatting = true; });
     chatInput.addEventListener('blur', () => { isChatting = false; });
     function addChatMessage(sender, message, color = '#00f0ff') {
@@ -894,7 +859,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
         chatLog.scrollTop = chatLog.scrollHeight;
     }
 
-    // --- Event Listeners ---
     document.addEventListener('keydown', e => {
         const key = e.key.toLowerCase();
         if (key === 'escape') {
@@ -936,12 +900,8 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
     });
 
     window.addEventListener('mousedown', (e) => {
-        // Don't register clicks if clicking on a UI panel
         if(e.target.closest('.ui-panel, .context-menu')) return;
-        
         if(e.button === 0) inputs.mouse.down = true;
-        
-        // Always hide context menus on any click
         hideAllContextMenus();
     });
 
@@ -949,7 +909,6 @@ const ws = new WebSocket(`${protocol}//${window.location.host}`);
         if(e.button === 0) inputs.mouse.down = false;
     });
 
-    // --- Initialization ---
     showLoginScreen();
     gameLoop();
 </script>
