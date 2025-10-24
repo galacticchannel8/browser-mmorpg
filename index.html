@@ -220,7 +220,6 @@ All Rights Reserved.
 
     const TILE_SIZE = 40, CHUNK_SIZE = 16;
     const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
-    // MODIFIED: Added tile type 15 for the new transparent doors.
     const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'}, 15:{n:'D', c:'#00f0ff'} };
     let particles = [];
     let gameStars = [];
@@ -345,14 +344,12 @@ All Rights Reserved.
             
             ctx.save();
             
-            // MODIFIED: Invisibility effect implemented here
             if (p.isInvisible) {
                 ctx.globalAlpha = 0.3;
             }
 
             ctx.translate(p.x, p.y);
             
-            // Draw name with outline
             ctx.font = '12px "Consolas",monospace';
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'black';
@@ -374,7 +371,7 @@ All Rights Reserved.
             ctx.closePath();
             ctx.fill();
             
-            ctx.restore(); // Restore context to remove alpha changes and transformations
+            ctx.restore(); 
 
             if (p.isBoosting && p.id === myPlayerId) {
                 const angle = p.angle + Math.PI + (Math.random() - 0.5) * 0.5;
@@ -464,8 +461,6 @@ All Rights Reserved.
             ctx.beginPath();
             ctx.rect(n.x-n.radius, n.y-n.radius, n.radius*2, n.radius*2);
             ctx.fill();
-
-            // Draw name with outline
             ctx.font = '12px "Consolas"';
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'black';
@@ -478,50 +473,47 @@ All Rights Reserved.
         'LootDrop': (l) => { ctx.fillStyle=l.color; ctx.shadowColor=l.color; ctx.shadowBlur=10; ctx.fillRect(l.x-l.radius,l.y-l.radius,l.radius*2,l.radius*2)},
         'EquipmentDrop': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.color; ctx.shadowColor = d.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, d.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
         'PlayerLootBag': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.item.color || TIER_COLORS[6]; ctx.shadowColor = d.item.color || TIER_COLORS[6]; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, 12, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
-        // MODIFIED: Complete redesign of the Tombstone to look like wreckage with a hologram.
         'Tombstone': (t) => {
             ctx.save();
             ctx.translate(t.x, t.y);
-            ctx.globalAlpha = Math.max(0, t.life / 180); // Fade out over time
+            ctx.globalAlpha = Math.max(0, t.life / 180);
 
-            // Draw main wreckage piece
             ctx.fillStyle = '#4a4a52';
             ctx.strokeStyle = '#212529';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(-20, -15);
-            ctx.lineTo(25, -20);
-            ctx.lineTo(20, 20);
-            ctx.lineTo(-25, 18);
+            ctx.moveTo(-20, -15); ctx.lineTo(25, -20); ctx.lineTo(20, 20); ctx.lineTo(-25, 18);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
 
-            // Draw a smaller overlapping piece
             ctx.fillStyle = '#3a3a3e';
-             ctx.beginPath();
-            ctx.moveTo(5, -5);
-            ctx.lineTo(15, 18);
-            ctx.lineTo(-15, 22);
-            ctx.lineTo(-8, 0);
+            ctx.beginPath();
+            ctx.moveTo(5, -5); ctx.lineTo(15, 18); ctx.lineTo(-15, 22); ctx.lineTo(-8, 0);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
-
-            // Draw flickering light
-            ctx.fillStyle = t.playerColor;
-            ctx.globalAlpha *= (0.6 + Math.sin(Date.now() / 150) * 0.4); // Flicker effect
-            ctx.shadowColor = t.playerColor;
-            ctx.shadowBlur = 20;
-            ctx.beginPath();
-            ctx.arc(-15, -12, 4, 0, Math.PI * 2);
-            ctx.fill();
             
-            // Reset alpha and shadow for text
+            // --- MODIFIED: Functional Loot Orb ---
+            // Check if the associated loot bag still exists in the game state.
+            const lootBagExists = gameState.entities.some(e => e.id === t.lootBagId);
+            if (lootBagExists) {
+                // Draw the pulsating loot orb.
+                ctx.save();
+                const pulse = 0.8 + Math.sin(Date.now() / 200) * 0.2; // Pulsating size
+                ctx.globalAlpha *= (0.8 + Math.sin(Date.now() / 200) * 0.2); // Pulsating alpha
+                ctx.fillStyle = t.playerColor;
+                ctx.shadowColor = t.playerColor;
+                ctx.shadowBlur = 25 * pulse;
+                ctx.beginPath();
+                ctx.arc(0, 5, 6 * pulse, 0, Math.PI * 2); // Orb positioned in the middle of wreckage
+                ctx.fill();
+                ctx.restore();
+            }
+
             ctx.globalAlpha = Math.max(0, t.life / 180);
             ctx.shadowBlur = 0;
 
-            // Draw hologram text
             ctx.textAlign = 'center';
             ctx.fillStyle = t.playerColor;
             ctx.shadowColor = t.playerColor;
@@ -636,30 +628,37 @@ All Rights Reserved.
                 const tileId = getTile(tX, tY);
                 const tile = TILE_TYPES[tileId];
 
-                // MODIFIED: Added specific drawing logic for transparent doors (tile 15)
-                if (tileId === 15) {
-                    // Draw the floor underneath first
-                    ctx.fillStyle = TILE_TYPES[10].c;
+                // --- MODIFIED: Wall and Door Rendering ---
+                if (tileId === 15) { // Draw animated energy door
+                    ctx.fillStyle = TILE_TYPES[10].c; // Floor underneath
                     ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
-                    // Then draw the semi-transparent door effect
-                    ctx.fillStyle = 'rgba(0, 240, 255, 0.2)';
+                    ctx.fillStyle = 'rgba(0, 240, 255, 0.15)';
                     ctx.shadowColor = 'rgba(0, 240, 255, 0.5)';
-                    ctx.shadowBlur = 10;
+                    ctx.shadowBlur = 15;
                     ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
-                } else if (tile && tileId !== 1) { // Only draw other non-empty space tiles
-                    if (tile.wc) { // It's a wall
+                    const scanLineY = tY + (Date.now() % 1500) / 1500 * TILE_SIZE;
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                    ctx.shadowColor = '#fff';
+                    ctx.shadowBlur = 10;
+                    ctx.fillRect(tX, scanLineY, TILE_SIZE, 2);
+                } else if (tile && tileId !== 1) { 
+                    if (tile.wc) { // Draw detailed wall
                         const floorTile = TILE_TYPES[tileId - 1] || TILE_TYPES[1];
                         ctx.fillStyle = floorTile.c;
                         ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
                         ctx.fillStyle = tile.wc;
                         ctx.shadowColor = tile.wc;
                         ctx.shadowBlur = 10;
-                    } else { // It's a floor
+                        ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
+                        ctx.shadowBlur = 0;
+                        ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(tX + 1, tY + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+                    } else { // Draw normal floor
                         ctx.fillStyle = tile.c;
                         ctx.shadowBlur = 0;
+                        ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
                     }
-                    ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
-                    
                     if (tileId === 10 || tileId === 13) {
                          drawTechPattern(tX + TILE_SIZE / 2, tY + TILE_SIZE / 2);
                     }
