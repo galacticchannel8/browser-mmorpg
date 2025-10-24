@@ -31,10 +31,10 @@ const players = {};
 let entities = [];
 const TILE_SIZE = 40;
 const CHUNK_SIZE = 16;
-const MAX_ENEMIES = 120;
+const MAX_ENEMIES = 150; // Increased density
 const ENEMY_SPAWN_INTERVAL = 1; // For spawning near players
 let enemySpawnTimer = ENEMY_SPAWN_INTERVAL;
-const GLOBAL_SPAWN_INTERVAL = 2; // For populating the whole world
+const GLOBAL_SPAWN_INTERVAL = 1; // More aggressive global spawning
 let globalSpawnTimer = GLOBAL_SPAWN_INTERVAL;
 const WORLD_BOUNDS = 6000; // Enemies will spawn randomly within this +/- coordinate range
 let lastTime = Date.now();
@@ -492,6 +492,7 @@ class Enemy extends Entity {
     }
     takeDamage(amount, damager) {
         this.health -= amount;
+        entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(amount)}`, '#ffffff'));
         if (this.health <= 0 && !this.isDead) {
             this.isDead = true;
             if (damager && players[damager.ownerId]) {
@@ -1025,7 +1026,7 @@ function gameLoop() {
                 }
             }
              for(const other of entities) {
-                if (other instanceof Enemy && !entity.hitTargets.includes(other.id) && Math.hypot(entity.x - other.x, other.y - other.y) < entity.radius) {
+                if (other instanceof Enemy && !entity.hitTargets.includes(other.id) && Math.hypot(entity.x - other.x, entity.y - other.y) < entity.radius) {
                     other.takeDamage(entity.damage, entity);
                     entity.hitTargets.push(other.id);
                 }
@@ -1077,7 +1078,7 @@ function gameLoop() {
     globalSpawnTimer -= dt;
     if (globalSpawnTimer <= 0) {
         globalSpawnTimer = GLOBAL_SPAWN_INTERVAL;
-        const spawnAttempts = 10; // Attempt to spawn 10 new mobs every interval
+        const spawnAttempts = 20; // Attempt to spawn more mobs every interval
         for (let i = 0; i < spawnAttempts; i++) {
              if (entities.filter(e => e instanceof Enemy).length >= MAX_ENEMIES) break;
              const spawnX = (Math.random() - 0.5) * 2 * WORLD_BOUNDS;
@@ -1103,22 +1104,30 @@ setInterval(gameLoop, 1000 / TICK_RATE);
 function spawnEnemyAt(x, y) {
     const distFromCenter = Math.hypot(x, y) / TILE_SIZE;
     const threat = getThreatLevel(x, y);
-    let enemyType;
+    let enemyTypes = [];
 
-    if (distFromCenter > 500 && Math.random() < 0.2) {
-        enemyType = GravityWell;
-    } else if (threat >= 4 && Math.random() < 0.25) {
-        enemyType = PhaseCaster;
-    } else if (distFromCenter > 400 && Math.random() < 0.6) {
-        enemyType = VoidSwarmer;
-    } else if (threat >= 3 && Math.random() < 0.3) {
-        enemyType = Warden;
-    } else if (threat >= 2 && Math.random() < 0.4) {
-        enemyType = Stinger;
-    } else {
-        enemyType = Enemy;
+    // Build a weighted list of possible enemies based on threat
+    if (threat === 1) {
+        enemyTypes.push(Enemy, Enemy, VoidSwarmer);
+    } else if (threat === 2) {
+        enemyTypes.push(Enemy, Stinger, Stinger, VoidSwarmer);
+    } else if (threat === 3) {
+        enemyTypes.push(Stinger, Warden, VoidSwarmer, VoidSwarmer);
+    } else if (threat === 4) {
+        enemyTypes.push(Warden, Warden, PhaseCaster, Stinger);
+    } else if (threat === 5) {
+        enemyTypes.push(GravityWell, PhaseCaster, Warden, Warden);
     }
-    entities.push(new enemyType(x, y, threat));
+    
+    // Far-flung regions have a higher chance of special mobs
+    if (distFromCenter > 500) {
+        enemyTypes.push(GravityWell, GravityWell, PhaseCaster);
+    }
+
+    if (enemyTypes.length > 0) {
+        const EnemyClass = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+        entities.push(new EnemyClass(x, y, threat));
+    }
 }
 
 

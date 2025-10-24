@@ -223,12 +223,38 @@ All Rights Reserved.
     
     // --- BACKGROUND AESTHETICS ---
     let starfield = [];
+    let nebulae = [];
+    function createNebulae() {
+        nebulae = [];
+        const nebulaColors = ['rgba(80, 0, 160, 0.1)', 'rgba(0, 80, 160, 0.1)', 'rgba(160, 0, 80, 0.1)'];
+        for(let i = 0; i < 5; i++) {
+            nebulae.push({
+                x: (Math.random() - 0.5) * 8000,
+                y: (Math.random() - 0.5) * 8000,
+                radius: Math.random() * 800 + 400,
+                color: nebulaColors[Math.floor(Math.random() * nebulaColors.length)],
+                speed: Math.random() * 0.05 + 0.02
+            });
+        }
+    }
+    function drawNebulae() {
+        ctx.save();
+        nebulae.forEach(nebula => {
+            const screenX = nebula.x - camera.x * nebula.speed;
+            const screenY = nebula.y - camera.y * nebula.speed;
+            ctx.fillStyle = nebula.color;
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, nebula.radius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.restore();
+    }
     function createStarfield() {
         starfield = [];
         for (let i = 0; i < 500; i++) {
             starfield.push({
-                x: Math.random() * 2 - 1, // Range -1 to 1
-                y: Math.random() * 2 - 1, // Range -1 to 1
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
                 size: Math.random() * 2 + 0.5,
                 speed: Math.random() * 0.2 + 0.1 // Parallax speed
             });
@@ -238,15 +264,17 @@ All Rights Reserved.
         ctx.save();
         ctx.fillStyle = '#fff';
         starfield.forEach(star => {
-            // Parallax effect based on camera position
-            const screenX = (canvas.width / 2) + star.x * (canvas.width / 2) - (camera.x * star.speed) % canvas.width;
-            const screenY = (canvas.height / 2) + star.y * (canvas.height / 2) - (camera.y * star.speed) % canvas.height;
+            const parallaxX = (star.x - (camera.x * star.speed)) % canvas.width;
+            const parallaxY = (star.y - (camera.y * star.speed)) % canvas.height;
+            const screenX = (parallaxX < 0) ? parallaxX + canvas.width : parallaxX;
+            const screenY = (parallaxY < 0) ? parallaxY + canvas.height : parallaxY;
             ctx.globalAlpha = star.speed * 2; // Dimmer stars move slower
             ctx.fillRect(screenX, screenY, star.size, star.size);
         });
         ctx.restore();
     }
     createStarfield();
+    createNebulae();
 
 
     ws.onmessage = (message) => {
@@ -489,16 +517,26 @@ All Rights Reserved.
 
     function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const myPlayer = gameState.players[myPlayerId];
         
-        drawStarfield();
+        const myPlayer = gameState.players[myPlayerId];
 
-        if (!isGameRunning || !myPlayer) return;
+        // Draw background first, only if in game
+        if (isGameRunning && myPlayer) {
+            drawStarfield();
+        }
+        
+        if (!isGameRunning || !myPlayer) {
+             // If not in game (e.g., login screen), still draw a static background
+            drawStarfield(); // Or a simpler version if preferred
+            return;
+        }
         
         camera.x = myPlayer.x; camera.y = myPlayer.y;
         
         ctx.save();
-        ctx.translate(canvas.width / 2, canvas.height / 2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
+        ctx.translate(canvas.width / 2, canvas.height / 2); 
+        drawNebulae(); // Draw nebulae relative to camera
+        ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
         
         const b = { l: Math.floor((camera.x-canvas.width/2/camera.zoom)/TILE_SIZE)-1, r: Math.ceil((camera.x+canvas.width/2/camera.zoom)/TILE_SIZE)+1, t: Math.floor((camera.y-canvas.height/2/camera.zoom)/TILE_SIZE)-1, b: Math.ceil((camera.y+canvas.height/2/camera.zoom)/TILE_SIZE)+1, };
         for (let y = b.t; y < b.b; y++) for (let x = b.l; x < b.r; x++) { const tX = x * TILE_SIZE, tY = y * TILE_SIZE; const tileId = getTile(tX, tY), tile = TILE_TYPES[tileId] || TILE_TYPES[1]; if (tile.wc) { const floorTile = TILE_TYPES[tileId - 1] || TILE_TYPES[1]; ctx.fillStyle = floorTile.c; ctx.fillRect(tX, tY, TILE_SIZE+1, TILE_SIZE+1); ctx.fillStyle = tile.wc; ctx.shadowColor = tile.wc; ctx.shadowBlur = 10; } else { ctx.fillStyle = tile.c; ctx.shadowBlur = 0; } ctx.fillRect(tX, tY, TILE_SIZE+1, TILE_SIZE+1); }
@@ -529,7 +567,6 @@ All Rights Reserved.
                 const angle = Math.atan2(worldMouseY - myPlayer.y, worldMouseX - myPlayer.x);
                 sendToServer({ type: 'input', inputs, angle });
             } else if (myPlayer.isTeleporting) {
-                // Send minimal input to allow server to cancel teleport on movement
                 sendToServer({ type: 'input', inputs: {w:inputs.w, a:inputs.a, s:inputs.s, d:inputs.d, space:inputs.space, mouse:inputs.mouse}, angle: myPlayer.angle });
             }
         }
@@ -984,6 +1021,12 @@ All Rights Reserved.
     }
 
     document.addEventListener('keydown', e => {
+        // Handle Escape key first to close any open panels
+        if (e.key === 'Escape') {
+            closeAllPanels();
+            return;
+        }
+
         if (isChatting) {
             if (e.key === 'Enter') {
                 const msg = chatInput.value.trim();
@@ -1000,6 +1043,7 @@ All Rights Reserved.
             return;
         }
         
+        // Prevent movement keys if any UI panel is open
         if (isShopOpen || isBankOpen || isTrading) return;
 
         const key = e.key.toLowerCase();
