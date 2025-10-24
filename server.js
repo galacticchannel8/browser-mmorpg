@@ -226,7 +226,7 @@ class Player {
                 this.y = CITY_SPAWN_POINT.y;
                 this.teleportCooldown = this.teleportMaxCooldown;
                 broadcastMessage({type: 'sfx', effect: 'teleportEnd', x: this.x, y: this.y, color: this.color});
-                return; 
+                return;
             }
              if (this.inputs.w || this.inputs.a || this.inputs.s || this.inputs.d || this.inputs.space || this.inputs.mouse.down) {
                 this.isTeleporting = false;
@@ -255,6 +255,7 @@ class Player {
         }
         this.energy = Math.max(0, Math.min(this.stats.maxEnergy, this.energy));
         
+        // Player movement is only blocked if they are teleporting AND not moving via inputs
         if (!this.isTeleporting) {
             const forward = (this.inputs.w ? 1 : 0) - (this.inputs.s ? 1 : 0); 
             const strafe = (this.inputs.d ? 1 : 0) - (this.inputs.a ? 1 : 0); 
@@ -277,16 +278,19 @@ class Player {
         this.teleportCooldown = Math.max(0, this.teleportCooldown - dt);
         this.abilityCooldown = Math.max(0, this.abilityCooldown - dt);
 
-        if (!this.isTeleporting) {
-            if (this.inputs.mouse.down && this.gunCooldown <= 0) this.fireWeapon();
-            if (this.inputs.space && this.meleeCooldown <= 0) this.fireMelee();
-            if (this.inputs.h && this.teleportCooldown <= 0) {
-                this.isTeleporting = true;
-                this.teleportTimer = this.TELEPORT_CHARGE_TIME;
-            }
-            if (this.inputs.q) { this.useAbility(); }
-            this.updateAbility(dt);
-            if (this.inputs.e) { this.attemptInteraction(); this.inputs.e = false; }
+        if (this.inputs.mouse.down && this.gunCooldown <= 0 && !this.isTeleporting) this.fireWeapon();
+        if (this.inputs.space && this.meleeCooldown <= 0 && !this.isTeleporting) this.fireMelee();
+        if (this.inputs.h && this.teleportCooldown <= 0 && !this.isTeleporting) {
+            this.isTeleporting = true;
+            this.teleportTimer = this.TELEPORT_CHARGE_TIME;
+        }
+        
+        if (this.inputs.q) { this.useAbility(); }
+        this.updateAbility(dt);
+
+        if (this.inputs.e && !this.isTeleporting) { 
+            this.attemptInteraction(); 
+            this.inputs.e = false; 
         }
     }
 
@@ -590,7 +594,7 @@ class GravityWell extends Enemy {
         this.health = this.maxHealth = 999999;
         this.color = '#1a1a1a';
         this.xpValue = 0;
-        this.pullRadius = 600;
+        this.pullRadius = 600; 
         this.eventHorizonRadius = this.pullRadius / 2;
         this.pullStrength = 300000;
     }

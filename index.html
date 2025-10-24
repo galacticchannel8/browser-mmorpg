@@ -11,7 +11,7 @@ All Rights Reserved.
     <style>
         body, html { background-color: #05060a; color: #00f0ff; font-family: 'Consolas', 'Monaco', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; user-select: none; }
         #gameCanvas { background-color: #05060a; cursor: crosshair; }
-        #chat-container { display: none; /* UPDATED: Hidden by default */ position: fixed; bottom: 20px; left: 20px; width: 400px; background-color: rgba(5, 6, 10, 0.7); border: 1px solid #00f0ff; border-radius: 5px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; z-index: 10; }
+        #chat-container { display: none; position: fixed; bottom: 20px; left: 20px; width: 400px; background-color: rgba(5, 6, 10, 0.7); border: 1px solid #00f0ff; border-radius: 5px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; z-index: 10; }
         #chat-log { height: 150px; padding: 10px; overflow-y: scroll; font-size: 14px; list-style: none; margin: 0; }
         #chat-log::-webkit-scrollbar { width: 4px; } #chat-log::-webkit-scrollbar-thumb { background: #00f0ff; }
         #chat-input { width: 100%; border: none; border-top: 1px solid #00f0ff; background-color: #05060a; color: #fff; padding: 8px; font-family: 'Consolas', 'Monaco', monospace; box-sizing: border-box; }
@@ -345,7 +345,6 @@ All Rights Reserved.
             ctx.save();
             ctx.translate(p.x, p.y);
             
-            // Draw name with outline
             ctx.font = '12px "Consolas",monospace';
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'black';
@@ -457,7 +456,6 @@ All Rights Reserved.
             ctx.rect(n.x-n.radius, n.y-n.radius, n.radius*2, n.radius*2);
             ctx.fill();
 
-            // Draw name with outline
             ctx.font = '12px "Consolas"';
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'black';
@@ -475,7 +473,6 @@ All Rights Reserved.
             ctx.translate(t.x, t.y);
             ctx.globalAlpha = 0.5 + (t.life / 180) * 0.5;
 
-            // Draw shipwreck debris
             ctx.fillStyle = '#495057';
             ctx.strokeStyle = '#212529';
             ctx.lineWidth = 3;
@@ -488,7 +485,6 @@ All Rights Reserved.
             ctx.fill();
             ctx.stroke();
 
-            // Draw flickering light
             ctx.fillStyle = t.playerColor;
             ctx.globalAlpha *= (0.7 + Math.sin(Date.now() / 100) * 0.3);
             ctx.shadowColor = t.playerColor;
@@ -496,8 +492,8 @@ All Rights Reserved.
             ctx.beginPath();
             ctx.arc(-15, -12, 3, 0, Math.PI * 2);
             ctx.fill();
-
-            // Draw hologram projector and text
+            
+            ctx.globalAlpha = (0.8 + Math.sin(Date.now() / 150) * 0.2) * (0.5 + (t.life / 180) * 0.5);
             ctx.fillStyle = 'rgba(108, 117, 125, 0.8)';
             ctx.fillRect(-22, -2, 44, 24);
             ctx.fillStyle = '#e9ecef';
@@ -571,14 +567,16 @@ All Rights Reserved.
     }
     
     function drawTechPattern(tX, tY) {
-        ctx.strokeStyle = 'rgba(0, 240, 255, 0.1)';
+        const pulse = 0.1 + (Math.sin(Date.now() / 1000 + tX / 100 + tY / 100) + 1) / 2 * 0.15;
+        ctx.strokeStyle = `rgba(0, 240, 255, ${pulse})`;
         ctx.lineWidth = 1;
         const size = TILE_SIZE / 2;
         ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-            ctx.lineTo(tX + size * Math.cos(i * Math.PI / 3), tY + size * Math.sin(i * Math.PI / 3));
+        const hexPoints = 6;
+        for (let i = 0; i < hexPoints + 1; i++) {
+            const angle = (i * Math.PI) / 3;
+            ctx.lineTo(tX + size * Math.cos(angle), tY + size * Math.sin(angle));
         }
-        ctx.closePath();
         ctx.stroke();
     }
 
@@ -613,21 +611,28 @@ All Rights Reserved.
                 const tileId = getTile(tX, tY);
                 const tile = TILE_TYPES[tileId];
 
-                if (tile && tileId !== 1) { // Only draw non-empty space tiles
-                    if (tile.wc) { // It's a wall
-                        const floorTile = TILE_TYPES[tileId - 1] || TILE_TYPES[1];
-                        ctx.fillStyle = floorTile.c;
-                        ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
-                        ctx.fillStyle = tile.wc;
-                        ctx.shadowColor = tile.wc;
-                        ctx.shadowBlur = 10;
-                    } else { // It's a floor
+                if (tile && tileId !== 1) {
+                    if (tile.wc) {
+                        const isEdge = !isSolid(getTile(tX, tY - TILE_SIZE)) || !isSolid(getTile(tX, tY + TILE_SIZE)) || !isSolid(getTile(tX - TILE_SIZE, tY)) || !isSolid(getTile(tX + TILE_SIZE, tY));
+
+                        const grad = ctx.createLinearGradient(tX, tY, tX, tY + TILE_SIZE);
+                        grad.addColorStop(0, tile.wc);
+                        grad.addColorStop(1, '#003338');
+                        ctx.fillStyle = grad;
+                        
+                        if(isEdge) {
+                           ctx.shadowColor = tile.wc;
+                           ctx.shadowBlur = 25 + Math.sin(Date.now()/500 + x) * 5;
+                        } else {
+                            ctx.shadowBlur = 0;
+                        }
+
+                    } else {
                         ctx.fillStyle = tile.c;
                         ctx.shadowBlur = 0;
                     }
                     ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
                     
-                    // Draw tech pattern on city floors and boss floors
                     if (tileId === 10 || tileId === 13) {
                          drawTechPattern(tX + TILE_SIZE / 2, tY + TILE_SIZE / 2);
                     }
@@ -653,7 +658,13 @@ All Rights Reserved.
     }
 
     function gameLoop() {
-        if (isGameRunning && myPlayerId && gameState.players[myPlayerId] && !isShopOpen && !isBankOpen && !isTrading) { 
+        if (!isGameRunning) {
+            render();
+            requestAnimationFrame(gameLoop);
+            return;
+        }
+
+        if (myPlayerId && gameState.players[myPlayerId] && !isShopOpen && !isBankOpen && !isTrading) { 
             const myPlayer = gameState.players[myPlayerId];
             if (!myPlayer.isDead) {
                 const worldMouseX = (inputs.mouse.x - canvas.width / 2) / camera.zoom + myPlayer.x;
@@ -686,7 +697,11 @@ All Rights Reserved.
         isGameRunning = false;
         closeAllPanels();
     }
-    function chooseClass(className) { chosenClassName = className; showShipSelection(); }
+    function chooseClass(className) { 
+        classSelectionPanel.style.display = 'none'; 
+        chosenClassName = className; 
+        showShipSelection(); 
+    }
     function chooseColor(color) {
         shipSelectionPanel.style.display = 'none';
         rightUI.style.display = 'block';
@@ -696,7 +711,11 @@ All Rights Reserved.
         sendToServer({ type: 'playerInit', username: loggedInUser, color: color, className: chosenClassName });
         isGameRunning = true;
     }
-    function handleRespawn() { sendToServer({type: 'playerRespawn'}); showClassSelection(); deathScreen.style.display = 'none'; }
+    function handleRespawn() { 
+        deathScreen.style.display = 'none';
+        sendToServer({type: 'playerRespawn'}); 
+        showClassSelection(); 
+    }
     function handleLogin() { const u=document.getElementById('login-username').value, p=document.getElementById('login-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]&&users[u]===p){loggedInUser=u;showClassSelection()}else{e.textContent='Invalid username or password.'} }
     function handleRegister() { const u=document.getElementById('register-username').value, p=document.getElementById('register-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} if(u.length<3){e.textContent='Username must be at least 3 characters.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]){e.textContent='Username already taken.'}else{users[u]=p;localStorage.setItem('galactic_os_users',JSON.stringify(users));loggedInUser=u;showClassSelection()} }
     function toggleLoginRegister(showLogin) { document.getElementById('login-form').style.display=showLogin?'block':'none';document.getElementById('register-form').style.display=showLogin?'none':'block';document.getElementById('login-error').textContent=''; }
