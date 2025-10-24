@@ -302,14 +302,33 @@ class Player {
         const damageTaken = Math.max(1, amount - this.stats.defense);
         this.health = Math.max(0, this.health - damageTaken);
         entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(damageTaken)}`));
-        if (this.health <= 0) this.die();
+        if (this.health <= 0) this.die(damager);
     }
 
-    die() {
+    die(killer = null) {
+        if (this.isDead) return; // Prevent multiple death calls
+
         if (this.trade.partnerId) {
-            cancelTrade(this.id, `${this.username} went offline.`);
+            cancelTrade(this.id, `${this.username} has disconnected.`);
         }
         this.isDead = true;
+
+        // Determine cause of death
+        let causeOfDeath = 'The Void';
+        if (killer) {
+            if (killer.ownerId && players[killer.ownerId]) {
+                causeOfDeath = players[killer.ownerId].username;
+            } else if (killer.bossName) {
+                causeOfDeath = `the ${killer.bossName}`;
+            } else if (killer.type) {
+                // Make the name more readable
+                causeOfDeath = `a ${killer.type.replace(/([A-Z])/g, ' $1').trim()}`;
+            }
+        }
+
+        // Create Tombstone
+        entities.push(new Tombstone(this.x, this.y, this.username, causeOfDeath));
+        
         const droppedItems = [...Object.values(this.equipment), ...this.inventory].filter(item => item !== null);
         const droppedBits = Math.floor(this.dataBits * 0.8);
         if(droppedItems.length > 0 || droppedBits > 0) {
@@ -474,6 +493,8 @@ class Enemy extends Entity {
     }
     takeDamage(amount, damager) {
         this.health -= amount;
+        // NEW: Add floating damage text for enemies
+        entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(amount)}`, '#ffffff'));
         if (this.health <= 0 && !this.isDead) {
             this.isDead = true;
             if (damager && players[damager.ownerId]) {
@@ -525,6 +546,8 @@ class Warden extends Enemy {
     takeDamage(amount, damager = null) {
         if (this.shield > 0) {
             this.shield -= amount;
+             // NEW: Show shield damage text
+            entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(amount)}`, '#e3d400'));
             if (this.shield < 0) {
                 const overflowDamage = -this.shield;
                 this.shield = 0;
@@ -538,29 +561,55 @@ class Warden extends Enemy {
 class GravityWell extends Enemy {
     constructor(x, y, tL) {
         super(x, y, tL, 'GravityWell');
-        this.radius = 20; this.speed = 0.5; this.health = this.maxHealth = 300; this.color = '#1a1a1a';
-        this.xpValue = 80 * tL;
+        this.radius = 20;
+        this.speed = 0; // NEW: GravityWells are stationary
+        this.health = this.maxHealth = 999999;
+        this.color = '#1a1a1a';
+        this.xpValue = 0; // NEW: No XP for an unkillable entity
         this.pullRadius = 300;
-        this.pullStrength = 2.5;
-        this.applyThreatLevel();
+        this.pullStrength = 25; // NEW: 10x pull strength
     }
     update(dt) {
-        super.update(dt);
-        for(const pid in players) {
+        // Player pull and kill logic
+        for (const pid in players) {
             const player = players[pid];
-            const dist = Math.hypot(player.x-this.x, player.y-this.y);
-            if(!player.isDead && !player.isTeleporting && dist < this.pullRadius) {
+            const dist = Math.hypot(player.x - this.x, player.y - this.y);
+
+            // NEW: Kill players who get too close
+            if (dist < this.radius && !player.isDead) {
+                player.die(this);
+                continue; // Skip to next player
+            }
+            
+            if (!player.isDead && !player.isTeleporting && dist < this.pullRadius) {
                 const pullForce = (1 - (dist / this.pullRadius)) * this.pullStrength;
                 const angle = Math.atan2(this.y - player.y, this.x - player.x);
                 let moveX = Math.cos(angle) * pullForce * (player.isBoosting ? 0.5 : 1);
                 let moveY = Math.sin(angle) * pullForce * (player.isBoosting ? 0.5 : 1);
-                
+
                 const nX = player.x + moveX;
                 const nY = player.y + moveY;
                 if (!isSolid(getTile(nX, player.y))) player.x = nX;
                 if (!isSolid(getTile(player.x, nY))) player.y = nY;
             }
         }
+
+        // NEW: Destroy other entities that get too close
+        for (const entity of entities) {
+            if (entity === this || entity.isDead) continue;
+            const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+            if (dist < this.radius) {
+                if (entity instanceof Enemy && !entity.isBoss) {
+                    entity.isDead = true; // Destroy other enemies
+                } else if (entity.type === 'Projectile' || entity.type === 'Grenade' || entity.type === 'LootDrop' || entity.type === 'EquipmentDrop') {
+                    entity.isDead = true; // Destroy projectiles and loot
+                }
+            }
+        }
+    }
+    // NEW: GravityWells are indestructible
+    takeDamage(amount, damager = null) {
+        return;
     }
 }
 
@@ -579,6 +628,7 @@ class WorldBoss extends Enemy {
     }
     takeDamage(amount, damager = null) {
         this.health -= amount;
+        entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(amount)}`, '#ffffff'));
         if (this.health <= 0 && !this.isDead) {
             this.isDead = true;
             if(damager && players[damager.ownerId]) {
@@ -783,6 +833,22 @@ class LootDrop extends Entity { constructor(x,y,v){ super(x + Math.random()*20-1
 class EquipmentDrop extends Entity { constructor(x, y, item) { super(x + Math.random()*20-10, y+Math.random()*20-10, 'EquipmentDrop'); this.item = item; this.radius = 8; this.color = TIER_COLORS[item.tier] || '#fff'; this.life = 60; this.pickupDelay = 0.5; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0) this.isDead = true; } }
 class PlayerLootBag extends Entity { constructor(x, y, items, bits, color) { super(x, y, 'PlayerLootBag'); this.item = { color: color }; this.items = items; this.bits = bits; this.life = 180; this.pickupDelay = 3; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0 || (this.bits <= 0 && this.items.every(i => i === null))) this.isDead = true; } }
 class FloatingText extends Entity { constructor(x, y, text, color = '#ff8888') { super(x, y, 'floatingText'); this.text = text; this.color = color; this.life = 1; } update(dt) { this.y -= 20 * dt; this.life -= dt; if (this.life <= 0) this.isDead = true; } }
+// NEW: Tombstone entity for player deaths
+class Tombstone extends Entity {
+    constructor(x, y, playerName, causeOfDeath) {
+        super(x, y, 'Tombstone');
+        this.playerName = playerName;
+        this.causeOfDeath = causeOfDeath;
+        this.life = 180; // Despawns after 3 minutes
+    }
+    update(dt) {
+        this.life -= dt;
+        if (this.life <= 0) {
+            this.isDead = true;
+        }
+    }
+}
+
 
 // --- INITIALIZE WORLD ---
 function initializeWorld() {
@@ -862,6 +928,15 @@ function gameLoop() {
                         if (angleDiff < entity.arc / 2) {
                             other.takeDamage(entity.damage, { ownerId: entity.ownerId });
                             entity.hitTargets.push(other.id);
+                             // NEW: Add a small knockback for more impact
+                            if (other instanceof Enemy && !other.isBoss) {
+                                const knockbackStrength = 15;
+                                const knockbackAngle = entity.angle;
+                                const knockbackX = other.x + Math.cos(knockbackAngle) * knockbackStrength;
+                                const knockbackY = other.y + Math.sin(knockbackAngle) * knockbackStrength;
+                                if (!isSolid(getTile(knockbackX, other.y))) other.x = knockbackX;
+                                if (!isSolid(getTile(other.x, knockbackY))) other.y = knockbackY;
+                            }
                         }
                     }
                 }
