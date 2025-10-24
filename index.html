@@ -343,6 +343,7 @@ All Rights Reserved.
             }
 
             ctx.save();
+            ctx.globalAlpha = p.isInvisible ? 0.3 : 1;
             ctx.translate(p.x, p.y);
             
             ctx.font = '12px "Consolas",monospace';
@@ -582,13 +583,12 @@ All Rights Reserved.
 
 
     function render() {
-        const myPlayer = gameState.players[myPlayerId];
-        
         if (!isGameRunning) {
             drawLoginBackground();
             return;
         }
 
+        const myPlayer = gameState.players[myPlayerId];
         if (!myPlayer) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             return;
