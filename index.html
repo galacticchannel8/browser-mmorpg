@@ -227,6 +227,33 @@ All Rights Reserved.
             if (data.type === 'sfx') {
                 if (data.effect === 'blink') {
                     for(let i=0; i<20; i++) particles.push({x: data.x, y: data.y, life: 1, size: Math.random()*3+1, color: data.color});
+                } else if (data.effect === 'teleportCharge') {
+                    for(let i=0; i<2; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = Math.random() * 20 + 20;
+                        particles.push({
+                            x: data.x + Math.cos(angle) * dist,
+                            y: data.y + Math.sin(angle) * dist,
+                            vx: Math.cos(angle) * -1,
+                            vy: Math.sin(angle) * -1,
+                            life: 0.5,
+                            size: Math.random() * 2 + 1,
+                            color: data.color
+                        });
+                    }
+                } else if (data.effect === 'teleportEnd') {
+                    for(let i=0; i<50; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        particles.push({
+                            x: data.x,
+                            y: data.y,
+                            vx: Math.cos(angle) * (Math.random() * 4),
+                            vy: Math.sin(angle) * (Math.random() * 4),
+                            life: 1.5,
+                            size: Math.random() * 3 + 1,
+                            color: data.color
+                        });
+                    }
                 }
             }
             else if (data.type === 'init') { myPlayerId = data.playerId; localWorld = data.world; }
@@ -311,7 +338,7 @@ All Rights Reserved.
                 const angle = p.angle + Math.PI + (Math.random() - 0.5) * 0.5;
                 const x = p.x + Math.cos(angle) * (r - 2);
                 const y = p.y + Math.sin(angle) * (r - 2);
-                particles.push({x: x, y: y, life: 1, size: Math.random() * 3 + 2, color: p.color});
+                particles.push({x: x, y: y, vx: 0, vy: 0, life: 1, size: Math.random() * 3 + 2, color: p.color});
             }
             if(p.shieldActive){ctx.fillStyle=`rgba(51, 255, 153, 0.4)`; ctx.beginPath(); ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2); ctx.fill();}
             if (p.id !== myPlayerId && p.health < p.stats.maxHealth) {
@@ -350,6 +377,7 @@ All Rights Reserved.
         'Stinger': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 3; const r = e.radius; ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0); ctx.closePath(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
         'VoidSwarmer': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; const r = e.radius; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-r-15; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
         'Warden': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 4; const r = e.radius; ctx.beginPath(); for (let i = 0; i < 5; i++) ctx.lineTo(r*Math.cos(i*2*Math.PI/5), r*Math.sin(i*2*Math.PI/5)); ctx.closePath(); ctx.stroke(); ctx.restore(); if (e.shield > 0) { ctx.fillStyle = `rgba(227, 212, 0, ${0.1 + (e.shield / e.maxShield) * 0.3})`; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 8, 0, Math.PI*2); ctx.fill(); } if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
+        'GravityWell': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = '#fff'; ctx.shadowBlur = e.radius; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI * 2); ctx.fill(); const rotation = (Date.now() / 3000) % (Math.PI*2); for(let i=0; i<3; i++) { ctx.rotate(rotation + i * Math.PI*2/3); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0, e.pullRadius * 0.3, Math.PI*0.1, Math.PI*0.9); ctx.stroke(); ctx.beginPath(); ctx.arc(0,0, e.pullRadius * 0.7, Math.PI*0.1, Math.PI*0.9); ctx.stroke(); } ctx.restore(); },
         'Dreadnought': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 30; ctx.beginPath(); ctx.rect(-e.radius, -e.radius/2, e.radius*2, e.radius); ctx.fill(); ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.rect(-e.radius/2, -e.radius/1.5, e.radius, e.radius*1.3); ctx.fill(); ctx.restore(); drawBossHealthbar(e); },
         'SerpentHead': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 20; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); drawBossHealthbar(e); e.segments.forEach(seg => drawFunctions['SerpentBody'](seg)); },
         'SerpentBody': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.shadowColor = e.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-e.radius-10; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
@@ -381,7 +409,7 @@ All Rights Reserved.
         for (let y = b.t; y < b.b; y++) for (let x = b.l; x < b.r; x++) { const tX = x * TILE_SIZE, tY = y * TILE_SIZE; const tileId = getTile(tX, tY), tile = TILE_TYPES[tileId] || TILE_TYPES[1]; if (tile.wc) { const floorTile = TILE_TYPES[tileId - 1] || TILE_TYPES[1]; ctx.fillStyle = floorTile.c; ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE); ctx.fillStyle = tile.wc; ctx.shadowColor = tile.wc; ctx.shadowBlur = 10; } else { ctx.fillStyle = tile.c; ctx.shadowBlur = 0; } ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE); }
         ctx.shadowBlur = 0;
         
-        particles.forEach(p => { p.life -= 0.05; p.x += (Math.random() - 0.5)*2; p.y += (Math.random() - 0.5)*2; ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); }); particles = particles.filter(p => p.life > 0); ctx.globalAlpha = 1;
+        particles.forEach(p => { p.life -= 0.05; p.x += p.vx; p.y += p.vy; ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); }); particles = particles.filter(p => p.life > 0); ctx.globalAlpha = 1;
         
         canvas.style.cursor = 'crosshair';
         canvas.oncontextmenu = showGroundContextMenu;
@@ -400,11 +428,14 @@ All Rights Reserved.
     function gameLoop() {
         if (isGameRunning && myPlayerId && gameState.players[myPlayerId] && !isShopOpen && !isBankOpen && !isTrading) { 
             const myPlayer = gameState.players[myPlayerId];
-            if (!myPlayer.isDead) {
+            if (!myPlayer.isDead && !myPlayer.isTeleporting) {
                 const worldMouseX = (inputs.mouse.x - canvas.width / 2) / camera.zoom + myPlayer.x;
                 const worldMouseY = (inputs.mouse.y - canvas.height / 2) / camera.zoom + myPlayer.y;
                 const angle = Math.atan2(worldMouseY - myPlayer.y, worldMouseX - myPlayer.x);
                 sendToServer({ type: 'input', inputs, angle });
+            } else if (myPlayer.isTeleporting) {
+                // Send minimal input to allow server to cancel teleport on movement
+                sendToServer({ type: 'input', inputs: {w:inputs.w, a:inputs.a, s:inputs.s, d:inputs.d, space:inputs.space, mouse:inputs.mouse}, angle: myPlayer.angle });
             }
         }
         render();
@@ -482,13 +513,11 @@ All Rights Reserved.
             const dX = e.x - player.x;
             const dY = e.y - player.y;
             if (Math.abs(dX) < viewDist && Math.abs(dY) < viewDist) {
-                if (e.isBoss) {
-                    minimapCtx.fillStyle = e.color;
-                    minimapCtx.fillRect(mapSize / 2 + dX * scale - 3, mapSize / 2 + dY * scale - 3, 6, 6);
-                } else if (e.type.includes('Enemy') || e.type === 'VoidSwarmer') {
-                    minimapCtx.fillStyle = e.color;
-                    minimapCtx.fillRect(mapSize / 2 + dX * scale - 1.5, mapSize / 2 + dY * scale - 1.5, 3, 3);
-                }
+                let size = 3;
+                if (e.isBoss) size = 6;
+                else if (e.type === 'GravityWell') size = 4;
+                minimapCtx.fillStyle = e.color;
+                minimapCtx.fillRect(mapSize / 2 + dX * scale - size/2, mapSize / 2 + dY * scale - size/2, size, size);
             }
         }
 
@@ -913,4 +942,4 @@ All Rights Reserved.
     gameLoop();
 </script>
 </body>
-</html>
+</html>"
