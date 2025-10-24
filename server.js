@@ -31,10 +31,10 @@ const players = {};
 let entities = [];
 const TILE_SIZE = 40;
 const CHUNK_SIZE = 16;
-const MAX_ENEMIES = 225; // UPDATED: Increased mob cap
+const MAX_ENEMIES = 225;
 const ENEMY_SPAWN_INTERVAL = 1;
-const DESPAWN_RADIUS = 2500; // NEW: Radius outside which enemies are candidates for despawning
-const DESPAWN_TIME = 60; // NEW: Time in seconds an enemy must be outside the radius to despawn
+const DESPAWN_RADIUS = 2500; 
+const DESPAWN_TIME = 60; 
 let enemySpawnTimer = ENEMY_SPAWN_INTERVAL;
 let lastTime = Date.now();
 const bossRespawnTimers = {};
@@ -289,7 +289,7 @@ class Player {
     fireMelee() {
         if (this.trade.partnerId || this.isTeleporting) return;
         this.meleeCooldown = 0.8;
-        const meleeDamage = this.stats.damage * 1.5; // Buffed from 1.2
+        const meleeDamage = this.stats.damage * 1.5;
         entities.push(new MeleeSlash(this.x, this.y, this.angle, this.id, meleeDamage, this.color));
     }
 
@@ -308,27 +308,34 @@ class Player {
     }
 
     die(killer = null) {
-        if (this.isDead) return; // Prevent multiple death calls
+        if (this.isDead) return;
 
         if (this.trade.partnerId) {
             cancelTrade(this.id, `${this.username} has disconnected.`);
         }
         this.isDead = true;
 
-        // Determine cause of death
+        // UPDATED: More specific cause of death logic
         let causeOfDeath = 'The Void';
-        if (killer) {
-            if (killer.ownerId && players[killer.ownerId]) {
-                causeOfDeath = players[killer.ownerId].username;
-            } else if (killer.bossName) {
-                causeOfDeath = `the ${killer.bossName}`;
-            } else if (killer.type) {
-                // Make the name more readable
-                causeOfDeath = `a ${killer.type.replace(/([A-Z])/g, ' $1').trim()}`;
+        let finalKiller = killer;
+
+        if (killer && killer.ownerId) {
+            const owner = players[killer.ownerId] || entities.find(e => e.id === killer.ownerId);
+            if (owner) {
+                finalKiller = owner;
             }
         }
 
-        // Create Tombstone
+        if (finalKiller) {
+            if (finalKiller.username) {
+                causeOfDeath = finalKiller.username;
+            } else if (finalKiller.bossName) {
+                causeOfDeath = `the ${finalKiller.bossName}`;
+            } else if (finalKiller.type) {
+                causeOfDeath = `a ${finalKiller.type.replace(/([A-Z])/g, ' $1').trim()}`;
+            }
+        }
+
         entities.push(new Tombstone(this.x, this.y, this.username, causeOfDeath));
         
         const droppedItems = [...Object.values(this.equipment), ...this.inventory].filter(item => item !== null);
@@ -345,7 +352,7 @@ class Player {
         this.equipment = { Weapon: null, Module: null, Plating: null, Utility: null };
         this.inventory = Array(12).fill(null);
         this.dataBits = 0;
-        this.level = 1; // Permadeath
+        this.level = 1;
         this.xp = 0;
         this.xpToNextLevel = this.calculateXpToNextLevel();
         this.recalculateStats();
@@ -446,7 +453,7 @@ class Enemy extends Entity {
         this.color = '#ff3355'; this.aggroRadius = 350; this.deAggroRadius = this.aggroRadius * 1.5;
         this.wanderTarget = null; this.wanderTimer = 0;
         this.xpValue = 15 * threatLevel;
-        this.timeOutsidePlayerRange = 0; // NEW: Timer for despawning
+        this.timeOutsidePlayerRange = 0;
         this.applyThreatLevel();
     }
     applyThreatLevel() { this.health = this.maxHealth = this.health * (1 + (this.threatLevel-1)*0.6); this.damageMultiplier = 1 + (this.threatLevel-1)*0.4; }
@@ -567,8 +574,10 @@ class GravityWell extends Enemy {
         this.health = this.maxHealth = 999999;
         this.color = '#1a1a1a';
         this.xpValue = 0;
-        this.pullRadius = 300;
-        this.pullStrength = 25;
+        // UPDATED: Reworked gravity mechanics
+        this.pullRadius = 600; // Larger pull radius
+        this.eventHorizonRadius = 50; // Point of no return
+        this.pullStrength = 60000; // Adjusted for inverse square falloff
     }
     update(dt) {
         for (const pid in players) {
@@ -581,10 +590,20 @@ class GravityWell extends Enemy {
             }
             
             if (!player.isDead && !player.isTeleporting && dist < this.pullRadius) {
-                const pullForce = (1 - (dist / this.pullRadius)) * this.pullStrength;
+                let pullForce;
+                // Exponential pull force based on inverse square law
+                if (dist > this.eventHorizonRadius) {
+                    pullForce = this.pullStrength / (dist * dist);
+                } else {
+                    // Inside the event horizon, pull is overwhelming
+                    pullForce = (this.pullStrength * 2) / (dist * dist);
+                }
+
+                const boostModifier = player.isBoosting ? 0.7 : 1.0; // Boosting helps but doesn't negate
                 const angle = Math.atan2(this.y - player.y, this.x - player.x);
-                let moveX = Math.cos(angle) * pullForce * (player.isBoosting ? 0.5 : 1);
-                let moveY = Math.sin(angle) * pullForce * (player.isBoosting ? 0.5 : 1);
+                
+                const moveX = Math.cos(angle) * pullForce * boostModifier;
+                const moveY = Math.sin(angle) * pullForce * boostModifier;
 
                 const nX = player.x + moveX;
                 const nY = player.y + moveY;
@@ -835,7 +854,7 @@ class Tombstone extends Entity {
         super(x, y, 'Tombstone');
         this.playerName = playerName;
         this.causeOfDeath = causeOfDeath;
-        this.life = 180; // Despawns after 3 minutes
+        this.life = 180;
     }
     update(dt) {
         this.life -= dt;
@@ -877,7 +896,6 @@ function gameLoop() {
         if (entity.isDead) { entities.splice(i, 1); continue; }
     }
 
-    // NEW: Despawn distant enemies
     const playerIds = Object.keys(players);
     if (playerIds.length > 0) {
         for (let i = entities.length - 1; i >= 0; i--) {
@@ -886,7 +904,7 @@ function gameLoop() {
                 let isNearPlayer = false;
                 for (const pid of playerIds) {
                     const player = players[pid];
-                    if (player.isDead) continue;
+                    if (!player || player.isDead) continue;
                     if (Math.hypot(entity.x - player.x, entity.y - player.y) < DESPAWN_RADIUS) {
                         isNearPlayer = true;
                         break;
@@ -1027,8 +1045,8 @@ function gameLoop() {
                 
                 const distFromCenter = Math.hypot(player.x, player.y) / TILE_SIZE;
                 const angle = Math.random() * Math.PI * 2;
-                const spawnX = player.x + Math.cos(angle) * 1000;
-                const spawnY = player.y + Math.sin(angle) * 1000;
+                const spawnX = player.x + Math.cos(angle) * (Math.random() * 500 + 800); // Tweak spawn distance
+                const spawnY = player.y + Math.sin(angle) * (Math.random() * 500 + 800);
                 
                 if(!isCity(spawnX, spawnY) && !isSolid(getTile(spawnX, spawnY))){
                      const threat = getThreatLevel(spawnX, spawnY);
