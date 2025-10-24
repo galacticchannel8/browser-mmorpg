@@ -31,15 +31,17 @@ const players = {};
 let entities = [];
 const TILE_SIZE = 40;
 const CHUNK_SIZE = 16;
-const MAX_ENEMIES = 150; // Increased density
-const ENEMY_SPAWN_INTERVAL = 1; // For spawning near players
-let enemySpawnTimer = ENEMY_SPAWN_INTERVAL;
-const GLOBAL_SPAWN_INTERVAL = 1; // More aggressive global spawning
-let globalSpawnTimer = GLOBAL_SPAWN_INTERVAL;
-const WORLD_BOUNDS = 6000; // Enemies will spawn randomly within this +/- coordinate range
 let lastTime = Date.now();
 const bossRespawnTimers = {};
 const activeTrades = {};
+
+// --- NEW SPAWNING SYSTEM: DANGER ZONES ---
+const DANGER_ZONES = {};
+const ZONE_RADIUS = 2500; // How far the zone extends from the boss
+const MOBS_PER_ZONE = 25; // How many mobs to maintain in each zone
+const ZONE_SPAWN_INTERVAL = 3; // How often to check and repopulate zones
+let zoneSpawnTimer = ZONE_SPAWN_INTERVAL;
+
 
 // --- PERSISTENT DATA ---
 const banks = loadData('banks.json');
@@ -70,7 +72,7 @@ function saveData(filename, data) {
 const Perlin=function(t){this.seed=t||Math.random();const r=new Uint8Array(512);for(let t=0;t<256;t++)r[t]=t;let n=0;for(let t=255;t>0;t--)n=Math.floor((t+1)*(this.seed=(48271*this.seed)%2147483647)/2147483647),[r[t],r[n]]=[r[n],r[t]];for(let t=0;t<256;t++)r[t+256]=r[t];const e=t=>t*t*t*(t*(6*t-15)+10),o=(t,r,n)=>r+t*(n-r),s=(t,r,n,s)=>{const i=15&t,a=i<8?r:n,h=i<4?n:12===i||14===i?r:s;return((1&i)==0?a:-a)+((2&i)==0?h:-h)};this.get=(t,n,i=0)=>{const a=Math.floor(t)&255,h=Math.floor(n)&255,c=Math.floor(i)&255;t-=Math.floor(t),n-=Math.floor(n),i-=Math.floor(i);const u=e(t),l=e(n),f=e(i),d=r[a]+h,p=r[d]+c,g=r[d+1]+c,m=r[a+1]+h,C=r[m]+c,w=r[m+1]+h;return o(f,o(l,o(u,s(r[p],t,n,i),s(r[C],t-1,n,i)),o(u,s(r[g],t,n-1,i),s(r[w],t-1,n-1,i))),o(l,o(u,s(r[p+1],t,n,i-1),s(r[C+1],t-1,n,i-1)),o(u,s(r[g+1],t,n-1,i-1),s(r[w+1],t-1,n-1,i-1))))}};
 const MAP_SEED = 'galactic_os_final_frontier';
 const perlin = new Perlin(MAP_SEED), biomeNoise = new Perlin(MAP_SEED + '_biomes');
-const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
+const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#05060a'}, 2:{n:'F',c:'#05060a',wc:'#005f6b'}, 3:{n:'C',c:'#05060a',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
 const cityData = [[11,11,11,11,11,11,11,14,14,11,11,11,11,11,11,11],[11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],[11,10,11,11,11,10,11,11,11,11,10,11,11,11,10,11],[11,10,11,10,10,10,10,10,10,10,10,10,10,11,10,11],[11,10,11,10,11,11,11,11,11,11,11,10,11,11,10,11],[14,10,10,10,11,10,10,10,10,10,10,10,11,10,10,14],[14,10,10,10,11,10,11,10,10,11,10,11,11,10,10,14],[11,10,11,10,11,10,10,10,10,10,10,10,11,10,10,11],[11,10,11,10,10,10,11,11,11,11,10,10,11,10,10,11],[11,10,11,11,11,10,10,10,10,10,10,11,11,11,10,11],[11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],[11,11,11,11,11,11,11,14,14,11,11,11,11,11,11,11]];
 const CITY_SPAWN_POINT = { x: 8 * TILE_SIZE, y: 8 * TILE_SIZE };
 const BOSS_LOCATIONS = { DREADNOUGHT: {x: 150*TILE_SIZE, y: 150*TILE_SIZE}, SERPENT: {x: -150*TILE_SIZE, y: -150*TILE_SIZE}, ORACLE: {x: 0, y: 300*TILE_SIZE}, VOID_HUNTER: {x: 300*TILE_SIZE, y: 0} };
@@ -128,7 +130,7 @@ function generateChunk(chunkX, chunkY) { const key = `${chunkX},${chunkY}`; if (
 function getTile(worldX, worldY) { const cX = Math.floor(worldX / TILE_SIZE); const cY = Math.floor(worldY / TILE_SIZE); const chX = Math.floor(cX / CHUNK_SIZE); const chY = Math.floor(cY / CHUNK_SIZE); const key = `${chX},${chY}`; if (!localWorld[key]) generateChunk(chX, chY); const chunk = localWorld[key]; const tX = (cX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; const tY = (cY % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; return chunk.tiles[tY * CHUNK_SIZE + tX]; }
 function isSolid(tileType) { return TILE_TYPES[tileType]?.wc !== undefined; }
 function isCity(worldX, worldY) { return Math.floor(worldX / TILE_SIZE / CHUNK_SIZE) === 0 && Math.floor(worldY / TILE_SIZE / CHUNK_SIZE) === 0; }
-function getThreatLevel(x, y) { if(isCity(x,y)) return 0; const distFromSpawn = Math.hypot(x, y) / TILE_SIZE; if (distFromSpawn < 100) return 1; if (distFromSpawn < 200) return 2; if (distFromSpawn < 300) return 3; if (distFromSpawn < 500) return 4; return 5; }
+function getThreatLevel(x, y) { if(isCity(x,y)) return 0; const distFromSpawn = Math.hypot(x, y) / TILE_SIZE; if (distFromSpawn < 80) return 1; if (distFromSpawn < 150) return 2; if (distFromSpawn < 220) return 3; if (distFromSpawn < 300) return 4; return 5; }
 function getItemBaseValue(item) { if (!item) return 0; return (item.tier * item.tier) * 20; }
 
 // --- PLAYER & SUBCLASSES (SERVER-SIDE) ---
@@ -310,7 +312,7 @@ class Player {
 
     die(killer = null) {
         if (this.trade.partnerId) {
-            cancelTrade(this.id, `${this.username} went offline.`);
+            cancelTrade(this.id, `${this.username} has disconnected.`);
         }
         this.isDead = true;
         
@@ -331,8 +333,23 @@ class Player {
         const droppedBits = Math.floor(this.dataBits * 0.8);
         if(droppedItems.length > 0 || droppedBits > 0) {
             entities.push(new PlayerLootBag(this.x, this.y, droppedItems, droppedBits, this.color));
-            entities.push(new Tombstone(this.x, this.y, this.username, causeOfDeath));
+            entities.push(new Wreckage(this.x, this.y, this.username, causeOfDeath, this.color));
         }
+        const playerSocket = getSocketByPlayerId(this.id);
+        if (playerSocket) playerSocket.send(JSON.stringify({ type: 'playerDied' }));
+    }
+    
+    obliterate() {
+        if (this.isDead) return;
+        if (this.trade.partnerId) {
+            cancelTrade(this.id, `${this.username} has disconnected.`);
+        }
+        broadcastMessage({type: 'chat', sender: 'SYSTEM', message: `${this.username} was consumed by a Gravity Well.`, color: '#ff3355'});
+        
+        this.isDead = true;
+        this.dataBits = 0; // All bits are lost
+        // All items on player are destroyed. No loot bag, no wreckage.
+
         const playerSocket = getSocketByPlayerId(this.id);
         if (playerSocket) playerSocket.send(JSON.stringify({ type: 'playerDied' }));
     }
@@ -554,46 +571,36 @@ class Warden extends Enemy {
         }
     }
 }
-class GravityWell extends Enemy {
-    constructor(x, y, tL) {
-        super(x, y, tL, 'GravityWell');
-        this.radius = 20; this.speed = 0.5; this.health = this.maxHealth = 300; this.color = '#1a1a1a';
-        this.xpValue = 80 * tL;
-        this.pullRadius = 300;
-        this.pullStrength = 25;
-        this.applyThreatLevel();
+class GravityWell extends Entity { // Changed to Entity from Enemy
+    constructor(x, y) {
+        super(x, y, 'GravityWell');
+        this.radius = 25;
+        this.color = '#1a1a1a';
+        this.pullRadius = 600; // Increased radius
+        this.pullStrength = 25; // Increased strength
+        this.eventHorizonRadius = 30; // Point of no return
     }
+    // No health, no takeDamage - it's indestructible
     update(dt) {
-        // Wandering logic from base Enemy, without the aggression/chasing
-        this.wanderTimer -= dt;
-        if (!this.wanderTarget || this.wanderTimer <= 0) {
-            this.wanderTimer = Math.random() * 3 + 2;
-            const wanderAngle = Math.random() * Math.PI * 2;
-            const wanderDist = Math.random() * 150 + 50;
-            this.wanderTarget = { x: this.x + Math.cos(wanderAngle) * wanderDist, y: this.y + Math.sin(wanderAngle) * wanderDist };
-        }
-        const dXt = this.wanderTarget.x - this.x, dYt = this.wanderTarget.y - this.y;
-        const dPt = Math.hypot(dXt, dYt);
-        if (dPt > 1) {
-            const timeAdjustedSpeed = this.speed * (dt * 60);
-            const nX = this.x + (dXt / dPt) * timeAdjustedSpeed;
-            const nY = this.y + (dYt / dPt) * timeAdjustedSpeed;
-            if (!isSolid(getTile(nX, nY)) && !isCity(nX, nY)) { this.x = nX; this.y = nY; }
-            else { this.wanderTarget = null; }
-        } else { this.wanderTarget = null; }
-
-        // Pull logic
         for(const pid in players) {
             const player = players[pid];
             if (player.isDead || player.isTeleporting) continue;
             
             const dist = Math.hypot(player.x-this.x, player.y-this.y);
-            if(dist < this.pullRadius && dist > this.radius) {
+            
+            // Check for obliteration
+            if (dist < this.eventHorizonRadius) {
+                player.obliterate();
+                continue; // Move to next player
+            }
+
+            // Pull logic
+            if(dist < this.pullRadius) {
                 const pullForce = (1 - (dist / this.pullRadius)) * this.pullStrength;
                 const angle = Math.atan2(this.y - player.y, this.x - player.x);
                 
                 const boostMultiplier = player.isBoosting ? 0.5 : 1;
-                const timeAdjustedPull = pullForce * boostMultiplier * (dt * 60);
+                const timeAdjustedPull = pullForce * boostMultiplier;
 
                 let moveX = Math.cos(angle) * timeAdjustedPull;
                 let moveY = Math.sin(angle) * timeAdjustedPull;
@@ -896,7 +903,7 @@ class NPC extends Entity { constructor(x, y, name, color = '#8a2be2') { super(x,
 class LootDrop extends Entity { constructor(x,y,v){ super(x + Math.random()*20-10, y + Math.random()*20-10, 'LootDrop'); this.value=v*5; this.radius=5; this.color='#ffff00'; this.life=60; } update(dt){ this.life-=dt; if (this.life <= 0) this.isDead=true; } }
 class EquipmentDrop extends Entity { constructor(x, y, item) { super(x + Math.random()*20-10, y+Math.random()*20-10, 'EquipmentDrop'); this.item = item; this.radius = 8; this.color = TIER_COLORS[item.tier] || '#fff'; this.life = 60; this.pickupDelay = 0.5; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0) this.isDead = true; } }
 class PlayerLootBag extends Entity { constructor(x, y, items, bits, color) { super(x, y, 'PlayerLootBag'); this.item = { color: color }; this.items = items; this.bits = bits; this.life = 180; this.pickupDelay = 3; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0 || (this.bits <= 0 && this.items.every(i => i === null))) this.isDead = true; } }
-class Tombstone extends Entity { constructor(x, y, playerName, causeOfDeath) { super(x, y, 'Tombstone'); this.playerName = playerName; this.causeOfDeath = causeOfDeath; this.life = 180; this.radius = 15; } update(dt) { this.life -= dt; if (this.life <= 0) this.isDead = true; } }
+class Wreckage extends Entity { constructor(x, y, playerName, causeOfDeath, color) { super(x, y, 'Wreckage'); this.playerName = playerName; this.causeOfDeath = causeOfDeath; this.color = color; this.life = 180; this.radius = 15; } update(dt) { this.life -= dt; if (this.life <= 0) this.isDead = true; } }
 class FloatingText extends Entity { constructor(x, y, text, color = '#ff8888') { super(x, y, 'floatingText'); this.text = text; this.color = color; this.life = 1; } update(dt) { this.y -= 20 * dt; this.life -= dt; if (this.life <= 0) this.isDead = true; } }
 
 // --- INITIALIZE WORLD ---
@@ -904,13 +911,26 @@ function initializeWorld() {
     entities.push(new NPC(6.5 * TILE_SIZE, 3.5 * TILE_SIZE, 'Exchange'));
     entities.push(new NPC(8.5 * TILE_SIZE, 3.5 * TILE_SIZE, 'Bank', '#e3d400'));
     generateChunk(0, 0);
+
     const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter };
     for(const bossName in BOSS_LOCATIONS) {
         const loc = BOSS_LOCATIONS[bossName];
+        DANGER_ZONES[bossName] = { x: loc.x, y: loc.y, mobCount: 0 }; // Initialize Danger Zones
         const BossClass = bossClasses[bossName];
         if (BossClass) entities.push(new BossClass(loc.x, loc.y));
+
+        // Spawn indestructible Gravity Wells in each Danger Zone
+        for (let i = 0; i < 2; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * 1000 + 500;
+            const gwX = loc.x + Math.cos(angle) * dist;
+            const gwY = loc.y + Math.sin(angle) * dist;
+            if (!isSolid(getTile(gwX, gwY))) {
+                entities.push(new GravityWell(gwX, gwY));
+            }
+        }
     }
-    console.log('[SERVER] World initialized and bosses have been spawned.');
+    console.log('[SERVER] World initialized, bosses and danger zones are active.');
 }
 initializeWorld();
 
@@ -1049,47 +1069,46 @@ function gameLoop() {
 
     for(const bossName in bossRespawnTimers) { if(bossRespawnTimers[bossName] > 0) { bossRespawnTimers[bossName] -= dt; if(bossRespawnTimers[bossName] <= 0) { const loc = BOSS_LOCATIONS[bossName]; const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter }; const BossClass = bossClasses[bossName]; if(BossClass) entities.push(new BossClass(loc.x, loc.y)); broadcastMessage({type: 'chat', sender: 'SYSTEM', message: `The ${bossName} has respawned!`, color: '#ff6a00'}); delete bossRespawnTimers[bossName]; } } }
 
-    const enemyCount = entities.filter(e => e instanceof Enemy).length;
+    // --- DANGER ZONE SPAWNING LOGIC ---
+    zoneSpawnTimer -= dt;
+    if (zoneSpawnTimer <= 0) {
+        zoneSpawnTimer = ZONE_SPAWN_INTERVAL;
 
-    // --- NEW SPAWNING LOGIC ---
-    // 1. Player-centric spawning (to keep action nearby)
-    enemySpawnTimer -= dt;
-    if (enemySpawnTimer <= 0) {
-        enemySpawnTimer = ENEMY_SPAWN_INTERVAL;
-        if (enemyCount < MAX_ENEMIES) {
-            for(const pid in players){
-                const player = players[pid];
-                if(isCity(player.x, player.y)) continue;
-                
+        // Reset mob counts for each zone
+        for (const zoneName in DANGER_ZONES) {
+            DANGER_ZONES[zoneName].mobCount = 0;
+        }
+
+        // Count existing mobs in each zone
+        entities.forEach(e => {
+            if (e instanceof Enemy) {
+                for (const zoneName in DANGER_ZONES) {
+                    const zone = DANGER_ZONES[zoneName];
+                    if (Math.hypot(e.x - zone.x, e.y - zone.y) < ZONE_RADIUS) {
+                        zone.mobCount++;
+                        break; // Mob can only be in one zone
+                    }
+                }
+            }
+        });
+
+        // Repopulate zones that are below the threshold
+        for (const zoneName in DANGER_ZONES) {
+            const zone = DANGER_ZONES[zoneName];
+            while (zone.mobCount < MOBS_PER_ZONE) {
                 const angle = Math.random() * Math.PI * 2;
-                const spawnX = player.x + Math.cos(angle) * 1000;
-                const spawnY = player.y + Math.sin(angle) * 1000;
-                
-                if (spawnX < 0 && spawnY < 0) continue; // Safe zone
-                
-                if(!isCity(spawnX, spawnY) && !isSolid(getTile(spawnX, spawnY))){
-                     spawnEnemyAt(spawnX, spawnY);
+                const dist = Math.random() * ZONE_RADIUS;
+                const spawnX = zone.x + Math.cos(angle) * dist;
+                const spawnY = zone.y + Math.sin(angle) * dist;
+
+                if (!isSolid(getTile(spawnX, spawnY))) {
+                    spawnEnemyAt(spawnX, spawnY);
+                    zone.mobCount++;
                 }
             }
         }
     }
 
-    // 2. Global spawning (to populate the world)
-    globalSpawnTimer -= dt;
-    if (globalSpawnTimer <= 0) {
-        globalSpawnTimer = GLOBAL_SPAWN_INTERVAL;
-        const spawnAttempts = 20; // Attempt to spawn more mobs every interval
-        for (let i = 0; i < spawnAttempts; i++) {
-             if (entities.filter(e => e instanceof Enemy).length >= MAX_ENEMIES) break;
-             const spawnX = (Math.random() - 0.5) * 2 * WORLD_BOUNDS;
-             const spawnY = (Math.random() - 0.5) * 2 * WORLD_BOUNDS;
-
-             if (spawnX < 0 && spawnY < 0) continue; // Safe zone
-             if(isCity(spawnX, spawnY) || isSolid(getTile(spawnX, spawnY))) continue;
-
-             spawnEnemyAt(spawnX, spawnY);
-        }
-    }
 
     const playersData = {};
     for (const id in players) playersData[id] = players[id].getData();
@@ -1102,12 +1121,11 @@ function gameLoop() {
 setInterval(gameLoop, 1000 / TICK_RATE);
 
 function spawnEnemyAt(x, y) {
-    const distFromCenter = Math.hypot(x, y) / TILE_SIZE;
     const threat = getThreatLevel(x, y);
     let enemyTypes = [];
 
     // Build a weighted list of possible enemies based on threat
-    if (threat === 1) {
+    if (threat <= 1) {
         enemyTypes.push(Enemy, Enemy, VoidSwarmer);
     } else if (threat === 2) {
         enemyTypes.push(Enemy, Stinger, Stinger, VoidSwarmer);
@@ -1115,18 +1133,16 @@ function spawnEnemyAt(x, y) {
         enemyTypes.push(Stinger, Warden, VoidSwarmer, VoidSwarmer);
     } else if (threat === 4) {
         enemyTypes.push(Warden, Warden, PhaseCaster, Stinger);
-    } else if (threat === 5) {
-        enemyTypes.push(GravityWell, PhaseCaster, Warden, Warden);
+    } else if (threat >= 5) { // Boss-level zones
+        enemyTypes.push(PhaseCaster, PhaseCaster, Warden, Warden, Stinger);
     }
     
-    // Far-flung regions have a higher chance of special mobs
-    if (distFromCenter > 500) {
-        enemyTypes.push(GravityWell, GravityWell, PhaseCaster);
-    }
-
     if (enemyTypes.length > 0) {
         const EnemyClass = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
         entities.push(new EnemyClass(x, y, threat));
+    } else {
+        // Default spawn if no other conditions met
+        entities.push(new Enemy(x, y, 1));
     }
 }
 
