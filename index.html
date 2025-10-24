@@ -191,23 +191,6 @@ All Rights Reserved.
     const minimapCanvas = document.getElementById('minimapCanvas'), minimapCtx = minimapCanvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
-    // --- MODIFIED: Minimap Scaling for High-DPI Screens ---
-    // This function scales the minimap canvas to match the device's pixel ratio, preventing blurriness.
-    function setupMinimapCanvas() {
-        const dpr = window.devicePixelRatio || 1;
-        const rect = minimapCanvas.getBoundingClientRect();
-        
-        minimapCanvas.width = rect.width * dpr;
-        minimapCanvas.height = rect.height * dpr;
-        
-        minimapCtx.scale(dpr, dpr);
-        
-        minimapCanvas.style.width = `${rect.width}px`;
-        minimapCanvas.style.height = `${rect.height}px`;
-    }
-    setupMinimapCanvas(); // Call it once on startup
-
-
     const loginContainer = document.getElementById('login-container');
     const classSelectionPanel = document.getElementById('class-selection');
     const shipSelectionPanel = document.getElementById('ship-selection');
@@ -237,8 +220,7 @@ All Rights Reserved.
 
     const TILE_SIZE = 40, CHUNK_SIZE = 16;
     const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
-    // --- MODIFIED: Updated wall colors to match the server and be more vibrant ---
-    const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#00f0ff'}, 3:{n:'C',c:'#150f1f',wc:'#be29ec'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'}, 15:{n:'D', c:'#00f0ff'} };
+    const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'}, 15:{n:'D', c:'#00f0ff'} };
     let particles = [];
     let gameStars = [];
     let loginStars = [];
@@ -770,15 +752,9 @@ All Rights Reserved.
     
     function drawMinimap(player) {
         const mapSize = 220, viewDist = 25 * TILE_SIZE;
-        // The scale factor now needs to consider the canvas's style width, not its attribute width
-        const scale = minimapCanvas.clientWidth / (viewDist * 2);
-
         minimapCtx.fillStyle = '#05060a';
-        minimapCtx.fillRect(0, 0, minimapCanvas.width, minimapCanvas.height);
-        
-        // The canvas context is already scaled, so we draw using logical coordinates (0-220)
-        minimapCtx.save();
-        minimapCtx.translate(minimapCanvas.clientWidth / 2, minimapCanvas.clientHeight / 2);
+        minimapCtx.fillRect(0, 0, mapSize, mapSize);
+        const scale = mapSize / (viewDist * 2);
 
         for(let y = -viewDist; y < viewDist; y += TILE_SIZE) {
             for(let x = -viewDist; x < viewDist; x += TILE_SIZE) {
@@ -786,7 +762,7 @@ All Rights Reserved.
                 const tile = TILE_TYPES[tileId] || TILE_TYPES[1];
                 if(tile) {
                     minimapCtx.fillStyle = tile.wc || tile.c;
-                    minimapCtx.fillRect(x * scale, y * scale, Math.ceil(TILE_SIZE * scale) + 1, Math.ceil(TILE_SIZE * scale) + 1);
+                    minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, Math.ceil(TILE_SIZE * scale) + 1, Math.ceil(TILE_SIZE * scale) + 1);
                 }
             }
         }
@@ -799,7 +775,7 @@ All Rights Reserved.
                 if (e.isBoss) size = 6;
                 else if (e.type === 'GravityWell') size = 4;
                 minimapCtx.fillStyle = e.color;
-                minimapCtx.fillRect(dX * scale - size/2, dY * scale - size/2, size, size);
+                minimapCtx.fillRect(mapSize / 2 + dX * scale - size/2, mapSize / 2 + dY * scale - size/2, size, size);
             }
         }
 
@@ -811,15 +787,13 @@ All Rights Reserved.
             if (Math.abs(dX) < viewDist && Math.abs(dY) < viewDist) {
                 minimapCtx.fillStyle = p.color;
                 minimapCtx.beginPath();
-                minimapCtx.arc(dX * scale, dY * scale, 3, 0, Math.PI * 2);
+                minimapCtx.arc(mapSize / 2 + dX * scale, mapSize / 2 + dY * scale, 3, 0, Math.PI * 2);
                 minimapCtx.fill();
             }
         }
         
         minimapCtx.fillStyle = player.color || '#00ff00';
-        minimapCtx.fillRect(-2, -2, 4, 4);
-
-        minimapCtx.restore();
+        minimapCtx.fillRect(mapSize/2 - 2, mapSize/2 - 2, 4, 4);
     }
 
     function updateInventoryAndEquipUI(player) {
@@ -1218,8 +1192,6 @@ All Rights Reserved.
     window.addEventListener('resize', () => {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        // Also update the minimap on resize
-        setupMinimapCanvas();
         initGameStars();
         initLoginStars();
     });
