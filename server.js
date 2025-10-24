@@ -36,9 +36,8 @@ const bossRespawnTimers = {};
 const activeTrades = {};
 
 // --- NEW SPAWNING SYSTEM: DANGER ZONES ---
-const DANGER_ZONES = {};
-const ZONE_RADIUS = 2500; // How far the zone extends from the boss
-const MOBS_PER_ZONE = 25; // How many mobs to maintain in each zone
+const ZONE_RADIUS = 3000; // How far the zone extends from the boss
+const MOBS_PER_ZONE = 30; // How many mobs to maintain in each zone
 const ZONE_SPAWN_INTERVAL = 3; // How often to check and repopulate zones
 let zoneSpawnTimer = ZONE_SPAWN_INTERVAL;
 
@@ -72,7 +71,7 @@ function saveData(filename, data) {
 const Perlin=function(t){this.seed=t||Math.random();const r=new Uint8Array(512);for(let t=0;t<256;t++)r[t]=t;let n=0;for(let t=255;t>0;t--)n=Math.floor((t+1)*(this.seed=(48271*this.seed)%2147483647)/2147483647),[r[t],r[n]]=[r[n],r[t]];for(let t=0;t<256;t++)r[t+256]=r[t];const e=t=>t*t*t*(t*(6*t-15)+10),o=(t,r,n)=>r+t*(n-r),s=(t,r,n,s)=>{const i=15&t,a=i<8?r:n,h=i<4?n:12===i||14===i?r:s;return((1&i)==0?a:-a)+((2&i)==0?h:-h)};this.get=(t,n,i=0)=>{const a=Math.floor(t)&255,h=Math.floor(n)&255,c=Math.floor(i)&255;t-=Math.floor(t),n-=Math.floor(n),i-=Math.floor(i);const u=e(t),l=e(n),f=e(i),d=r[a]+h,p=r[d]+c,g=r[d+1]+c,m=r[a+1]+h,C=r[m]+c,w=r[m+1]+h;return o(f,o(l,o(u,s(r[p],t,n,i),s(r[C],t-1,n,i)),o(u,s(r[g],t,n-1,i),s(r[w],t-1,n-1,i))),o(l,o(u,s(r[p+1],t,n,i-1),s(r[C+1],t-1,n,i-1)),o(u,s(r[g+1],t,n-1,i-1),s(r[w+1],t-1,n-1,i-1))))}};
 const MAP_SEED = 'galactic_os_final_frontier';
 const perlin = new Perlin(MAP_SEED), biomeNoise = new Perlin(MAP_SEED + '_biomes');
-const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#05060a'}, 2:{n:'F',c:'#05060a',wc:'#005f6b'}, 3:{n:'C',c:'#05060a',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
+const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#10121f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
 const cityData = [[11,11,11,11,11,11,11,14,14,11,11,11,11,11,11,11],[11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],[11,10,11,11,11,10,11,11,11,11,10,11,11,11,10,11],[11,10,11,10,10,10,10,10,10,10,10,10,10,11,10,11],[11,10,11,10,11,11,11,11,11,11,11,10,11,11,10,11],[14,10,10,10,11,10,10,10,10,10,10,10,11,10,10,14],[14,10,10,10,11,10,11,10,10,11,10,11,11,10,10,14],[11,10,11,10,11,10,10,10,10,10,10,10,11,10,10,11],[11,10,11,10,10,10,11,11,11,11,10,10,11,10,10,11],[11,10,11,11,11,10,10,10,10,10,10,11,11,11,10,11],[11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],[11,11,11,11,11,11,11,14,14,11,11,11,11,11,11,11]];
 const CITY_SPAWN_POINT = { x: 8 * TILE_SIZE, y: 8 * TILE_SIZE };
 const BOSS_LOCATIONS = { DREADNOUGHT: {x: 150*TILE_SIZE, y: 150*TILE_SIZE}, SERPENT: {x: -150*TILE_SIZE, y: -150*TILE_SIZE}, ORACLE: {x: 0, y: 300*TILE_SIZE}, VOID_HUNTER: {x: 300*TILE_SIZE, y: 0} };
@@ -915,7 +914,6 @@ function initializeWorld() {
     const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter };
     for(const bossName in BOSS_LOCATIONS) {
         const loc = BOSS_LOCATIONS[bossName];
-        DANGER_ZONES[bossName] = { x: loc.x, y: loc.y, mobCount: 0 }; // Initialize Danger Zones
         const BossClass = bossClasses[bossName];
         if (BossClass) entities.push(new BossClass(loc.x, loc.y));
 
@@ -1069,33 +1067,22 @@ function gameLoop() {
 
     for(const bossName in bossRespawnTimers) { if(bossRespawnTimers[bossName] > 0) { bossRespawnTimers[bossName] -= dt; if(bossRespawnTimers[bossName] <= 0) { const loc = BOSS_LOCATIONS[bossName]; const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter }; const BossClass = bossClasses[bossName]; if(BossClass) entities.push(new BossClass(loc.x, loc.y)); broadcastMessage({type: 'chat', sender: 'SYSTEM', message: `The ${bossName} has respawned!`, color: '#ff6a00'}); delete bossRespawnTimers[bossName]; } } }
 
-    // --- DANGER ZONE SPAWNING LOGIC ---
+    // --- NEW DANGER ZONE SPAWNING LOGIC ---
     zoneSpawnTimer -= dt;
     if (zoneSpawnTimer <= 0) {
         zoneSpawnTimer = ZONE_SPAWN_INTERVAL;
 
-        // Reset mob counts for each zone
-        for (const zoneName in DANGER_ZONES) {
-            DANGER_ZONES[zoneName].mobCount = 0;
-        }
+        const allEnemies = entities.filter(e => e instanceof Enemy);
 
-        // Count existing mobs in each zone
-        entities.forEach(e => {
-            if (e instanceof Enemy) {
-                for (const zoneName in DANGER_ZONES) {
-                    const zone = DANGER_ZONES[zoneName];
-                    if (Math.hypot(e.x - zone.x, e.y - zone.y) < ZONE_RADIUS) {
-                        zone.mobCount++;
-                        break; // Mob can only be in one zone
-                    }
-                }
-            }
-        });
+        for (const zoneName in BOSS_LOCATIONS) {
+            const zone = BOSS_LOCATIONS[zoneName];
+            
+            // Count enemies currently in this zone
+            const mobsInZone = allEnemies.filter(e => Math.hypot(e.x - zone.x, e.y - zone.y) < ZONE_RADIUS).length;
 
-        // Repopulate zones that are below the threshold
-        for (const zoneName in DANGER_ZONES) {
-            const zone = DANGER_ZONES[zoneName];
-            while (zone.mobCount < MOBS_PER_ZONE) {
+            let mobsToSpawn = MOBS_PER_ZONE - mobsInZone;
+
+            for (let i = 0; i < mobsToSpawn; i++) {
                 const angle = Math.random() * Math.PI * 2;
                 const dist = Math.random() * ZONE_RADIUS;
                 const spawnX = zone.x + Math.cos(angle) * dist;
@@ -1103,7 +1090,6 @@ function gameLoop() {
 
                 if (!isSolid(getTile(spawnX, spawnY))) {
                     spawnEnemyAt(spawnX, spawnY);
-                    zone.mobCount++;
                 }
             }
         }
@@ -1122,28 +1108,11 @@ setInterval(gameLoop, 1000 / TICK_RATE);
 
 function spawnEnemyAt(x, y) {
     const threat = getThreatLevel(x, y);
-    let enemyTypes = [];
-
-    // Build a weighted list of possible enemies based on threat
-    if (threat <= 1) {
-        enemyTypes.push(Enemy, Enemy, VoidSwarmer);
-    } else if (threat === 2) {
-        enemyTypes.push(Enemy, Stinger, Stinger, VoidSwarmer);
-    } else if (threat === 3) {
-        enemyTypes.push(Stinger, Warden, VoidSwarmer, VoidSwarmer);
-    } else if (threat === 4) {
-        enemyTypes.push(Warden, Warden, PhaseCaster, Stinger);
-    } else if (threat >= 5) { // Boss-level zones
-        enemyTypes.push(PhaseCaster, PhaseCaster, Warden, Warden, Stinger);
-    }
+    // Boss zones are always threat 4-5, so we spawn tough enemies
+    const enemyTypes = [Warden, PhaseCaster, Stinger, Stinger, VoidSwarmer];
     
-    if (enemyTypes.length > 0) {
-        const EnemyClass = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
-        entities.push(new EnemyClass(x, y, threat));
-    } else {
-        // Default spawn if no other conditions met
-        entities.push(new Enemy(x, y, 1));
-    }
+    const EnemyClass = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+    entities.push(new EnemyClass(x, y, threat));
 }
 
 
