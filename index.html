@@ -10,7 +10,7 @@ All Rights Reserved.
     <title>Galactic OS - Alpha</title>
     <style>
         body, html { background-color: #05060a; color: #00f0ff; font-family: 'Consolas', 'Monaco', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; user-select: none; }
-        #gameCanvas { background-color: #10121f; cursor: crosshair; }
+        #gameCanvas { background-color: #05060a; cursor: crosshair; }
         #chat-container { position: fixed; bottom: 20px; left: 20px; width: 400px; background-color: rgba(5, 6, 10, 0.7); border: 1px solid #00f0ff; border-radius: 5px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; z-index: 10; }
         #chat-log { height: 150px; padding: 10px; overflow-y: scroll; font-size: 14px; list-style: none; margin: 0; }
         #chat-log::-webkit-scrollbar { width: 4px; } #chat-log::-webkit-scrollbar-thumb { background: #00f0ff; }
@@ -220,6 +220,34 @@ All Rights Reserved.
     const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
     const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
     let particles = [];
+    
+    // --- BACKGROUND AESTHETICS ---
+    let starfield = [];
+    function createStarfield() {
+        starfield = [];
+        for (let i = 0; i < 500; i++) {
+            starfield.push({
+                x: Math.random() * 2 - 1, // Range -1 to 1
+                y: Math.random() * 2 - 1, // Range -1 to 1
+                size: Math.random() * 2 + 0.5,
+                speed: Math.random() * 0.2 + 0.1 // Parallax speed
+            });
+        }
+    }
+    function drawStarfield() {
+        ctx.save();
+        ctx.fillStyle = '#fff';
+        starfield.forEach(star => {
+            // Parallax effect based on camera position
+            const screenX = (canvas.width / 2) + star.x * (canvas.width / 2) - (camera.x * star.speed) % canvas.width;
+            const screenY = (canvas.height / 2) + star.y * (canvas.height / 2) - (camera.y * star.speed) % canvas.height;
+            ctx.globalAlpha = star.speed * 2; // Dimmer stars move slower
+            ctx.fillRect(screenX, screenY, star.size, star.size);
+        });
+        ctx.restore();
+    }
+    createStarfield();
+
 
     ws.onmessage = (message) => {
         try {
@@ -398,6 +426,25 @@ All Rights Reserved.
             ctx.restore();
             if (e.health < e.maxHealth) { const barW = 40, barH = 6, barX = e.x - barW / 2, barY = e.y - e.radius - 20; ctx.fillStyle = 'rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX, barY, barW, barH); ctx.fillStyle = '#999'; ctx.fillRect(barX, barY, barW * (e.health / e.maxHealth), barH); }
         },
+        'PhaseCaster': (e) => {
+            ctx.save();
+            ctx.translate(e.x, e.y);
+            ctx.strokeStyle = e.color;
+            ctx.shadowColor = e.color;
+            ctx.shadowBlur = 15;
+            ctx.lineWidth = 3;
+            const r = e.radius;
+            const angle = Date.now() / 400;
+            ctx.beginPath();
+            ctx.rect(-r, -r, r * 2, r * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(0, -r); ctx.lineTo(0, r);
+            ctx.moveTo(-r, 0); ctx.lineTo(r, 0);
+            ctx.stroke();
+            ctx.restore();
+            if (e.health < e.maxHealth) { const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); }
+        },
         'Dreadnought': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 30; ctx.beginPath(); ctx.rect(-e.radius, -e.radius/2, e.radius*2, e.radius); ctx.fill(); ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.rect(-e.radius/2, -e.radius/1.5, e.radius, e.radius*1.3); ctx.fill(); ctx.restore(); drawBossHealthbar(e); },
         'SerpentHead': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 20; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); drawBossHealthbar(e); e.segments.forEach(seg => drawFunctions['SerpentBody'](seg)); },
         'SerpentBody': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.shadowColor = e.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-e.radius-10; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
@@ -443,6 +490,9 @@ All Rights Reserved.
     function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         const myPlayer = gameState.players[myPlayerId];
+        
+        drawStarfield();
+
         if (!isGameRunning || !myPlayer) return;
         
         camera.x = myPlayer.x; camera.y = myPlayer.y;
@@ -451,7 +501,7 @@ All Rights Reserved.
         ctx.translate(canvas.width / 2, canvas.height / 2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
         
         const b = { l: Math.floor((camera.x-canvas.width/2/camera.zoom)/TILE_SIZE)-1, r: Math.ceil((camera.x+canvas.width/2/camera.zoom)/TILE_SIZE)+1, t: Math.floor((camera.y-canvas.height/2/camera.zoom)/TILE_SIZE)-1, b: Math.ceil((camera.y+canvas.height/2/camera.zoom)/TILE_SIZE)+1, };
-        for (let y = b.t; y < b.b; y++) for (let x = b.l; x < b.r; x++) { const tX = x * TILE_SIZE, tY = y * TILE_SIZE; const tileId = getTile(tX, tY), tile = TILE_TYPES[tileId] || TILE_TYPES[1]; if (tile.wc) { const floorTile = TILE_TYPES[tileId - 1] || TILE_TYPES[1]; ctx.fillStyle = floorTile.c; ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE); ctx.fillStyle = tile.wc; ctx.shadowColor = tile.wc; ctx.shadowBlur = 10; } else { ctx.fillStyle = tile.c; ctx.shadowBlur = 0; } ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE); }
+        for (let y = b.t; y < b.b; y++) for (let x = b.l; x < b.r; x++) { const tX = x * TILE_SIZE, tY = y * TILE_SIZE; const tileId = getTile(tX, tY), tile = TILE_TYPES[tileId] || TILE_TYPES[1]; if (tile.wc) { const floorTile = TILE_TYPES[tileId - 1] || TILE_TYPES[1]; ctx.fillStyle = floorTile.c; ctx.fillRect(tX, tY, TILE_SIZE+1, TILE_SIZE+1); ctx.fillStyle = tile.wc; ctx.shadowColor = tile.wc; ctx.shadowBlur = 10; } else { ctx.fillStyle = tile.c; ctx.shadowBlur = 0; } ctx.fillRect(tX, tY, TILE_SIZE+1, TILE_SIZE+1); }
         ctx.shadowBlur = 0;
         
         particles.forEach(p => { p.life -= 0.05; p.x += p.vx; p.y += p.vy; ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); }); particles = particles.filter(p => p.life > 0); ctx.globalAlpha = 1;
@@ -972,6 +1022,7 @@ All Rights Reserved.
     window.addEventListener('resize', () => {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+        createStarfield(); // Recreate starfield for new dimensions
     });
 
     canvas.addEventListener('mousemove', e => {

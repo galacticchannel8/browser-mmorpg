@@ -32,11 +32,14 @@ let entities = [];
 const TILE_SIZE = 40;
 const CHUNK_SIZE = 16;
 const MAX_ENEMIES = 120;
-const ENEMY_SPAWN_INTERVAL = 1;
+const ENEMY_SPAWN_INTERVAL = 1; // For spawning near players
 let enemySpawnTimer = ENEMY_SPAWN_INTERVAL;
+const GLOBAL_SPAWN_INTERVAL = 2; // For populating the whole world
+let globalSpawnTimer = GLOBAL_SPAWN_INTERVAL;
+const WORLD_BOUNDS = 6000; // Enemies will spawn randomly within this +/- coordinate range
 let lastTime = Date.now();
 const bossRespawnTimers = {};
-const activeTrades = {}; // NEW: To manage trade sessions
+const activeTrades = {};
 
 // --- PERSISTENT DATA ---
 const banks = loadData('banks.json');
@@ -556,7 +559,7 @@ class GravityWell extends Enemy {
         this.radius = 20; this.speed = 0.5; this.health = this.maxHealth = 300; this.color = '#1a1a1a';
         this.xpValue = 80 * tL;
         this.pullRadius = 300;
-        this.pullStrength = 2.5;
+        this.pullStrength = 25;
         this.applyThreatLevel();
     }
     update(dt) {
@@ -599,6 +602,77 @@ class GravityWell extends Enemy {
                 if (!isSolid(getTile(nX, player.y))) player.x = nX;
                 if (!isSolid(getTile(player.x, nY))) player.y = nY;
             }
+        }
+    }
+}
+class PhaseCaster extends Enemy {
+    constructor(x, y, tL) {
+        super(x, y, tL, 'PhaseCaster');
+        this.radius = 14;
+        this.speed = 2.0;
+        this.health = this.maxHealth = 100;
+        this.color = '#a832a4';
+        this.xpValue = 50 * tL;
+        this.laserCooldown = 0;
+        this.applyThreatLevel();
+    }
+    update(dt) {
+        let targetPlayer = null;
+        let closestDist = Infinity;
+        for(const pid in players){
+            const player = players[pid];
+            if (player.isDead || player.isInvisible || player.trade.partnerId || player.isTeleporting) continue;
+            const dist = Math.hypot(player.x - this.x, player.y - this.y);
+            if(dist < closestDist){
+                closestDist = dist;
+                targetPlayer = player;
+            }
+        }
+        
+        this.laserCooldown -= dt;
+
+        if (targetPlayer && closestDist < this.aggroRadius && !isCity(targetPlayer.x, targetPlayer.y)) {
+            // Keep a distance
+            const idealDist = 300;
+            const dX = targetPlayer.x - this.x, dY = targetPlayer.y - this.y;
+            let moveDir = 0;
+            if (closestDist < idealDist - 20) moveDir = -1; // Move away
+            else if (closestDist > idealDist + 20) moveDir = 1; // Move closer
+
+            if(moveDir !== 0) {
+                 const timeAdjustedSpeed = this.speed * moveDir * (dt * 60);
+                 const nX = this.x + (dX / closestDist) * timeAdjustedSpeed;
+                 const nY = this.y + (dY / closestDist) * timeAdjustedSpeed;
+                 if (isCity(nX, nY)) return; 
+                 if (!isSolid(getTile(nX, this.y))) this.x = nX;
+                 if (!isSolid(getTile(this.x, nY))) this.y = nY;
+            }
+            
+            // Fire laser
+            if(this.laserCooldown <= 0) {
+                this.laserCooldown = 4; // 4 second cooldown
+                const p = { ownerId: this.id, angle: Math.atan2(dY, dX), color: this.color, damage: 50 * this.damageMultiplier };
+                entities.push(new Laser(this.x, this.y, p, 600));
+            }
+
+        } else {
+            // Standard wander behavior if no target
+            this.wanderTimer -= dt;
+            if (!this.wanderTarget || this.wanderTimer <= 0) {
+                this.wanderTimer = Math.random() * 3 + 2;
+                const wanderAngle = Math.random() * Math.PI * 2;
+                const wanderDist = Math.random() * 150 + 50;
+                this.wanderTarget = { x: this.x + Math.cos(wanderAngle) * wanderDist, y: this.y + Math.sin(wanderAngle) * wanderDist };
+            }
+            const dXt = this.wanderTarget.x - this.x, dYt = this.wanderTarget.y - this.y;
+            const dPt = Math.hypot(dXt, dYt);
+            if (dPt > 1) {
+                const timeAdjustedSpeed = (this.speed / 2) * (dt * 60);
+                const nX = this.x + (dXt / dPt) * timeAdjustedSpeed;
+                const nY = this.y + (dYt / dPt) * timeAdjustedSpeed;
+                if (!isSolid(getTile(nX, nY)) && !isCity(nX, nY)) { this.x = nX; this.y = nY; }
+                else { this.wanderTarget = null; }
+            } else { this.wanderTarget = null; }
         }
     }
 }
@@ -909,19 +983,34 @@ function gameLoop() {
         }
         else if (entity.type === 'Laser') {
              const ownerIsPlayer = entity.ownerId.startsWith('player_');
+             const ownerEntity = ownerIsPlayer ? players[entity.ownerId] : entities.find(e => e.id === entity.ownerId);
+             if (!ownerEntity) continue;
+             entity.x = ownerEntity.x; // Make laser follow owner
+             entity.y = ownerEntity.y;
+
              if(ownerIsPlayer) {
                 for(const other of entities) {
                     if (other instanceof Enemy) {
                         const dx = other.x - entity.x; const dy = other.y - entity.y; const dist = Math.hypot(dx, dy);
-                        if (dist < other.radius) continue; 
-                        if (dist < entity.length) {
-                            const angleToTarget = Math.atan2(dy, dx);
-                            let angleDiff = Math.abs(entity.angle - angleToTarget);
-                            if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
-                            if (angleDiff < Math.atan2(other.radius, dist)) {
-                                other.takeDamage(entity.damage * dt * 20, {ownerId: entity.ownerId});
-                            }
+                        if (dist > entity.length || dist < other.radius) continue; 
+                        const angleToTarget = Math.atan2(dy, dx);
+                        let angleDiff = Math.abs(entity.angle - angleToTarget);
+                        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                        if (angleDiff < Math.atan2(other.radius, dist)) {
+                            other.takeDamage(entity.damage * dt * 20, {ownerId: entity.ownerId});
                         }
+                    }
+                }
+             } else { // Laser is from an enemy
+                for(const p of Object.values(players)) {
+                    if (p.isDead) continue;
+                    const dx = p.x - entity.x; const dy = p.y - entity.y; const dist = Math.hypot(dx, dy);
+                    if (dist > entity.length || dist < p.radius) continue;
+                    const angleToTarget = Math.atan2(dy, dx);
+                    let angleDiff = Math.abs(entity.angle - angleToTarget);
+                    if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                    if (angleDiff < Math.atan2(p.radius, dist)) {
+                        p.takeDamage(entity.damage * dt * 20, ownerEntity);
                     }
                 }
              }
@@ -936,7 +1025,7 @@ function gameLoop() {
                 }
             }
              for(const other of entities) {
-                if (other instanceof Enemy && !entity.hitTargets.includes(other.id) && Math.hypot(entity.x - other.x, entity.y - other.y) < entity.radius) {
+                if (other instanceof Enemy && !entity.hitTargets.includes(other.id) && Math.hypot(entity.x - other.x, other.y - other.y) < entity.radius) {
                     other.takeDamage(entity.damage, entity);
                     entity.hitTargets.push(other.id);
                 }
@@ -959,10 +1048,14 @@ function gameLoop() {
 
     for(const bossName in bossRespawnTimers) { if(bossRespawnTimers[bossName] > 0) { bossRespawnTimers[bossName] -= dt; if(bossRespawnTimers[bossName] <= 0) { const loc = BOSS_LOCATIONS[bossName]; const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter }; const BossClass = bossClasses[bossName]; if(BossClass) entities.push(new BossClass(loc.x, loc.y)); broadcastMessage({type: 'chat', sender: 'SYSTEM', message: `The ${bossName} has respawned!`, color: '#ff6a00'}); delete bossRespawnTimers[bossName]; } } }
 
+    const enemyCount = entities.filter(e => e instanceof Enemy).length;
+
+    // --- NEW SPAWNING LOGIC ---
+    // 1. Player-centric spawning (to keep action nearby)
     enemySpawnTimer -= dt;
     if (enemySpawnTimer <= 0) {
         enemySpawnTimer = ENEMY_SPAWN_INTERVAL;
-        if (entities.filter(e => e instanceof Enemy).length < MAX_ENEMIES) {
+        if (enemyCount < MAX_ENEMIES) {
             for(const pid in players){
                 const player = players[pid];
                 if(isCity(player.x, player.y)) continue;
@@ -971,27 +1064,29 @@ function gameLoop() {
                 const spawnX = player.x + Math.cos(angle) * 1000;
                 const spawnY = player.y + Math.sin(angle) * 1000;
                 
-                if (spawnX < 0 && spawnY < 0) continue;
+                if (spawnX < 0 && spawnY < 0) continue; // Safe zone
                 
                 if(!isCity(spawnX, spawnY) && !isSolid(getTile(spawnX, spawnY))){
-                     const distFromCenter = Math.hypot(spawnX, spawnY) / TILE_SIZE;
-                     const threat = getThreatLevel(spawnX, spawnY);
-                     let enemyType;
-
-                     if (distFromCenter > 500 && Math.random() < 0.2) {
-                        enemyType = GravityWell;
-                     } else if (distFromCenter > 400 && Math.random() < 0.6) {
-                         enemyType = VoidSwarmer;
-                     } else if (threat >= 3 && Math.random() < 0.3) {
-                         enemyType = Warden;
-                     } else if (threat >= 2 && Math.random() < 0.4) {
-                         enemyType = Stinger;
-                     } else {
-                         enemyType = Enemy;
-                     }
-                     entities.push(new enemyType(spawnX,spawnY, threat));
+                     spawnEnemyAt(spawnX, spawnY);
                 }
             }
+        }
+    }
+
+    // 2. Global spawning (to populate the world)
+    globalSpawnTimer -= dt;
+    if (globalSpawnTimer <= 0) {
+        globalSpawnTimer = GLOBAL_SPAWN_INTERVAL;
+        const spawnAttempts = 10; // Attempt to spawn 10 new mobs every interval
+        for (let i = 0; i < spawnAttempts; i++) {
+             if (entities.filter(e => e instanceof Enemy).length >= MAX_ENEMIES) break;
+             const spawnX = (Math.random() - 0.5) * 2 * WORLD_BOUNDS;
+             const spawnY = (Math.random() - 0.5) * 2 * WORLD_BOUNDS;
+
+             if (spawnX < 0 && spawnY < 0) continue; // Safe zone
+             if(isCity(spawnX, spawnY) || isSolid(getTile(spawnX, spawnY))) continue;
+
+             spawnEnemyAt(spawnX, spawnY);
         }
     }
 
@@ -1004,6 +1099,28 @@ function gameLoop() {
     wss.clients.forEach(client => { if (client.readyState === WebSocket.OPEN) client.send(stateToSend); });
 }
 setInterval(gameLoop, 1000 / TICK_RATE);
+
+function spawnEnemyAt(x, y) {
+    const distFromCenter = Math.hypot(x, y) / TILE_SIZE;
+    const threat = getThreatLevel(x, y);
+    let enemyType;
+
+    if (distFromCenter > 500 && Math.random() < 0.2) {
+        enemyType = GravityWell;
+    } else if (threat >= 4 && Math.random() < 0.25) {
+        enemyType = PhaseCaster;
+    } else if (distFromCenter > 400 && Math.random() < 0.6) {
+        enemyType = VoidSwarmer;
+    } else if (threat >= 3 && Math.random() < 0.3) {
+        enemyType = Warden;
+    } else if (threat >= 2 && Math.random() < 0.4) {
+        enemyType = Stinger;
+    } else {
+        enemyType = Enemy;
+    }
+    entities.push(new enemyType(x, y, threat));
+}
+
 
 // --- TRADE LOGIC ---
 function startTrade(player1Id, player2Id) {
