@@ -31,16 +31,12 @@ const players = {};
 let entities = [];
 const TILE_SIZE = 40;
 const CHUNK_SIZE = 16;
+const MAX_ENEMIES = 80;
+const ENEMY_SPAWN_INTERVAL = 1;
+let enemySpawnTimer = ENEMY_SPAWN_INTERVAL;
 let lastTime = Date.now();
 const bossRespawnTimers = {};
-const activeTrades = {};
-
-// --- NEW SPAWNING SYSTEM: DANGER ZONES ---
-const ZONE_RADIUS = 3000; // How far the zone extends from the boss
-const MOBS_PER_ZONE = 30; // How many mobs to maintain in each zone
-const ZONE_SPAWN_INTERVAL = 3; // How often to check and repopulate zones
-let zoneSpawnTimer = ZONE_SPAWN_INTERVAL;
-
+const activeTrades = {}; // NEW: To manage trade sessions
 
 // --- PERSISTENT DATA ---
 const banks = loadData('banks.json');
@@ -71,7 +67,7 @@ function saveData(filename, data) {
 const Perlin=function(t){this.seed=t||Math.random();const r=new Uint8Array(512);for(let t=0;t<256;t++)r[t]=t;let n=0;for(let t=255;t>0;t--)n=Math.floor((t+1)*(this.seed=(48271*this.seed)%2147483647)/2147483647),[r[t],r[n]]=[r[n],r[t]];for(let t=0;t<256;t++)r[t+256]=r[t];const e=t=>t*t*t*(t*(6*t-15)+10),o=(t,r,n)=>r+t*(n-r),s=(t,r,n,s)=>{const i=15&t,a=i<8?r:n,h=i<4?n:12===i||14===i?r:s;return((1&i)==0?a:-a)+((2&i)==0?h:-h)};this.get=(t,n,i=0)=>{const a=Math.floor(t)&255,h=Math.floor(n)&255,c=Math.floor(i)&255;t-=Math.floor(t),n-=Math.floor(n),i-=Math.floor(i);const u=e(t),l=e(n),f=e(i),d=r[a]+h,p=r[d]+c,g=r[d+1]+c,m=r[a+1]+h,C=r[m]+c,w=r[m+1]+h;return o(f,o(l,o(u,s(r[p],t,n,i),s(r[C],t-1,n,i)),o(u,s(r[g],t,n-1,i),s(r[w],t-1,n-1,i))),o(l,o(u,s(r[p+1],t,n,i-1),s(r[C+1],t-1,n,i-1)),o(u,s(r[g+1],t,n-1,i-1),s(r[w+1],t-1,n-1,i-1))))}};
 const MAP_SEED = 'galactic_os_final_frontier';
 const perlin = new Perlin(MAP_SEED), biomeNoise = new Perlin(MAP_SEED + '_biomes');
-const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#10121f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
+const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
 const cityData = [[11,11,11,11,11,11,11,14,14,11,11,11,11,11,11,11],[11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],[11,10,11,11,11,10,11,11,11,11,10,11,11,11,10,11],[11,10,11,10,10,10,10,10,10,10,10,10,10,11,10,11],[11,10,11,10,11,11,11,11,11,11,11,10,11,11,10,11],[14,10,10,10,11,10,10,10,10,10,10,10,11,10,10,14],[14,10,10,10,11,10,11,10,10,11,10,11,11,10,10,14],[11,10,11,10,11,10,10,10,10,10,10,10,11,10,10,11],[11,10,11,10,10,10,11,11,11,11,10,10,11,10,10,11],[11,10,11,11,11,10,10,10,10,10,10,11,11,11,10,11],[11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],[11,11,11,11,11,11,11,14,14,11,11,11,11,11,11,11]];
 const CITY_SPAWN_POINT = { x: 8 * TILE_SIZE, y: 8 * TILE_SIZE };
 const BOSS_LOCATIONS = { DREADNOUGHT: {x: 150*TILE_SIZE, y: 150*TILE_SIZE}, SERPENT: {x: -150*TILE_SIZE, y: -150*TILE_SIZE}, ORACLE: {x: 0, y: 300*TILE_SIZE}, VOID_HUNTER: {x: 300*TILE_SIZE, y: 0} };
@@ -129,7 +125,7 @@ function generateChunk(chunkX, chunkY) { const key = `${chunkX},${chunkY}`; if (
 function getTile(worldX, worldY) { const cX = Math.floor(worldX / TILE_SIZE); const cY = Math.floor(worldY / TILE_SIZE); const chX = Math.floor(cX / CHUNK_SIZE); const chY = Math.floor(cY / CHUNK_SIZE); const key = `${chX},${chY}`; if (!localWorld[key]) generateChunk(chX, chY); const chunk = localWorld[key]; const tX = (cX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; const tY = (cY % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; return chunk.tiles[tY * CHUNK_SIZE + tX]; }
 function isSolid(tileType) { return TILE_TYPES[tileType]?.wc !== undefined; }
 function isCity(worldX, worldY) { return Math.floor(worldX / TILE_SIZE / CHUNK_SIZE) === 0 && Math.floor(worldY / TILE_SIZE / CHUNK_SIZE) === 0; }
-function getThreatLevel(x, y) { if(isCity(x,y)) return 0; const distFromSpawn = Math.hypot(x, y) / TILE_SIZE; if (distFromSpawn < 80) return 1; if (distFromSpawn < 150) return 2; if (distFromSpawn < 220) return 3; if (distFromSpawn < 300) return 4; return 5; }
+function getThreatLevel(x, y) { if(isCity(x,y)) return 0; const distFromSpawn = Math.hypot(x, y) / TILE_SIZE; if (distFromSpawn < 100) return 1; if (distFromSpawn < 200) return 2; if (distFromSpawn < 300) return 3; if (distFromSpawn < 500) return 4; return 5; }
 function getItemBaseValue(item) { if (!item) return 0; return (item.tier * item.tier) * 20; }
 
 // --- PLAYER & SUBCLASSES (SERVER-SIDE) ---
@@ -306,49 +302,19 @@ class Player {
         const damageTaken = Math.max(1, amount - this.stats.defense);
         this.health = Math.max(0, this.health - damageTaken);
         entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(damageTaken)}`));
-        if (this.health <= 0) this.die(damager);
+        if (this.health <= 0) this.die();
     }
 
-    die(killer = null) {
+    die() {
         if (this.trade.partnerId) {
-            cancelTrade(this.id, `${this.username} has disconnected.`);
+            cancelTrade(this.id, `${this.username} went offline.`);
         }
         this.isDead = true;
-        
-        let causeOfDeath = 'the environment';
-        if (killer) {
-            if (killer.ownerId && players[killer.ownerId]) {
-                causeOfDeath = players[killer.ownerId].username;
-            } else if (killer.bossName) {
-                causeOfDeath = `the ${killer.bossName}`;
-            } else if (killer.type) {
-                causeOfDeath = `a ${killer.type}`;
-            } else {
-                causeOfDeath = 'unknown forces';
-            }
-        }
-        
         const droppedItems = [...Object.values(this.equipment), ...this.inventory].filter(item => item !== null);
         const droppedBits = Math.floor(this.dataBits * 0.8);
         if(droppedItems.length > 0 || droppedBits > 0) {
             entities.push(new PlayerLootBag(this.x, this.y, droppedItems, droppedBits, this.color));
-            entities.push(new Wreckage(this.x, this.y, this.username, causeOfDeath, this.color));
         }
-        const playerSocket = getSocketByPlayerId(this.id);
-        if (playerSocket) playerSocket.send(JSON.stringify({ type: 'playerDied' }));
-    }
-    
-    obliterate() {
-        if (this.isDead) return;
-        if (this.trade.partnerId) {
-            cancelTrade(this.id, `${this.username} has disconnected.`);
-        }
-        broadcastMessage({type: 'chat', sender: 'SYSTEM', message: `${this.username} was consumed by a Gravity Well.`, color: '#ff3355'});
-        
-        this.isDead = true;
-        this.dataBits = 0; // All bits are lost
-        // All items on player are destroyed. No loot bag, no wreckage.
-
         const playerSocket = getSocketByPlayerId(this.id);
         if (playerSocket) playerSocket.send(JSON.stringify({ type: 'playerDied' }));
     }
@@ -426,10 +392,10 @@ class Player {
     }
 }
 
-class Operator extends Player { constructor(id, u, c) { super(id, u, c, 'Operator'); this.classStats = { speed: 4.5, maxHealth: 80 }; this.isInvisible = false; this.invisDuration = 0; this.recalculateStats(); this.health = this.stats.maxHealth; } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) { this.abilityCooldown = 12; this.isInvisible = true; this.invisDuration = 3; } } updateAbility(dt) { if (this.isInvisible) { this.invisDuration -= dt; if (this.invisDuration <= 0) this.isInvisible = false; } } }
-class Guardian extends Player { constructor(id, u, c) { super(id, u, c, 'Guardian'); this.classStats = { speed: 3.5, maxHealth: 150 }; this.shieldActive = false; this.shieldDuration = 0; this.shieldHealth = 0; this.recalculateStats(); this.health = this.stats.maxHealth; } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) { this.abilityCooldown = 20; this.shieldActive = true; this.shieldDuration = 5; this.shieldHealth = 100; } } updateAbility(dt) { if (this.shieldActive) { this.shieldDuration -= dt; if (this.shieldDuration <= 0) this.shieldActive = false; } } takeDamage(amount, damager = null) { this.timeSinceLastHit = 0; if(this.isTeleporting) this.isTeleporting = false; if (this.shieldActive) { const damageAbsorbed = Math.min(this.shieldHealth, amount); this.shieldHealth -= damageAbsorbed; const damageLeft = amount - damageAbsorbed; if (this.shieldHealth <= 0) this.shieldActive = false; if (damageLeft > 0) super.takeDamage(damageLeft, damager); } else { super.takeDamage(amount, damager); } } }
+class Operator extends Player { constructor(id, u, c) { super(id, u, c, 'Operator'); this.classStats = { speed: 4.5, maxHealth: 80 }; this.isInvisible = false; this.invisDuration = 0; this.recalculateStats(); } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) { this.abilityCooldown = 12; this.isInvisible = true; this.invisDuration = 3; } } updateAbility(dt) { if (this.isInvisible) { this.invisDuration -= dt; if (this.invisDuration <= 0) this.isInvisible = false; } } }
+class Guardian extends Player { constructor(id, u, c) { super(id, u, c, 'Guardian'); this.classStats = { speed: 3.5, maxHealth: 150 }; this.shieldActive = false; this.shieldDuration = 0; this.shieldHealth = 0; this.recalculateStats(); } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) { this.abilityCooldown = 20; this.shieldActive = true; this.shieldDuration = 5; this.shieldHealth = 100; } } updateAbility(dt) { if (this.shieldActive) { this.shieldDuration -= dt; if (this.shieldDuration <= 0) this.shieldActive = false; } } takeDamage(amount, damager = null) { this.timeSinceLastHit = 0; if(this.isTeleporting) this.isTeleporting = false; if (this.shieldActive) { const damageAbsorbed = Math.min(this.shieldHealth, amount); this.shieldHealth -= damageAbsorbed; const damageLeft = amount - damageAbsorbed; if (this.shieldHealth <= 0) this.shieldActive = false; if (damageLeft > 0) super.takeDamage(damageLeft, damager); } else { super.takeDamage(amount, damager); } } }
 class Spectre extends Player {
-    constructor(id, u, c) { super(id, u, c, 'Spectre'); this.recalculateStats(); this.health = this.stats.maxHealth; }
+    constructor(id, u, c) { super(id, u, c, 'Spectre'); this.recalculateStats(); }
     useAbility() {
         if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) {
             this.abilityCooldown = 6;
@@ -485,7 +451,7 @@ class Enemy extends Entity {
                 if (!isSolid(getTile(nX, this.y))) this.x = nX;
                 if (!isSolid(getTile(this.x, nY))) this.y = nY;
             } else {
-                targetPlayer.takeDamage(80 * this.damageMultiplier * dt, this);
+                targetPlayer.takeDamage(40 * this.damageMultiplier * dt, this);
             }
         } else {
             this.wanderTimer -= dt;
@@ -508,7 +474,6 @@ class Enemy extends Entity {
     }
     takeDamage(amount, damager) {
         this.health -= amount;
-        entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(amount)}`, '#ffffff'));
         if (this.health <= 0 && !this.isDead) {
             this.isDead = true;
             if (damager && players[damager.ownerId]) {
@@ -524,7 +489,7 @@ class Enemy extends Entity {
         }
     }
 }
-class Stinger extends Enemy { constructor(x, y, tL) { super(x, y, tL, 'Stinger'); this.radius = 10; this.speed = 4; this.health = this.maxHealth = 40; this.color = '#f07cff'; this.shootCooldown = 1.6; this.xpValue = 20 * tL; this.applyThreatLevel(); } update(dt) { super.update(dt); this.shootCooldown -= dt; if (this.shootCooldown <= 0) { this.shootCooldown = 1.6; for(const pid in players){ const player = players[pid]; if(!player.isDead && !player.isTeleporting && Math.hypot(player.x - this.x, player.y - this.y) < this.aggroRadius){ const p = { ownerId: this.id, angle: Math.atan2(player.y - this.y, player.x - this.x), color: this.color, damage: 60*this.damageMultiplier }; entities.push(new Projectile(this.x, this.y, p, 0.8)); break; } } } } }
+class Stinger extends Enemy { constructor(x, y, tL) { super(x, y, tL, 'Stinger'); this.radius = 10; this.speed = 4; this.health = this.maxHealth = 40; this.color = '#f07cff'; this.shootCooldown = 1.6; this.xpValue = 20 * tL; this.applyThreatLevel(); } update(dt) { super.update(dt); this.shootCooldown -= dt; if (this.shootCooldown <= 0) { this.shootCooldown = 1.6; for(const pid in players){ const player = players[pid]; if(!player.isDead && !player.isTeleporting && Math.hypot(player.x - this.x, player.y - this.y) < this.aggroRadius){ const p = { ownerId: this.id, angle: Math.atan2(player.y - this.y, player.x - this.x), color: this.color, damage: 30*this.damageMultiplier }; entities.push(new Projectile(this.x, this.y, p, 0.8)); break; } } } } }
 class VoidSwarmer extends Enemy {
     constructor(x, y, tL) {
         super(x, y, tL, 'VoidSwarmer');
@@ -570,116 +535,31 @@ class Warden extends Enemy {
         }
     }
 }
-class GravityWell extends Entity { // Changed to Entity from Enemy
-    constructor(x, y) {
-        super(x, y, 'GravityWell');
-        this.radius = 25;
-        this.color = '#1a1a1a';
-        this.pullRadius = 600; // Increased radius
-        this.pullStrength = 25; // Increased strength
-        this.eventHorizonRadius = 30; // Point of no return
+class GravityWell extends Enemy {
+    constructor(x, y, tL) {
+        super(x, y, tL, 'GravityWell');
+        this.radius = 20; this.speed = 0.5; this.health = this.maxHealth = 300; this.color = '#1a1a1a';
+        this.xpValue = 80 * tL;
+        this.pullRadius = 300;
+        this.pullStrength = 2.5;
+        this.applyThreatLevel();
     }
-    // No health, no takeDamage - it's indestructible
     update(dt) {
+        super.update(dt);
         for(const pid in players) {
             const player = players[pid];
-            if (player.isDead || player.isTeleporting) continue;
-            
             const dist = Math.hypot(player.x-this.x, player.y-this.y);
-            
-            // Check for obliteration
-            if (dist < this.eventHorizonRadius) {
-                player.obliterate();
-                continue; // Move to next player
-            }
-
-            // Pull logic
-            if(dist < this.pullRadius) {
+            if(!player.isDead && !player.isTeleporting && dist < this.pullRadius) {
                 const pullForce = (1 - (dist / this.pullRadius)) * this.pullStrength;
                 const angle = Math.atan2(this.y - player.y, this.x - player.x);
-                
-                const boostMultiplier = player.isBoosting ? 0.5 : 1;
-                const timeAdjustedPull = pullForce * boostMultiplier;
-
-                let moveX = Math.cos(angle) * timeAdjustedPull;
-                let moveY = Math.sin(angle) * timeAdjustedPull;
+                let moveX = Math.cos(angle) * pullForce * (player.isBoosting ? 0.5 : 1);
+                let moveY = Math.sin(angle) * pullForce * (player.isBoosting ? 0.5 : 1);
                 
                 const nX = player.x + moveX;
                 const nY = player.y + moveY;
                 if (!isSolid(getTile(nX, player.y))) player.x = nX;
                 if (!isSolid(getTile(player.x, nY))) player.y = nY;
             }
-        }
-    }
-}
-class PhaseCaster extends Enemy {
-    constructor(x, y, tL) {
-        super(x, y, tL, 'PhaseCaster');
-        this.radius = 14;
-        this.speed = 2.0;
-        this.health = this.maxHealth = 100;
-        this.color = '#a832a4';
-        this.xpValue = 50 * tL;
-        this.laserCooldown = 0;
-        this.applyThreatLevel();
-    }
-    update(dt) {
-        let targetPlayer = null;
-        let closestDist = Infinity;
-        for(const pid in players){
-            const player = players[pid];
-            if (player.isDead || player.isInvisible || player.trade.partnerId || player.isTeleporting) continue;
-            const dist = Math.hypot(player.x - this.x, player.y - this.y);
-            if(dist < closestDist){
-                closestDist = dist;
-                targetPlayer = player;
-            }
-        }
-        
-        this.laserCooldown -= dt;
-
-        if (targetPlayer && closestDist < this.aggroRadius && !isCity(targetPlayer.x, targetPlayer.y)) {
-            // Keep a distance
-            const idealDist = 300;
-            const dX = targetPlayer.x - this.x, dY = targetPlayer.y - this.y;
-            let moveDir = 0;
-            if (closestDist < idealDist - 20) moveDir = -1; // Move away
-            else if (closestDist > idealDist + 20) moveDir = 1; // Move closer
-
-            if(moveDir !== 0) {
-                 const timeAdjustedSpeed = this.speed * moveDir * (dt * 60);
-                 const nX = this.x + (dX / closestDist) * timeAdjustedSpeed;
-                 const nY = this.y + (dY / closestDist) * timeAdjustedSpeed;
-                 if (isCity(nX, nY)) return; 
-                 if (!isSolid(getTile(nX, this.y))) this.x = nX;
-                 if (!isSolid(getTile(this.x, nY))) this.y = nY;
-            }
-            
-            // Fire laser
-            if(this.laserCooldown <= 0) {
-                this.laserCooldown = 4; // 4 second cooldown
-                const p = { ownerId: this.id, angle: Math.atan2(dY, dX), color: this.color, damage: 50 * this.damageMultiplier };
-                entities.push(new Laser(this.x, this.y, p, 600));
-            }
-
-        } else {
-            // Standard wander behavior if no target
-            this.wanderTimer -= dt;
-            if (!this.wanderTarget || this.wanderTimer <= 0) {
-                this.wanderTimer = Math.random() * 3 + 2;
-                const wanderAngle = Math.random() * Math.PI * 2;
-                const wanderDist = Math.random() * 150 + 50;
-                this.wanderTarget = { x: this.x + Math.cos(wanderAngle) * wanderDist, y: this.y + Math.sin(wanderAngle) * wanderDist };
-            }
-            const dXt = this.wanderTarget.x - this.x, dYt = this.wanderTarget.y - this.y;
-            const dPt = Math.hypot(dXt, dYt);
-            if (dPt > 1) {
-                const timeAdjustedSpeed = (this.speed / 2) * (dt * 60);
-                const nX = this.x + (dXt / dPt) * timeAdjustedSpeed;
-                const nY = this.y + (dYt / dPt) * timeAdjustedSpeed;
-                if (!isSolid(getTile(nX, nY)) && !isCity(nX, nY)) { this.x = nX; this.y = nY; }
-                else { this.wanderTarget = null; }
-            } else { this.wanderTarget = null; }
         }
     }
 }
@@ -726,7 +606,7 @@ class Dreadnought extends WorldBoss {
         if(dP > 400 && !isCity(this.x, this.y)) { this.x += (dX / dP) * this.speed * (dt * 60); this.y += (dY / dP) * this.speed * (dt * 60); }
         this.attackTimer -= dt;
         if(this.attackTimer <= 0) {
-            const p = { ownerId: this.id, angle: Math.atan2(dY, dX), color: this.color, damage: 160 };
+            const p = { ownerId: this.id, angle: Math.atan2(dY, dX), color: this.color, damage: 80 };
             switch(this.attackPhase) {
                 case 'idle': case 'barrage':
                     this.attackTimer = 3;
@@ -759,7 +639,7 @@ class SerpentHead extends WorldBoss {
         this.attackTimer -= dt;
         if(this.attackTimer <= 0) {
             this.attackTimer = 0.3;
-            const proj = { ownerId: this.id, angle: Math.atan2(targetPlayer.y-this.y, targetPlayer.x-this.x), color: this.color, damage: 120 };
+            const proj = { ownerId: this.id, angle: Math.atan2(targetPlayer.y-this.y, targetPlayer.x-this.x), color: this.color, damage: 60 };
             entities.push(new Projectile(this.x, this.y, proj, 1.2, 8));
         }
         let leader = this;
@@ -807,7 +687,7 @@ class SerpentBody extends Enemy {
             this.shootCooldown = Math.random() * 3 + 2;
             let targetPlayer=null; for(const pid in players){const p=players[pid]; if(!p.isDead && !p.isTeleporting && Math.hypot(p.x-this.x,p.y-this.y) < this.aggroRadius){targetPlayer=p; break;}}
             if (targetPlayer) {
-                 const p = { ownerId: this.id, angle: Math.atan2(targetPlayer.y - this.y, targetPlayer.x - this.x), color: this.color, damage: 80 };
+                 const p = { ownerId: this.id, angle: Math.atan2(targetPlayer.y - this.y, targetPlayer.x - this.x), color: this.color, damage: 40 };
                  entities.push(new Projectile(this.x, this.y, p));
             }
         }
@@ -821,7 +701,7 @@ class TheOracle extends WorldBoss {
 
         this.attackTimer -= dt;
         if(this.attackTimer <= 0) {
-            const p = { ownerId: this.id, color: this.color, damage: 100};
+            const p = { ownerId: this.id, color: this.color, damage: 50};
             switch(this.attackPhase) {
                 case 'idle': case 'barrage':
                     for(let i=0; i<12; i++) { p.angle = (i/12) * Math.PI*2 + Date.now()/1000; entities.push(new Projectile(this.x, this.y, p)); }
@@ -857,7 +737,7 @@ class VoidHunter extends WorldBoss {
                     const currentTarget = players[Object.keys(players).find(id => players[id] === targetPlayer)];
                     if(!currentTarget) return;
                     for(let i=0; i<10; i++) {
-                        const proj = { ownerId: this.id, angle: Math.atan2(currentTarget.y-this.y, currentTarget.x-this.x) + (Math.random()-0.5)*0.8, color: '#ff3355', damage: 240};
+                        const proj = { ownerId: this.id, angle: Math.atan2(currentTarget.y-this.y, currentTarget.x-this.x) + (Math.random()-0.5)*0.8, color: '#ff3355', damage: 120};
                         entities.push(new Projectile(this.x, this.y, proj, 0.5));
                     }
                     setTimeout(() => {
@@ -902,7 +782,6 @@ class NPC extends Entity { constructor(x, y, name, color = '#8a2be2') { super(x,
 class LootDrop extends Entity { constructor(x,y,v){ super(x + Math.random()*20-10, y + Math.random()*20-10, 'LootDrop'); this.value=v*5; this.radius=5; this.color='#ffff00'; this.life=60; } update(dt){ this.life-=dt; if (this.life <= 0) this.isDead=true; } }
 class EquipmentDrop extends Entity { constructor(x, y, item) { super(x + Math.random()*20-10, y+Math.random()*20-10, 'EquipmentDrop'); this.item = item; this.radius = 8; this.color = TIER_COLORS[item.tier] || '#fff'; this.life = 60; this.pickupDelay = 0.5; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0) this.isDead = true; } }
 class PlayerLootBag extends Entity { constructor(x, y, items, bits, color) { super(x, y, 'PlayerLootBag'); this.item = { color: color }; this.items = items; this.bits = bits; this.life = 180; this.pickupDelay = 3; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0 || (this.bits <= 0 && this.items.every(i => i === null))) this.isDead = true; } }
-class Wreckage extends Entity { constructor(x, y, playerName, causeOfDeath, color) { super(x, y, 'Wreckage'); this.playerName = playerName; this.causeOfDeath = causeOfDeath; this.color = color; this.life = 180; this.radius = 15; } update(dt) { this.life -= dt; if (this.life <= 0) this.isDead = true; } }
 class FloatingText extends Entity { constructor(x, y, text, color = '#ff8888') { super(x, y, 'floatingText'); this.text = text; this.color = color; this.life = 1; } update(dt) { this.y -= 20 * dt; this.life -= dt; if (this.life <= 0) this.isDead = true; } }
 
 // --- INITIALIZE WORLD ---
@@ -910,25 +789,13 @@ function initializeWorld() {
     entities.push(new NPC(6.5 * TILE_SIZE, 3.5 * TILE_SIZE, 'Exchange'));
     entities.push(new NPC(8.5 * TILE_SIZE, 3.5 * TILE_SIZE, 'Bank', '#e3d400'));
     generateChunk(0, 0);
-
     const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter };
     for(const bossName in BOSS_LOCATIONS) {
         const loc = BOSS_LOCATIONS[bossName];
         const BossClass = bossClasses[bossName];
         if (BossClass) entities.push(new BossClass(loc.x, loc.y));
-
-        // Spawn indestructible Gravity Wells in each Danger Zone
-        for (let i = 0; i < 2; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const dist = Math.random() * 1000 + 500;
-            const gwX = loc.x + Math.cos(angle) * dist;
-            const gwY = loc.y + Math.sin(angle) * dist;
-            if (!isSolid(getTile(gwX, gwY))) {
-                entities.push(new GravityWell(gwX, gwY));
-            }
-        }
     }
-    console.log('[SERVER] World initialized, bosses and danger zones are active.');
+    console.log('[SERVER] World initialized and bosses have been spawned.');
 }
 initializeWorld();
 
@@ -1002,34 +869,19 @@ function gameLoop() {
         }
         else if (entity.type === 'Laser') {
              const ownerIsPlayer = entity.ownerId.startsWith('player_');
-             const ownerEntity = ownerIsPlayer ? players[entity.ownerId] : entities.find(e => e.id === entity.ownerId);
-             if (!ownerEntity) continue;
-             entity.x = ownerEntity.x; // Make laser follow owner
-             entity.y = ownerEntity.y;
-
              if(ownerIsPlayer) {
                 for(const other of entities) {
                     if (other instanceof Enemy) {
                         const dx = other.x - entity.x; const dy = other.y - entity.y; const dist = Math.hypot(dx, dy);
-                        if (dist > entity.length || dist < other.radius) continue; 
-                        const angleToTarget = Math.atan2(dy, dx);
-                        let angleDiff = Math.abs(entity.angle - angleToTarget);
-                        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
-                        if (angleDiff < Math.atan2(other.radius, dist)) {
-                            other.takeDamage(entity.damage * dt * 20, {ownerId: entity.ownerId});
+                        if (dist < other.radius) continue; 
+                        if (dist < entity.length) {
+                            const angleToTarget = Math.atan2(dy, dx);
+                            let angleDiff = Math.abs(entity.angle - angleToTarget);
+                            if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                            if (angleDiff < Math.atan2(other.radius, dist)) {
+                                other.takeDamage(entity.damage * dt * 20, {ownerId: entity.ownerId});
+                            }
                         }
-                    }
-                }
-             } else { // Laser is from an enemy
-                for(const p of Object.values(players)) {
-                    if (p.isDead) continue;
-                    const dx = p.x - entity.x; const dy = p.y - entity.y; const dist = Math.hypot(dx, dy);
-                    if (dist > entity.length || dist < p.radius) continue;
-                    const angleToTarget = Math.atan2(dy, dx);
-                    let angleDiff = Math.abs(entity.angle - angleToTarget);
-                    if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
-                    if (angleDiff < Math.atan2(p.radius, dist)) {
-                        p.takeDamage(entity.damage * dt * 20, ownerEntity);
                     }
                 }
              }
@@ -1067,34 +919,38 @@ function gameLoop() {
 
     for(const bossName in bossRespawnTimers) { if(bossRespawnTimers[bossName] > 0) { bossRespawnTimers[bossName] -= dt; if(bossRespawnTimers[bossName] <= 0) { const loc = BOSS_LOCATIONS[bossName]; const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter }; const BossClass = bossClasses[bossName]; if(BossClass) entities.push(new BossClass(loc.x, loc.y)); broadcastMessage({type: 'chat', sender: 'SYSTEM', message: `The ${bossName} has respawned!`, color: '#ff6a00'}); delete bossRespawnTimers[bossName]; } } }
 
-    // --- NEW DANGER ZONE SPAWNING LOGIC ---
-    zoneSpawnTimer -= dt;
-    if (zoneSpawnTimer <= 0) {
-        zoneSpawnTimer = ZONE_SPAWN_INTERVAL;
-
-        const allEnemies = entities.filter(e => e instanceof Enemy);
-
-        for (const zoneName in BOSS_LOCATIONS) {
-            const zone = BOSS_LOCATIONS[zoneName];
-            
-            // Count enemies currently in this zone
-            const mobsInZone = allEnemies.filter(e => Math.hypot(e.x - zone.x, e.y - zone.y) < ZONE_RADIUS).length;
-
-            let mobsToSpawn = MOBS_PER_ZONE - mobsInZone;
-
-            for (let i = 0; i < mobsToSpawn; i++) {
+    enemySpawnTimer -= dt;
+    if (enemySpawnTimer <= 0) {
+        enemySpawnTimer = ENEMY_SPAWN_INTERVAL;
+        if (entities.filter(e => e instanceof Enemy).length < MAX_ENEMIES) {
+            for(const pid in players){
+                const player = players[pid];
+                if(isCity(player.x, player.y) || Math.random() < 0.5) continue;
+                
+                const distFromCenter = Math.hypot(player.x, player.y) / TILE_SIZE;
                 const angle = Math.random() * Math.PI * 2;
-                const dist = Math.random() * ZONE_RADIUS;
-                const spawnX = zone.x + Math.cos(angle) * dist;
-                const spawnY = zone.y + Math.sin(angle) * dist;
-
-                if (!isSolid(getTile(spawnX, spawnY))) {
-                    spawnEnemyAt(spawnX, spawnY);
+                const spawnX = player.x + Math.cos(angle) * 1000;
+                const spawnY = player.y + Math.sin(angle) * 1000;
+                
+                if(!isCity(spawnX, spawnY) && !isSolid(getTile(spawnX, spawnY))){
+                     const threat = getThreatLevel(spawnX, spawnY);
+                     let enemyType;
+                     if (distFromCenter > 500 && Math.random() < 0.2) {
+                        enemyType = GravityWell;
+                     } else if (distFromCenter > 400 && Math.random() < 0.6) {
+                         enemyType = VoidSwarmer;
+                     } else if (threat >= 3 && Math.random() < 0.3) {
+                         enemyType = Warden;
+                     } else if (threat >= 2 && Math.random() < 0.4) {
+                         enemyType = Stinger;
+                     } else {
+                         enemyType = Enemy;
+                     }
+                     entities.push(new enemyType(spawnX,spawnY, threat));
                 }
             }
         }
     }
-
 
     const playersData = {};
     for (const id in players) playersData[id] = players[id].getData();
@@ -1105,16 +961,6 @@ function gameLoop() {
     wss.clients.forEach(client => { if (client.readyState === WebSocket.OPEN) client.send(stateToSend); });
 }
 setInterval(gameLoop, 1000 / TICK_RATE);
-
-function spawnEnemyAt(x, y) {
-    const threat = getThreatLevel(x, y);
-    // Boss zones are always threat 4-5, so we spawn tough enemies
-    const enemyTypes = [Warden, PhaseCaster, Stinger, Stinger, VoidSwarmer];
-    
-    const EnemyClass = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
-    entities.push(new EnemyClass(x, y, threat));
-}
-
 
 // --- TRADE LOGIC ---
 function startTrade(player1Id, player2Id) {

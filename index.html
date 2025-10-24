@@ -218,7 +218,7 @@ All Rights Reserved.
 
     const TILE_SIZE = 40, CHUNK_SIZE = 16;
     const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
-    const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#10121f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
+    const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#05060a'}, 2:{n:'F',c:'#05060a',wc:'#005f6b'}, 3:{n:'C',c:'#05060a',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'} };
     let particles = [];
     
     // --- BACKGROUND AESTHETICS ---
@@ -539,11 +539,11 @@ All Rights Reserved.
         
         ctx.save();
         ctx.translate(canvas.width / 2, canvas.height / 2); 
-        drawNebulae(); // Draw nebulae in parallaxing screen space, behind the game world
+        drawNebulae(); // Draw nebulae relative to camera, behind tiles
         ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
         
         const b = { l: Math.floor((camera.x-canvas.width/2/camera.zoom)/TILE_SIZE)-1, r: Math.ceil((camera.x+canvas.width/2/camera.zoom)/TILE_SIZE)+1, t: Math.floor((camera.y-canvas.height/2/camera.zoom)/TILE_SIZE)-1, b: Math.ceil((camera.y+canvas.height/2/camera.zoom)/TILE_SIZE)+1, };
-        for (let y = b.t; y < b.b; y++) for (let x = b.l; x < b.r; x++) { const tX = x * TILE_SIZE, tY = y * TILE_SIZE; const tileId = getTile(tX, tY), tile = TILE_TYPES[tileId] || TILE_TYPES[1]; if (tile.wc) { ctx.fillStyle = tile.c; ctx.fillRect(tX, tY, TILE_SIZE+1, TILE_SIZE+1); ctx.fillStyle = tile.wc; ctx.shadowColor = tile.wc; ctx.shadowBlur = 10; ctx.fillRect(tX, tY, TILE_SIZE+1, TILE_SIZE+1); } else { ctx.fillStyle = tile.c; ctx.fillRect(tX, tY, TILE_SIZE+1, TILE_SIZE+1); } }
+        for (let y = b.t; y < b.b; y++) for (let x = b.l; x < b.r; x++) { const tX = x * TILE_SIZE, tY = y * TILE_SIZE; const tileId = getTile(tX, tY), tile = TILE_TYPES[tileId] || TILE_TYPES[1]; if (tile.wc) { ctx.fillStyle = tile.wc; ctx.shadowColor = tile.wc; ctx.shadowBlur = 10; ctx.fillRect(tX, tY, TILE_SIZE+1, TILE_SIZE+1); } else { ctx.fillStyle = tile.c; ctx.shadowBlur = 0; ctx.fillRect(tX, tY, TILE_SIZE+1, TILE_SIZE+1); } }
         ctx.shadowBlur = 0;
         
         particles.forEach(p => { p.life -= 0.05; p.x += p.vx; p.y += p.vy; ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); }); particles = particles.filter(p => p.life > 0); ctx.globalAlpha = 1;
