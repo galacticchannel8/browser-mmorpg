@@ -445,9 +445,61 @@ All Rights Reserved.
             ctx.restore();
         },
         'Dreadnought': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 30; ctx.beginPath(); ctx.rect(-e.radius, -e.radius/2, e.radius*2, e.radius); ctx.fill(); ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.rect(-e.radius/2, -e.radius/1.5, e.radius, e.radius*1.3); ctx.fill(); ctx.restore(); drawBossHealthbar(e); },
-        'SerpentHead': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 20; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); drawBossHealthbar(e); e.segments.forEach(seg => drawFunctions['SerpentBody'](seg)); },
+        'SerpentHead': (e) => {
+            ctx.save();
+            ctx.translate(e.x, e.y);
+            ctx.fillStyle = e.color;
+            ctx.shadowColor = e.color;
+            ctx.shadowBlur = 20;
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+            drawBossHealthbar(e);
+            // SERVER-SIDE NOTE: The 'segments' array needs to have its x/y coordinates
+            // continuously updated on the server to follow the head for this to render correctly.
+            // The client-side code below correctly draws segments at their given x/y.
+            e.segments.forEach(seg => drawFunctions['SerpentBody'](seg));
+        },
         'SerpentBody': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.shadowColor = e.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-e.radius-10; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
-        'TheOracle': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 30; ctx.lineWidth = 8; ctx.beginPath(); for(let i=0; i<6; i++) ctx.lineTo(e.radius * Math.cos(i*2*Math.PI/6), e.radius*Math.sin(i*2*Math.PI/6)); ctx.closePath(); ctx.stroke(); ctx.restore(); drawBossHealthbar(e); },
+        'TheOracle': (e) => {
+            ctx.save();
+            ctx.translate(e.x, e.y);
+
+            // Main Hexagon Outline
+            ctx.strokeStyle = e.color;
+            ctx.shadowColor = e.color;
+            ctx.shadowBlur = 30;
+            ctx.lineWidth = 8;
+            ctx.beginPath();
+            for(let i=0; i<6; i++) ctx.lineTo(e.radius * Math.cos(i*2*Math.PI/6), e.radius*Math.sin(i*2*Math.PI/6));
+            ctx.closePath();
+            ctx.stroke();
+
+            // --- MODIFIED: Added inner texture ---
+            // Inner transparent fill
+            ctx.fillStyle = e.color;
+            ctx.globalAlpha = 0.15;
+            ctx.fill();
+
+            // Inner rotating details
+            const rotation = (Date.now() / 6000) % (Math.PI * 2);
+            ctx.rotate(rotation);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = e.color;
+            ctx.shadowBlur = 20;
+
+            const innerRadius = e.radius * 0.65;
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            for(let i=0; i<6; i++) ctx.lineTo(innerRadius * Math.cos(i*2*Math.PI/6), innerRadius * Math.sin(i*2*Math.PI/6));
+            ctx.closePath();
+            ctx.stroke();
+            // --- END MODIFICATION ---
+
+            ctx.restore();
+            drawBossHealthbar(e);
+        },
         'aclysmHunter': (e) => { if(e.isInvisible) return; ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = '#ff3355'; ctx.shadowBlur = 25; ctx.beginPath(); ctx.moveTo(e.radius, 0); ctx.lineTo(-e.radius, e.radius); ctx.lineTo(-e.radius, -e.radius); ctx.closePath(); ctx.fill(); ctx.restore(); drawBossHealthbar(e); },
         'Projectile': (p) => { ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); },
         'MortarProjectile': (p) => { ctx.strokeStyle=`rgba(255,106,0,${1-(p.life/2)})`; ctx.lineWidth=5; ctx.beginPath(); ctx.arc(p.tX, p.tY, p.radius*(1-(p.life/2))*10,0,Math.PI*2); ctx.stroke(); },
@@ -708,26 +760,47 @@ All Rights Reserved.
         isGameRunning = false;
         initLoginStars();
     }
-    function showClassSelection() { loginContainer.style.display = 'none'; classSelectionPanel.style.display = 'block'; }
-    function showShipSelection() { classSelectionPanel.style.display = 'none'; shipSelectionPanel.style.display = 'block'; }
+    function showClassSelection() {
+        loginContainer.style.display = 'none';
+        shipSelectionPanel.style.display = 'none';
+        deathScreen.style.display = 'none';
+        classSelectionPanel.style.display = 'block';
+    }
+    function showShipSelection() {
+        classSelectionPanel.style.display = 'none';
+        shipSelectionPanel.style.display = 'block';
+    }
     function showDeathScreen() {
         deathScreen.style.display = 'block';
         rightUI.style.display = 'none';
         leftUI.style.display = 'none';
         isGameRunning = false;
+        // FIX: Ensure other modals are closed when death screen appears.
+        classSelectionPanel.style.display = 'none';
+        shipSelectionPanel.style.display = 'none';
         closeAllPanels();
     }
-    function chooseClass(className) { chosenClassName = className; showShipSelection(); }
+    function chooseClass(className) {
+        chosenClassName = className;
+        showShipSelection();
+    }
     function chooseColor(color) {
+        // FIX: Explicitly hide all selection panels to prevent them from reappearing.
+        classSelectionPanel.style.display = 'none';
         shipSelectionPanel.style.display = 'none';
+        deathScreen.style.display = 'none';
+        
         rightUI.style.display = 'block';
         leftUI.style.display = 'block';
         chatContainer.style.display = 'block';
-        deathScreen.style.display = 'none';
         sendToServer({ type: 'playerInit', username: loggedInUser, color: color, className: chosenClassName });
         isGameRunning = true;
     }
-    function handleRespawn() { sendToServer({type: 'playerRespawn'}); showClassSelection(); deathScreen.style.display = 'none'; }
+    function handleRespawn() {
+        deathScreen.style.display = 'none';
+        sendToServer({type: 'playerRespawn'});
+        showClassSelection();
+    }
     function handleLogin() { const u=document.getElementById('login-username').value, p=document.getElementById('login-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]&&users[u]===p){loggedInUser=u;showClassSelection()}else{e.textContent='Invalid username or password.'} }
     function handleRegister() { const u=document.getElementById('register-username').value, p=document.getElementById('register-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} if(u.length<3){e.textContent='Username must be at least 3 characters.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]){e.textContent='Username already taken.'}else{users[u]=p;localStorage.setItem('galactic_os_users',JSON.stringify(users));loggedInUser=u;showClassSelection()} }
     function toggleLoginRegister(showLogin) { document.getElementById('login-form').style.display=showLogin?'block':'none';document.getElementById('register-form').style.display=showLogin?'none':'block';document.getElementById('login-error').textContent=''; }

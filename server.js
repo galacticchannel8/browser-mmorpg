@@ -714,13 +714,31 @@ class SerpentHead extends WorldBoss {
     }
     update(dt) {
         let targetPlayer=null; for(const pid in players){const p=players[pid]; if(!p.isDead && !p.isTeleporting && Math.hypot(p.x-this.x,p.y-this.y) < this.aggroRadius){targetPlayer=p; break;}} if(!targetPlayer) return;
-        super.update(dt);
+        
+        // --- MODIFICATION: Explicit head movement ---
+        // Instead of relying on the generic Enemy.update(), we define the head's movement
+        // directly to ensure it moves and the body has something to follow.
+        const dX = targetPlayer.x - this.x;
+        const dY = targetPlayer.y - this.y;
+        const distToPlayer = Math.hypot(dX, dY);
+        // Move towards the player but try to keep some distance
+        if (distToPlayer > 300 && !isCity(this.x, this.y)) {
+            const timeAdjustedSpeed = this.speed * (dt * 60);
+            const nX = this.x + (dX / distToPlayer) * timeAdjustedSpeed;
+            const nY = this.y + (dY / distToPlayer) * timeAdjustedSpeed;
+            if (!isSolid(getTile(nX, this.y))) this.x = nX;
+            if (!isSolid(getTile(this.x, nY))) this.y = nY;
+        }
+        // --- END MODIFICATION ---
+
         this.attackTimer -= dt;
         if(this.attackTimer <= 0) {
             this.attackTimer = 0.3;
             const proj = { ownerId: this.id, angle: Math.atan2(targetPlayer.y-this.y, targetPlayer.x-this.x), color: this.color, damage: 60 };
             entities.push(new Projectile(this.x, this.y, proj, 1.2, 8));
         }
+
+        // Update body segments to follow the leader
         let leader = this;
         this.segments.forEach(seg => {
             if (!seg.isDead) {
@@ -755,7 +773,10 @@ class SerpentBody extends Enemy {
         const dist = Math.hypot(dX, dY);
         const targetDist = this.radius + leader.radius - 15;
         if(dist > targetDist) {
-            const timeAdjustedSpeed = 10 * (dt * 60);
+            // --- MODIFICATION: Increased follow speed ---
+            // The follow speed must be faster than the head's speed for the body to keep up.
+            // Increased from 10 to 12.
+            const timeAdjustedSpeed = 12 * (dt * 60);
             this.x += (dX / dist) * timeAdjustedSpeed;
             this.y += (dY / dist) * timeAdjustedSpeed;
         }
