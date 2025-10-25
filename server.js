@@ -71,7 +71,6 @@ const MAP_SEED = 'galactic_os_final_frontier';
 const perlin = new Perlin(MAP_SEED), biomeNoise = new Perlin(MAP_SEED + '_biomes');
 const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'}, 15:{n:'D', c:'#00f0ff'} };
 
-// --- MODIFIED: New city layout with an open center ---
 const cityData = [
     [11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],
     [11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],
@@ -925,18 +924,16 @@ class Tombstone extends Entity {
     }
 }
 
-
 // --- INITIALIZE WORLD ---
 function initializeWorld() {
-    entities = []; // Clear existing entities
-    // Spawn new NPCs in the corners
-    entities.push(new Exchange(2.5 * TILE_SIZE, 2.5 * TILE_SIZE));
-    entities.push(new Bank(13.5 * TILE_SIZE, 2.5 * TILE_SIZE));
+    entities = []; 
+    entities.push(new NPC(2.5 * TILE_SIZE, 2.5 * TILE_SIZE, 'Exchange'));
+    entities.push(new NPC(13.5 * TILE_SIZE, 2.5 * TILE_SIZE, 'Bank', '#e3d400'));
     entities.push(new Hospital(2.5 * TILE_SIZE, 13.5 * TILE_SIZE));
     entities.push(new AdminPanel(13.5 * TILE_SIZE, 13.5 * TILE_SIZE));
     entities.push(new Portal(CITY_SPAWN_POINT.x, CITY_SPAWN_POINT.y));
 
-    generateChunk(0, 0); // Generate the city chunk
+    generateChunk(0, 0); 
     const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter };
     for(const bossName in BOSS_LOCATIONS) {
         const loc = BOSS_LOCATIONS[bossName];
