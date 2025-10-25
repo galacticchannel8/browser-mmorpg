@@ -29,6 +29,8 @@ console.log(`[SERVER] Galactic OS server is operational on port ${PORT}`);
 // --- GAME STATE ---
 const players = {};
 let entities = [];
+const parties = {};
+let nextPartyId = 0;
 const TILE_SIZE = 40;
 const CHUNK_SIZE = 16;
 const MAX_ENEMIES = 225;
@@ -187,6 +189,7 @@ class Player {
         this.xpToNextLevel = this.calculateXpToNextLevel();
         this.stats = {};
         this.recalculateStats();
+        // --- FIX: Set health to max AFTER stats are calculated ---
         this.health = this.stats.maxHealth;
         this.energy = this.stats.maxEnergy;
         this.gunCooldown = 0;
@@ -356,13 +359,19 @@ class Player {
         }
         this.isDead = true;
 
+        // --- ENHANCED: Determine specific cause of death ---
         let causeOfDeath = 'The Void';
         if (killer) {
-            if (killer.ownerId && players[killer.ownerId]) {
-                causeOfDeath = players[killer.ownerId].username;
-            } else if (killer.bossName) {
+            const owner = players[killer.ownerId] || entities.find(e => e.id === killer.ownerId);
+            if (owner && players[owner.id]) { // The owner of the damage source is a player
+                causeOfDeath = owner.username;
+            } else if (owner && owner.bossName) { // The owner is a boss
+                causeOfDeath = owner.bossName;
+            } else if (owner && owner.type) { // The owner is a regular mob
+                causeOfDeath = owner.type.replace(/([A-Z])/g, ' $1').trim();
+            } else if (killer.bossName) { // The damaging entity itself is the boss (e.g., contact damage)
                 causeOfDeath = killer.bossName;
-            } else if (killer.type) {
+            } else if (killer.type) { // The damaging entity itself is a mob
                 causeOfDeath = killer.type.replace(/([A-Z])/g, ' $1').trim();
             }
         }
@@ -479,10 +488,10 @@ class Player {
     }
 }
 
-class Operator extends Player { constructor(id, u, c) { super(id, u, c, 'Operator'); this.classStats = { speed: 4.5, maxHealth: 80 }; this.isInvisible = false; this.invisDuration = 0; this.recalculateStats(); } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) { this.abilityCooldown = 12; this.isInvisible = true; this.invisDuration = 3; } } updateAbility(dt) { if (this.isInvisible) { this.invisDuration -= dt; if (this.invisDuration <= 0) this.isInvisible = false; } } }
-class Guardian extends Player { constructor(id, u, c) { super(id, u, c, 'Guardian'); this.classStats = { speed: 3.5, maxHealth: 150 }; this.shieldActive = false; this.shieldDuration = 0; this.shieldHealth = 0; this.recalculateStats(); } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) { this.abilityCooldown = 20; this.shieldActive = true; this.shieldDuration = 5; this.shieldHealth = 100; } } updateAbility(dt) { if (this.shieldActive) { this.shieldDuration -= dt; if (this.shieldDuration <= 0) this.shieldActive = false; } } takeDamage(amount, damager = null) { this.timeSinceLastHit = 0; if(this.isTeleporting) this.isTeleporting = false; if (this.shieldActive) { const damageAbsorbed = Math.min(this.shieldHealth, amount); this.shieldHealth -= damageAbsorbed; const damageLeft = amount - damageAbsorbed; if (this.shieldHealth <= 0) this.shieldActive = false; if (damageLeft > 0) super.takeDamage(damageLeft, damager); } else { super.takeDamage(amount, damager); } } }
+class Operator extends Player { constructor(id, u, c) { super(id, u, c, 'Operator'); this.classStats = { speed: 4.5, maxHealth: 80 }; this.recalculateStats(); this.health = this.stats.maxHealth; this.isInvisible = false; this.invisDuration = 0; } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) { this.abilityCooldown = 12; this.isInvisible = true; this.invisDuration = 3; } } updateAbility(dt) { if (this.isInvisible) { this.invisDuration -= dt; if (this.invisDuration <= 0) this.isInvisible = false; } } }
+class Guardian extends Player { constructor(id, u, c) { super(id, u, c, 'Guardian'); this.classStats = { speed: 3.5, maxHealth: 150 }; this.recalculateStats(); this.health = this.stats.maxHealth; this.shieldActive = false; this.shieldDuration = 0; this.shieldHealth = 0; } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) { this.abilityCooldown = 20; this.shieldActive = true; this.shieldDuration = 5; this.shieldHealth = 100; } } updateAbility(dt) { if (this.shieldActive) { this.shieldDuration -= dt; if (this.shieldDuration <= 0) this.shieldActive = false; } } takeDamage(amount, damager = null) { this.timeSinceLastHit = 0; if(this.isTeleporting) this.isTeleporting = false; if (this.shieldActive) { const damageAbsorbed = Math.min(this.shieldHealth, amount); this.shieldHealth -= damageAbsorbed; const damageLeft = amount - damageAbsorbed; if (this.shieldHealth <= 0) this.shieldActive = false; if (damageLeft > 0) super.takeDamage(damageLeft, damager); } else { super.takeDamage(amount, damager); } } }
 class Spectre extends Player {
-    constructor(id, u, c) { super(id, u, c, 'Spectre'); this.recalculateStats(); }
+    constructor(id, u, c) { super(id, u, c, 'Spectre'); this.recalculateStats(); this.health = this.stats.maxHealth; }
     useAbility() {
         if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) {
             this.abilityCooldown = 6;
@@ -953,7 +962,7 @@ class Grenade extends Projectile { constructor(x,y,p,rad) { super(x,y,p,0.8,8); 
 class Shockwave extends Entity { constructor(x,y,mR,d,ownerId){ super(x,y,'Shockwave'); this.ownerId=ownerId; this.radius=0; this.maxRadius=mR; this.damage=d; this.life=0.5; this.hitTargets=[]; } update(dt){ this.radius += this.maxRadius * 3 * dt; this.life -= dt; if(this.life <= 0) this.isDead = true; } }
 class NPC extends Entity { constructor(x, y, name, color = '#8a2be2') { super(x, y, 'NPC'); this.name = name; this.radius = 10; this.color = color; } }
 class MedBay extends Entity { constructor(x, y) { super(x, y, 'MedBay'); this.name = 'Med-Bay'; this.radius = 12; this.color = '#ffffff'; } }
-class AdminPanel extends Entity { constructor(x, y) { super(x, y, 'AdminPanel'); this.name = 'Admin'; this.radius = 10; this.color = '#1a1a1a'; } }
+class AdminPanel extends Entity { constructor(x, y) { super(x, y, 'AdminPanel'); this.name = 'Admin'; this.radius = 10; this.color = '#4f0000'; } }
 class Portal extends Entity { constructor(x, y) { super(x, y, 'Portal'); this.name = 'Portal'; this.radius = 25; } }
 class LootDrop extends Entity { constructor(x,y,v){ super(x + Math.random()*20-10, y + Math.random()*20-10, 'LootDrop'); this.value=v*5; this.radius=5; this.color='#ffff00'; this.life=60; } update(dt){ this.life-=dt; if (this.life <= 0) this.isDead=true; } }
 class EquipmentDrop extends Entity { constructor(x, y, item) { super(x + Math.random()*20-10, y+Math.random()*20-10, 'EquipmentDrop'); this.item = item; this.radius = 8; this.color = TIER_COLORS[item.tier] || '#fff'; this.life = 60; this.pickupDelay = 0.5; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0) this.isDead = true; } }
@@ -996,6 +1005,21 @@ function initializeWorld() {
     console.log('[SERVER] World initialized and bosses have been spawned.');
 }
 initializeWorld();
+
+// --- PARTY HELPERS ---
+function getPartyIdForPlayer(playerId) {
+    for (const partyId in parties) {
+        if (parties[partyId].includes(playerId)) {
+            return partyId;
+        }
+    }
+    return null;
+}
+
+function areInSameParty(player1Id, player2Id) {
+    const partyId1 = getPartyIdForPlayer(player1Id);
+    return partyId1 !== null && parties[partyId1].includes(player2Id);
+}
 
 // --- MAIN GAME LOOP ---
 function gameLoop() {
@@ -1050,6 +1074,7 @@ function gameLoop() {
             for(const pid in players) {
                 const p = players[pid];
                 if (ownerIsPlayer && pid === entity.ownerId) continue;
+                if (ownerIsPlayer && areInSameParty(entity.ownerId, pid)) continue; // --- FRIENDLY FIRE CHECK ---
                 if (!p.isDead && Math.hypot(entity.x - p.x, entity.y - p.y) < entity.radius + p.radius) {
                     if(isCity(p.x, p.y) && ownerIsPlayer) continue;
                     p.takeDamage(entity.damage, entity);
@@ -1122,6 +1147,7 @@ function gameLoop() {
         else if(entity.type === 'Shockwave'){
              for(const pid in players) {
                 const p = players[pid];
+                if(entity.ownerId.startsWith('player_') && areInSameParty(entity.ownerId, pid)) continue; // --- FRIENDLY FIRE CHECK ---
                 if (!p.isDead && !entity.hitTargets.includes(pid) && Math.hypot(entity.x - p.x, entity.y - p.y) < entity.radius) {
                     if(isCity(p.x, p.y) && entity.ownerId.startsWith('player_')) continue;
                     p.takeDamage(entity.damage, entity);
@@ -1391,6 +1417,29 @@ wss.on('connection', (ws) => {
             if (player && player.trade.partnerId && data.type === 'tradeCancel') {
                 cancelTrade(player.id, `${player.username} cancelled the trade.`);
             }
+            if (player && data.type === 'partyInvite') {
+                const targetSocket = getSocketByPlayerId(data.targetId);
+                if (targetSocket) {
+                    targetSocket.send(JSON.stringify({ type: 'partyInvite', from: player.getData() }));
+                }
+            }
+            if (player && data.type === 'partyResponse') {
+                const inviter = players[data.inviterId];
+                if (inviter && data.accepted) {
+                    const inviterPartyId = getPartyIdForPlayer(inviter.id);
+                    const inviteePartyId = getPartyIdForPlayer(player.id);
+
+                    if (inviterPartyId && !inviteePartyId) {
+                        parties[inviterPartyId].push(player.id);
+                    } else if (!inviterPartyId && inviteePartyId) {
+                        parties[inviteePartyId].push(inviter.id);
+                    } else if (!inviterPartyId && !inviteePartyId) {
+                        const newPartyId = `party_${nextPartyId++}`;
+                        parties[newPartyId] = [inviter.id, player.id];
+                    }
+                }
+            }
+
 
             if (!player || player.isDead) return;
             if (data.type === 'input') { player.inputs = data.inputs; player.angle = data.angle; }
@@ -1407,6 +1456,18 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         const player = players[ws.playerId];
         if (player) {
+            // Remove player from any party they are in
+            const partyId = getPartyIdForPlayer(ws.playerId);
+            if (partyId) {
+                const party = parties[partyId];
+                const index = party.indexOf(ws.playerId);
+                if (index > -1) {
+                    party.splice(index, 1);
+                }
+                if (party.length < 2) { // Disband party if only one person is left
+                    delete parties[partyId];
+                }
+            }
             if (player.trade.partnerId) {
                 cancelTrade(player.id, `${player.username} has disconnected.`);
             }

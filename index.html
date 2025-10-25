@@ -28,10 +28,10 @@ All Rights Reserved.
         #login-container, #death-screen, #x-prompt-container { width: 350px; z-index: 101; }
         #login-container h2, #death-screen h2, #x-prompt-container h2 { margin-bottom: 20px; }
         .login-form input, #x-prompt-container input { width: calc(100% - 20px); background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 10px; margin-bottom: 10px; font-family: inherit; }
-        .login-form button, #death-screen button, .trade-button, .prompt-button { background: #00f0ff; color: #05060a; border: none; padding: 10px 15px; cursor: pointer; font-family: inherit; font-weight: bold; width: 100%; }
-        .login-form button:hover, #death-screen button:hover, .trade-button:hover, .prompt-button:hover { background: #fff; }
-        .login-form button:disabled, .trade-button:disabled, .prompt-button:disabled { background: #555; cursor: default; }
-        #prompt-buttons { display: flex; gap: 10px; margin-top: 10px; }
+        .login-form button, #death-screen button, .trade-button, .prompt-button, .popup-button { background: #00f0ff; color: #05060a; border: none; padding: 10px 15px; cursor: pointer; font-family: inherit; font-weight: bold; width: 100%; }
+        .login-form button:hover, #death-screen button:hover, .trade-button:hover, .prompt-button:hover, .popup-button:hover { background: #fff; }
+        .login-form button:disabled, .trade-button:disabled, .prompt-button:disabled, .popup-button:disabled { background: #555; cursor: default; }
+        #prompt-buttons, #party-invite-buttons { display: flex; gap: 10px; margin-top: 10px; }
         #login-error { color: #ff3355; margin-top: 10px; height: 20px; }
         .login-toggle { color: #00f0ff; cursor: pointer; text-decoration: underline; margin-top: 15px; }
         #right-ui-container { display: none; position: fixed; top: 20px; right: 20px; width: 220px; z-index: 15; }
@@ -95,6 +95,8 @@ All Rights Reserved.
         #trade-status { margin-top: 15px; height: 20px; color: #ffff00; font-weight: bold; }
         #trade-buttons { margin-top: 10px; display: flex; gap: 10px; }
         .trade-slot.offered::after { content: '✓'; position: absolute; top: 0; right: 2px; color: #33ff99; font-weight: bold; }
+        #party-invite-popup { display: none; position: fixed; bottom: 200px; left: 50%; transform: translateX(-50%); z-index: 100; padding: 15px; text-align: center; }
+        #party-invite-popup p { margin: 0 0 10px 0; font-size: 14px; }
     </style>
 </head>
 
@@ -192,6 +194,14 @@ All Rights Reserved.
             <button id="trade-cancel-btn" class="trade-button" style="background-color: #ff3355;">CANCEL</button>
         </div>
     </div>
+    
+    <div id="party-invite-popup" class="ui-panel">
+        <p id="party-invite-text">Player invites you to a party!</p>
+        <div id="party-invite-buttons">
+            <button id="party-invite-accept" class="popup-button">Accept</button>
+            <button id="party-invite-decline" class="popup-button" style="background-color: #ff3355;">Decline</button>
+        </div>
+    </div>
 
     <div id="death-screen" class="ui-panel"><h2>YOU ARE OFFLINE</h2><p>Your journey has ended. Your legacy is stored in the Bank.</p><button onclick="handleRespawn()">RE-ESTABLISH CONNECTION</button></div>
 
@@ -219,6 +229,7 @@ All Rights Reserved.
     const groundContextMenu = document.getElementById('ground-item-context-menu');
     const playerContextMenu = document.getElementById('player-context-menu');
     const xPromptContainer = document.getElementById('x-prompt-container');
+    const partyInvitePopup = document.getElementById('party-invite-popup');
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}`);
@@ -231,6 +242,7 @@ All Rights Reserved.
     let currentTradeData = { myOfferItems: [], myOfferBits: 0 };
     let _promptCallback = null;
     let currentBankData = []; 
+    let currentPartyInvite = null;
 
     const TILE_SIZE = 40, CHUNK_SIZE = 16;
     const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
@@ -326,6 +338,11 @@ All Rights Reserved.
             else if (data.type === 'tradePartnerAccepted') { document.getElementById('trade-status').textContent = 'Partner has accepted. Waiting for you.'; }
             else if (data.type === 'tradeCancelled') { addChatMessage('SYSTEM', data.reason, '#ff3355'); closeTradeWindow(); }
             else if (data.type === 'tradeCompleted') { addChatMessage('SYSTEM', 'Trade successful!', '#33ff99'); closeTradeWindow(); }
+            else if (data.type === 'partyInvite') {
+                currentPartyInvite = { fromId: data.from.id, fromName: data.from.username };
+                document.getElementById('party-invite-text').textContent = `${data.from.username} sent you a party invite!`;
+                partyInvitePopup.style.display = 'block';
+            }
 
         } catch (error) { console.error('[CLIENT] Error processing server message:', error); }
     };
@@ -363,20 +380,27 @@ All Rights Reserved.
 
             ctx.translate(p.x, p.y);
             
+            // --- FIX: Draw health bar ABOVE name ---
+            if (p.id !== myPlayerId && p.health < p.stats.maxHealth) {
+                const barW = 40, barH = 5, barX = -barW / 2, barY = -p.radius - 20;
+                ctx.fillStyle = 'rgba(255, 51, 85, 0.7)'; ctx.fillRect(barX, barY, barW, barH);
+                ctx.fillStyle = p.color; ctx.fillRect(barX, barY, barW * (p.health / p.stats.maxHealth), barH);
+            }
+
             ctx.font = '12px "Consolas",monospace';
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 3;
             ctx.lineJoin = 'round';
-            ctx.strokeText(`[Lvl ${p.level}] ${p.username}`, 0, -25);
+            ctx.strokeText(`[Lvl ${p.level}] ${p.username}`, 0, -p.radius - 5);
             ctx.fillStyle = '#fff';
-            ctx.fillText(`[Lvl ${p.level}] ${p.username}`, 0, -25);
+            ctx.fillText(`[Lvl ${p.level}] ${p.username}`, 0, -p.radius - 5);
 
             ctx.rotate(p.angle);
             ctx.fillStyle = p.color;
             ctx.shadowColor = p.color;
             ctx.shadowBlur = 15;
-            const r = 15;
+            const r = p.radius;
             ctx.beginPath();
             ctx.moveTo(r, 0);
             ctx.lineTo(-r / 2, -r / 2);
@@ -388,8 +412,8 @@ All Rights Reserved.
 
             if (p.isBoosting && p.id === myPlayerId) {
                 const angle = p.angle + Math.PI + (Math.random() - 0.5) * 0.5;
-                const x = p.x + Math.cos(angle) * (r - 2);
-                const y = p.y + Math.sin(angle) * (r - 2);
+                const x = p.x + Math.cos(angle) * (p.radius - 2);
+                const y = p.y + Math.sin(angle) * (p.radius - 2);
                 particles.push({x: x, y: y, vx: 0, vy: 0, life: 1, size: Math.random() * 3 + 2, color: p.color});
             }
             if(p.shieldActive){
@@ -398,14 +422,9 @@ All Rights Reserved.
                 ctx.shadowColor = p.color;
                 ctx.shadowBlur = 25;
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, p.radius + 8, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.restore();
-            }
-            if (p.id !== myPlayerId && p.health < p.stats.maxHealth) {
-                const barW = 40, barH = 5, barX = p.x - barW / 2, barY = p.y - r - 15;
-                ctx.fillStyle = 'rgba(255, 51, 85, 0.7)'; ctx.fillRect(barX, barY, barW, barH);
-                ctx.fillStyle = p.color; ctx.fillRect(barX, barY, barW * (p.health / p.stats.maxHealth), barH);
             }
             if (p.id === myPlayerId && p.isTeleporting) {
                 const chargePercent = 1 - (p.teleportTimer / p.TELEPORT_CHARGE_TIME);
@@ -520,35 +539,45 @@ All Rights Reserved.
         'NPC': (n) => {
             ctx.save();
             ctx.translate(n.x, n.y);
-            ctx.fillStyle=n.color;
-            ctx.shadowColor=n.color;
-            ctx.shadowBlur=10;
-            ctx.beginPath();
-            ctx.rect(-n.radius, -n.radius, n.radius*2, n.radius*2);
-            ctx.fill();
-
-            // --- NEW: Draw unique icon based on name ---
-            ctx.strokeStyle = '#00f0ff';
-            ctx.lineWidth = 2;
-            ctx.font = 'bold 12px "Consolas",monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+            ctx.shadowColor = n.color;
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = n.color;
+            ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
+            
+            // --- RESTORED: Draw unique icon based on name ---
             if (n.name === 'Bank') {
-                ctx.strokeText('$', 0, 0);
+                ctx.fillStyle = '#e3d400';
+                ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
+                ctx.fillStyle = '#fff';
+                const barHeight = n.radius * 0.2;
+                ctx.fillRect(-n.radius*0.6, -n.radius*0.5, n.radius*1.2, barHeight);
+                ctx.fillRect(-n.radius*0.6, 0, n.radius*1.2, barHeight);
+                ctx.fillRect(-n.radius*0.6, n.radius*0.5-barHeight, n.radius*1.2, barHeight);
             } else if (n.name === 'Exchange') {
-                ctx.strokeText('<>', 0, 0);
+                ctx.fillStyle = '#8a2be2';
+                ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.font = 'bold 12px "Consolas",monospace';
+                // Draw arrows
+                ctx.beginPath();
+                ctx.moveTo(-n.radius*0.5, -n.radius*0.3); ctx.lineTo(n.radius*0.5, -n.radius*0.3); ctx.lineTo(n.radius*0.3, -n.radius*0.5);
+                ctx.moveTo(n.radius*0.5, -n.radius*0.3); ctx.lineTo(n.radius*0.3, -n.radius*0.1);
+                ctx.moveTo(n.radius*0.5, n.radius*0.3); ctx.lineTo(-n.radius*0.5, n.radius*0.3); ctx.lineTo(-n.radius*0.3, n.radius*0.5);
+                ctx.moveTo(-n.radius*0.5, n.radius*0.3); ctx.lineTo(-n.radius*0.3, n.radius*0.1);
+                ctx.stroke();
             }
             
             ctx.restore();
-
+            
             ctx.font = '12px "Consolas"';
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 3;
             ctx.lineJoin = 'round';
-            ctx.strokeText(n.name, n.x, n.y - n.radius-5);
-            ctx.fillStyle='#fff';
-            ctx.fillText(n.name, n.x, n.y - n.radius-5);
+            ctx.strokeText(n.name, n.x, n.y - n.radius - 5);
+            ctx.fillStyle = '#fff';
+            ctx.fillText(n.name, n.x, n.y - n.radius - 5);
         },
         'MedBay': (n) => {
             ctx.save();
@@ -570,28 +599,19 @@ All Rights Reserved.
             ctx.restore();
         },
         'AdminPanel': (n) => {
-            ctx.save();
+             ctx.save();
             ctx.translate(n.x, n.y);
-            ctx.fillStyle=n.color;
-            ctx.shadowColor='#ff3355';
-            ctx.shadowBlur=10;
-            ctx.beginPath();
-            ctx.rect(-n.radius, -n.radius, n.radius*2, n.radius*2);
-            ctx.fill();
+            ctx.shadowColor = n.color;
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = '#4f0000';
+            ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
             
-            // --- NEW: Draw unique icon for Admin ---
-            ctx.save();
-            ctx.strokeStyle = '#ff3355';
-            ctx.lineWidth = 1;
-            const time = Date.now() / 1000;
-            for(let i = 0; i < 6; i++) {
-                ctx.rotate(Math.PI / 3);
-                ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.arc(0, 0, n.radius * 0.8, 0, Math.PI / 6);
-                ctx.stroke();
-            }
-            ctx.restore();
+            // --- RESTORED: Draw console icon ---
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px "Consolas",monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('>_', -n.radius*0.6, 0);
 
             ctx.restore();
             
@@ -1066,15 +1086,11 @@ All Rights Reserved.
         if (!player || player.id === myPlayerId) return;
         hideAllContextMenus();
         
-        playerContextMenu.innerHTML = '';
-        const tradeLi = document.createElement('li');
-        tradeLi.textContent = `Trade ${player.username}`;
-        tradeLi.onclick = () => {
-            sendToServer({ type: 'tradeRequest', targetId: player.id });
-            addChatMessage('SYSTEM', `Trade request sent to ${player.username}.`, '#ffff00');
-            hideAllContextMenus();
-        };
-        playerContextMenu.appendChild(tradeLi);
+        playerContextMenu.innerHTML = `
+            <li onclick="sendToServer({ type: 'tradeRequest', targetId: '${player.id}' }); hideAllContextMenus();">Trade ${player.username}</li>
+            <li onclick="sendToServer({ type: 'followPlayer', targetId: '${player.id}' }); hideAllContextMenus();">Follow ${player.username}</li>
+            <li onclick="sendToServer({ type: 'partyInvite', targetId: '${player.id}' }); hideAllContextMenus();">Invite ${player.username}</li>
+        `;
         
         playerContextMenu.style.display = 'block';
         playerContextMenu.style.left = `${event.clientX}px`;
@@ -1092,6 +1108,7 @@ All Rights Reserved.
         closeBank();
         closeTradeWindow();
         xPromptContainer.style.display = 'none';
+        partyInvitePopup.style.display = 'none';
     }
 
     function openShop(npcName, npcInventory, marketListings) {
@@ -1355,6 +1372,22 @@ All Rights Reserved.
         _promptCallback = null;
         xPromptContainer.style.display = 'none';
     });
+    
+    document.getElementById('party-invite-accept').addEventListener('click', () => {
+        if (currentPartyInvite) {
+            sendToServer({ type: 'partyResponse', accepted: true, inviterId: currentPartyInvite.fromId });
+            currentPartyInvite = null;
+            partyInvitePopup.style.display = 'none';
+        }
+    });
+
+    document.getElementById('party-invite-decline').addEventListener('click', () => {
+        if (currentPartyInvite) {
+            sendToServer({ type: 'partyResponse', accepted: false, inviterId: currentPartyInvite.fromId });
+            currentPartyInvite = null;
+            partyInvitePopup.style.display = 'none';
+        }
+    });
 
 
     document.addEventListener('keydown', e => {
@@ -1379,7 +1412,7 @@ All Rights Reserved.
             return;
         }
         
-        if (isShopOpen || isBankOpen || isTrading || xPromptContainer.style.display === 'block') return;
+        if (isShopOpen || isBankOpen || isTrading || xPromptContainer.style.display === 'block' || partyInvitePopup.style.display === 'block') return;
 
         const key = e.key.toLowerCase();
         if (e.code === 'Space') {
