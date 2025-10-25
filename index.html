@@ -45,7 +45,6 @@ All Rights Reserved.
         #inventory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
         .inventory-slot, .bank-slot, .trade-slot { width: 45px; height: 45px; background-color: rgba(0,0,0,0.5); border: 1px solid #555; display: flex; justify-content: center; align-items: center; font-size: 10px; text-align: center; cursor: pointer; position: relative; }
         .inventory-slot:hover, .bank-slot:hover, .trade-slot:hover { background-color: rgba(255,255,255,0.1); }
-        /* UPDATED: Added styles for bank item quantity */
         .quantity-display { position: absolute; bottom: 1px; right: 3px; font-size: 12px; font-weight: bold; color: #ffff00; text-shadow: 1px 1px 2px #000; pointer-events: none; }
         .context-menu { display: none; position: fixed; z-index: 102; background-color: #05060a; border: 1px solid #00f0ff; list-style: none; padding: 5px; margin: 0; font-size: 14px; }
         .context-menu li { padding: 8px; cursor: pointer; }
@@ -67,7 +66,6 @@ All Rights Reserved.
         .shop-item-buy, .shop-item-sell, .market-buy-btn { background: #00f0ff; color: #05060a; border: none; padding: 5px 10px; cursor: pointer; }
         .shop-item-buy:disabled, .market-buy-btn:disabled { background: #555; cursor: default; }
         #market-sell-panel { margin-top: 15px; border-top: 1px solid #555; padding-top: 10px; }
-        /* UPDATED: Custom styles for market UI to match theme */
         #market-sell-panel select, #market-sell-panel input { background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; font-family: inherit; margin: 0 5px; -moz-appearance: textfield; }
         #market-sell-panel select { appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2300f0ff' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 25px; }
         #market-sell-panel input[type=number]::-webkit-inner-spin-button, #market-sell-panel input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
@@ -87,7 +85,6 @@ All Rights Reserved.
         .npc-trade-columns { display: flex; justify-content: space-between; gap: 15px; }
         #npc-buy-panel, #npc-sell-panel { width: 48%; }
         #npc-buy-panel h3, #npc-sell-panel h3 { margin-top: 0; text-align: center; color: #ffff00; }
-        /* UPDATED: Styles for new trade system */
         #trade-container { width: 600px; padding: 15px; }
         #trade-header { margin-bottom: 15px; font-size: 1.2em; }
         .trade-window { display: flex; justify-content: space-between; gap: 10px; }
@@ -112,7 +109,6 @@ All Rights Reserved.
 
 <body>
     <canvas id="gameCanvas"></canvas>
-    <!-- UPDATED: Added bank context menu -->
     <ul id="item-context-menu" class="context-menu"></ul>
     <ul id="bank-context-menu" class="context-menu"></ul>
     <ul id="ground-item-context-menu" class="context-menu"></ul>
@@ -177,7 +173,6 @@ All Rights Reserved.
         </div>
     </div>
     
-    <!-- UPDATED: New HTML structure for two-stage trade -->
     <div id="trade-container" class="ui-panel">
         <h2 id="trade-header">Trading with Player</h2>
         
@@ -246,11 +241,12 @@ All Rights Reserved.
     const chatInput = document.getElementById('chat-input');
     const chatLog = document.getElementById('chat-log');
     const itemContextMenu = document.getElementById('item-context-menu');
-    const bankContextMenu = document.getElementById('bank-context-menu'); // UPDATED: Bank context menu
+    const bankContextMenu = document.getElementById('bank-context-menu'); 
     const groundContextMenu = document.getElementById('ground-item-context-menu');
     const playerContextMenu = document.getElementById('player-context-menu');
 
-    const protocol = window.location.protocol === 'https' ? 'wss:' : 'ws:';
+    // UPDATED: Force secure WebSocket for Render deployment
+    const protocol = 'wss:'; 
     const ws = new WebSocket(`${protocol}//${window.location.host}`);
     let myPlayerId = null, localWorld = {}, gameState = { players: {}, entities: [] };
     let camera = { x: 0, y: 0, zoom: 1 };
@@ -258,7 +254,6 @@ All Rights Reserved.
     let isGameRunning = false, isChatting = false, isShopOpen = false, isBankOpen = false, isTrading = false;
     let loggedInUser = "Player", chosenClassName = null;
     let currentShopName = null;
-    // UPDATED: Trade state management
     let currentTradeData = { myOfferItems: [], myOfferBits: 0, myAccepted: false, partnerAccepted: false };
 
     const TILE_SIZE = 40, CHUNK_SIZE = 16;
@@ -344,7 +339,6 @@ All Rights Reserved.
             else if (data.type === 'openBank') { openBank(data.bank); }
             else if (data.type === 'marketUpdate') { if(isShopOpen) updateMarketView(data.marketListings); }
             else if (data.type === 'worldChunkUpdate') { localWorld[data.key] = data.chunk; }
-            // UPDATED: New trade message handlers
             else if (data.type === 'tradeRequest') {
                 if (isTrading) return;
                 if(confirm(`${data.from.username} wants to trade with you. Accept?`)) {
@@ -823,7 +817,7 @@ All Rights Reserved.
         
         ctx.restore();
         
-        if (!myPlayer.isDead) { 
+        if (myPlayer && !myPlayer.isDead) { 
             drawUI(myPlayer); 
             drawMinimap(myPlayer); 
         }
@@ -927,7 +921,6 @@ All Rights Reserved.
                 const tile = TILE_TYPES[tileId] || TILE_TYPES[1];
                 if(tile) {
                     minimapCtx.fillStyle = tile.wc || tile.c;
-                    // UPDATED: Minimap rendering fix. Removed "+1" which caused the right edge to render incorrectly.
                     minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, Math.ceil(TILE_SIZE * scale), Math.ceil(TILE_SIZE * scale));
                 }
             }
@@ -1019,7 +1012,6 @@ All Rights Reserved.
         itemContextMenu.style.top = `${event.clientY}px`;
     }
 
-    // UPDATED: New context menu for bank items
     function showBankContextMenu(event, index, item, quantity) {
         event.preventDefault();
         if (!item) return;
@@ -1037,7 +1029,6 @@ All Rights Reserved.
         bankContextMenu.style.top = `${event.clientY}px`;
     }
 
-    // UPDATED: Helper function for "Withdraw-X"
     function promptWithdrawX(index, maxQuantity) {
         const amountStr = prompt(`How many would you like to withdraw? (Max: ${maxQuantity})`);
         if (amountStr) {
@@ -1109,7 +1100,7 @@ All Rights Reserved.
         itemContextMenu.style.display = 'none';
         groundContextMenu.style.display = 'none';
         playerContextMenu.style.display = 'none';
-        bankContextMenu.style.display = 'none'; // UPDATED: Hide bank menu
+        bankContextMenu.style.display = 'none';
     }
 
     function closeAllPanels() {
@@ -1145,13 +1136,11 @@ All Rights Reserved.
         bankContainer.style.display = 'none';
     }
     
-    // UPDATED: Complete overhaul of trade functions
     function openTradeWindow(partnerData) {
         closeAllPanels();
         isTrading = true;
         tradeContainer.style.display = 'block';
 
-        // Reset to stage 1
         document.getElementById('trade-offer-window').style.display = 'block';
         document.getElementById('trade-confirm-screen').style.display = 'none';
         document.getElementById('trade-header').textContent = `Trading with ${partnerData.username}`;
@@ -1188,7 +1177,7 @@ All Rights Reserved.
     }
 
     function offerTradeItem(inventoryIndex) {
-        if (currentTradeData.myAccepted) return; // Cannot change offer after accepting
+        if (currentTradeData.myAccepted) return;
         const myPlayer = gameState.players[myPlayerId];
         const item = myPlayer.inventory[inventoryIndex];
         if (item && !currentTradeData.myOfferItems.some(i => i.originalIndex === inventoryIndex)) {
@@ -1199,15 +1188,14 @@ All Rights Reserved.
     }
 
     function removeTradeItem(offerIndex) {
-        if (currentTradeData.myAccepted) return; // Cannot change offer after accepting
+        if (currentTradeData.myAccepted) return;
         currentTradeData.myOfferItems.splice(offerIndex, 1);
         renderMyTradeOffer();
         updateMyTradeOffer();
     }
 
     function updateMyTradeOffer() {
-        if (currentTradeData.myAccepted) { // Prevent changes if already accepted
-            // Maybe revert the input change, but for now just block sending
+        if (currentTradeData.myAccepted) {
             const bitsInput = document.getElementById('my-trade-bits');
             bitsInput.value = currentTradeData.myOfferBits;
             return;
@@ -1216,7 +1204,6 @@ All Rights Reserved.
         const bitsChanged = currentTradeData.myOfferBits !== bits;
         currentTradeData.myOfferBits = bits;
 
-        // An offer change implies resetting the 'accepted' status
         sendToServer({ type: 'tradeUpdate', offerItems: currentTradeData.myOfferItems.map(i => i.item), offerBits: bits });
     }
 
@@ -1301,7 +1288,6 @@ All Rights Reserved.
         });
     }
 
-    // UPDATED: Bank view now handles stacked items
     function updateBankView(bankData) {
         const grid = document.getElementById('bank-grid');
         grid.innerHTML = '';
@@ -1433,7 +1419,6 @@ All Rights Reserved.
             if (isShopOpen) closeShop();
             if (isBankOpen) closeBank();
             if (isTrading) {
-                // In stage 2, escape should act as cancel
                 if (document.getElementById('trade-confirm-screen').style.display === 'block') {
                     sendToServer({ type: 'tradeCancel' });
                 } else {
