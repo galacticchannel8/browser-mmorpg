@@ -11,7 +11,7 @@ All Rights Reserved.
     <style>
         body, html { background-color: #05060a; color: #00f0ff; font-family: 'Consolas', 'Monaco', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; user-select: none; }
         #gameCanvas { background-color: #05060a; cursor: crosshair; }
-        #chat-container { display: none; /* UPDATED: Hidden by default */ position: fixed; bottom: 20px; left: 20px; width: 400px; background-color: rgba(5, 6, 10, 0.7); border: 1px solid #00f0ff; border-radius: 5px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; z-index: 10; }
+        #chat-container { display: block; /* UPDATED: Changed to block to be visible by default */ position: fixed; bottom: 20px; left: 20px; width: 400px; background-color: rgba(5, 6, 10, 0.7); border: 1px solid #00f0ff; border-radius: 5px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; z-index: 10; }
         #chat-log { height: 150px; padding: 10px; overflow-y: scroll; font-size: 14px; list-style: none; margin: 0; }
         #chat-log::-webkit-scrollbar { width: 4px; } #chat-log::-webkit-scrollbar-thumb { background: #00f0ff; }
         #chat-input { width: 100%; border: none; border-top: 1px solid #00f0ff; background-color: #05060a; color: #fff; padding: 8px; font-family: 'Consolas', 'Monaco', monospace; box-sizing: border-box; }
@@ -295,7 +295,7 @@ All Rights Reserved.
             osc.type = 'square';
             osc.frequency.setValueAtTime(200, now);
             osc.frequency.linearRampToValueAtTime(100, now + 0.1);
-            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.setValueAtTime(0.1, now); // UPDATED: Volume lowered from 0.15
             gain.gain.linearRampToValueAtTime(0, now + 0.1);
             osc.connect(gain);
             gain.connect(this.context.destination);
@@ -327,7 +327,7 @@ All Rights Reserved.
             osc.type = 'sawtooth';
             osc.frequency.setValueAtTime(300, now);
             osc.frequency.exponentialRampToValueAtTime(50, now + 0.4);
-            gain.gain.setValueAtTime(0.15, now); // Lowered volume
+            gain.gain.setValueAtTime(0.1, now); // UPDATED: Lowered volume from 0.15
             gain.gain.linearRampToValueAtTime(0, now + 0.4);
             osc.connect(gain);
             gain.connect(this.context.destination);
@@ -335,12 +335,29 @@ All Rights Reserved.
             osc.stop(now + 0.4);
         },
         
+        // ADDED: New sound for Dreadnought mortar
+        playMortarLaunch: function() {
+            if (!this.context) return;
+            const now = this.context.currentTime;
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.exponentialRampToValueAtTime(30, now + 0.5);
+            gain.gain.setValueAtTime(0.1, now); // Set to consistent volume
+            gain.gain.linearRampToValueAtTime(0, now + 0.5);
+            osc.connect(gain);
+            gain.connect(this.context.destination);
+            osc.start(now);
+            osc.stop(now + 0.5);
+        },
+        
         playAbility: function(type) {
             if (!this.context) return;
             const now = this.context.currentTime;
             const osc = this.context.createOscillator();
             const gain = this.context.createGain();
-            let vol = 0.15;
+            let vol = 0.1; // UPDATED: Volume lowered from 0.15
 
             if (type === 'Guardian') { // Shield up
                 osc.type = 'sine';
@@ -505,6 +522,7 @@ All Rights Reserved.
                 else if (data.effect === 'melee') Sound.playMelee();
                 else if (data.effect === 'damage') Sound.playDamage();
                 else if (data.effect === 'ability') Sound.playAbility(data.class);
+                else if (data.effect === 'mortarLaunch') Sound.playMortarLaunch(); // UPDATED: Added handler for new sound
                 else if (data.effect === 'blink') {
                     for(let i=0; i<20; i++) particles.push({x: data.x, y: data.y, life: 1, size: Math.random()*3+1, color: data.color, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2});
                 } else if (data.effect === 'teleportCharge') {

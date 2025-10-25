@@ -734,6 +734,7 @@ class Dreadnought extends WorldBoss {
     constructor(x, y) {
         super(x, y, "DREADNOUGHT", '#ff6a00', 15000, "Dreadnought");
         this.leashRadius = 1000;
+        this.speed = 2.0; // Slightly reduced speed for smoother movement
     }
     update(dt) {
         if (Math.hypot(this.x - this.spawnX, this.y - this.spawnY) > this.leashRadius) {
@@ -746,9 +747,12 @@ class Dreadnought extends WorldBoss {
         for(const pid in players) { const p = players[pid]; if(!p.isDead && !p.isTeleporting && Math.hypot(p.x - this.x, p.y - this.y) < this.aggroRadius) { targetPlayer = p; break; }}
         if (!targetPlayer) return;
         const dX = targetPlayer.x - this.x, dY = targetPlayer.y - this.y; const dP = Math.hypot(dX, dY);
+        
+        // UPDATED: Removed collision checks to allow flying
         if(dP > 400) { 
-            this.x += (dX / dP) * this.speed * (dt * 60); 
-            this.y += (dY / dP) * this.speed * (dt * 60); 
+            const timeAdjustedSpeed = this.speed * (dt * 60);
+            this.x += (dX / dP) * timeAdjustedSpeed; 
+            this.y += (dY / dP) * timeAdjustedSpeed; 
         }
 
         this.attackTimer -= dt;
@@ -762,6 +766,8 @@ class Dreadnought extends WorldBoss {
                     this.attackPhase = 'mortar'; break;
                 case 'mortar':
                     this.attackTimer = 5;
+                    // UPDATED: Added sound effect trigger
+                    broadcastMessage({ type: 'sfx', effect: 'mortarLaunch' });
                     entities.push(new MortarProjectile(this.x, this.y, targetPlayer.x, targetPlayer.y, this.id));
                     this.attackPhase = 'barrage'; break;
             }
