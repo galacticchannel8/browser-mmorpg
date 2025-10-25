@@ -1,1681 +1,1801 @@
-<div id="chat-container">
-    <div class="chat-header">
-        <div class="chat-tabs">
-            <div id="chat-tab-all" class="chat-tab active">All</div>
-            <div id="chat-tab-party" class="chat-tab">Party</div>
-        </div>
-        <button id="leave-party-btn">Leave</button>
-    </div>
-    <ul id="chat-log"></ul>
-    <input type="text" id="chat-input" placeholder="Press Enter to chat..." maxlength="100">
-</div>
-<div id="login-container" class="ui-panel"><div id="login-form" class="login-form"><h2>LOGIN</h2><input type="text" id="login-username" placeholder="Username" required><input type="password" id="login-password" placeholder="Password" required><button onclick="handleLogin()">ENTER GALACTIC OS</button><p class="login-toggle" onclick="toggleLoginRegister(false)">Need an account? Register</p></div><div id="register-form" class="login-form" style="display: none;"><h2>REGISTER</h2><input type="text" id="register-username" placeholder="Username" required><input type="password" id="register-password" placeholder="Password" required><button onclick="handleRegister()">CREATE ACCOUNT</button><p class="login-toggle" onclick="toggleLoginRegister(true)">Already have an account? Login</p></div><div id="login-error"></div></div>
-<div id="class-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR CLASS</h2><div class="class-option" onclick="chooseClass('Operator')"><h3>OPERATOR</h3><p>High speed, low health. Ability: Invisibility.</p></div><div class="class-option" onclick="chooseClass('Guardian')"><h3>GUARDIAN</h3><p>High health, low speed. Ability: Personal Shield.</p></div><div class="class-option" onclick="chooseClass('Spectre')"><h3>SPECTRE</h3><p>Balanced stats. Ability: Short-range Blink.</p></div></div>
-<div id="ship-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR SHIP COLOR</h2><div id="color-grid"><div class="color-option" style="background-color: #00f0ff;" onclick="chooseColor('#00f0ff')"></div><div class="color-option" style="background-color: #33ff99;" onclick="chooseColor('#33ff99')"></div><div class="color-option" style="background-color: #f07cff;" onclick="chooseColor('#f07cff')"></div><div class="color-option" style="background-color: #ff3355;" onclick="chooseColor('#ff3355')"></div><div class="color-option" style="background-color: #e3d400;" onclick="chooseColor('#e3d400')"></div><div class="color-option" style="background-color: #ffffff;" onclick="chooseColor('#ffffff')"></div></div></div>
+<!--
+Copyright (c) 2025 GalacticChannel8.com
+All Rights Reserved.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galactic OS - Alpha</title>
+    <style>
+        body, html { background-color: #05060a; color: #00f0ff; font-family: 'Consolas', 'Monaco', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; user-select: none; }
+        #gameCanvas { background-color: #05060a; cursor: crosshair; }
+        /* UPDATED: Changed display from 'none' to 'block'. The JS will handle hiding it on the login screen. */
+        #chat-container { display: block; position: fixed; bottom: 20px; left: 20px; width: 400px; background-color: rgba(5, 6, 10, 0.7); border: 1px solid #00f0ff; border-radius: 5px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; z-index: 10; }
+        #chat-log { height: 150px; padding: 10px; overflow-y: scroll; font-size: 14px; list-style: none; margin: 0; }
+        #chat-log::-webkit-scrollbar { width: 4px; } #chat-log::-webkit-scrollbar-thumb { background: #00f0ff; }
+        #chat-input { width: 100%; border: none; border-top: 1px solid #00f0ff; background-color: #05060a; color: #fff; padding: 8px; font-family: 'Consolas', 'Monaco', monospace; box-sizing: border-box; }
+        #chat-input:focus { outline: none; box-shadow: 0 0 10px rgba(0, 240, 255, 0.7) inset; }
+        .chat-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #00f0ff; padding: 0 5px; }
+        .chat-tabs { display: flex; }
+        .chat-tab { padding: 6px 10px; cursor: pointer; font-size: 14px; }
+        .chat-tab.active { color: #05060a; background-color: #00f0ff; }
+        #leave-party-btn { display: none; background: #ff3355; color: #fff; border: none; cursor: pointer; padding: 4px 8px; font-size: 12px; }
+        .ui-panel { background-color: rgba(5, 6, 10, 0.85); border: 1px solid #00f0ff; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; padding: 10px; }
+        #class-selection, #ship-selection, #login-container, #death-screen, #shop-container, #bank-container, #trade-container, #x-prompt-container { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; text-align: center; }
+        .selection-panel h2 { margin-top: 0; color: #ffff00; }
+        .class-option { border: 1px solid #777; padding: 15px; margin: 10px; cursor: pointer; transition: all 0.2s ease; }
+        .class-option:hover { background: #00f0ff; color: #05060a; border-color: #fff; }
+        .class-option h3 { margin: 0 0 5px 0; } .class-option p { margin: 0; font-size: 14px; }
+        #color-grid { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+        .color-option { width: 40px; height: 40px; border: 2px solid #777; cursor: pointer; transition: all 0.2s ease; }
+        .color-option:hover { border-color: #fff; transform: scale(1.1); box-shadow: 0 0 10px #fff; }
+        #login-container, #death-screen, #x-prompt-container { width: 350px; z-index: 101; }
+        #login-container h2, #death-screen h2, #x-prompt-container h2 { margin-bottom: 20px; }
+        .login-form input, #x-prompt-container input { width: calc(100% - 20px); background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 10px; margin-bottom: 10px; font-family: inherit; }
+        .login-form button, #death-screen button, .trade-button, .prompt-button, .popup-button { background: #00f0ff; color: #05060a; border: none; padding: 10px 15px; cursor: pointer; font-family: inherit; font-weight: bold; width: 100%; }
+        .login-form button:hover, #death-screen button:hover, .trade-button:hover, .prompt-button:hover, .popup-button:hover { background: #fff; }
+        .login-form button:disabled, .trade-button:disabled, .prompt-button:disabled, .popup-button:disabled, .shop-item-sell:disabled { background: #555; cursor: default; }
+        #prompt-buttons, #party-invite-buttons, #trade-request-buttons { display: flex; gap: 10px; margin-top: 10px; }
+        #login-error { color: #ff3355; margin-top: 10px; height: 20px; }
+        .login-toggle { color: #00f0ff; cursor: pointer; text-decoration: underline; margin-top: 15px; }
+        #right-ui-container { display: none; position: fixed; top: 20px; right: 20px; width: 220px; z-index: 15; }
+        #minimap-container { border: 2px solid #00f0ff; box-shadow: 0 0 4px #00f0ff, 0 0 12px rgba(0, 240, 255, 0.6), inset 0 0 4px rgba(0, 240, 255, 0.4); margin-bottom: 10px; }
+        #coords { text-align: center; font-size: 16px; margin-bottom: 10px; color: #00f0ff; }
+        #equipment-panel { text-align: left; margin-bottom: 10px; }
+        #equipment-panel h3 { margin: 0 0 10px 0; color: #ffff00; text-align: center; font-size: 1em; }
+        .equip-slot { margin-bottom: 4px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 5px; border: 1px solid #555; cursor: pointer; }
+        .equip-slot:hover { background-color: rgba(255,255,255,0.1); }
+        .equip-slot strong { color: #aaa; display: inline-block; width: 60px; }
+        #inventory-panel h3 { margin: 0 0 10px 0; color: #ffff00; text-align: center; font-size: 1em; }
+        #inventory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+        .inventory-slot, .bank-slot, .trade-slot { width: 45px; height: 45px; background-color: rgba(0,0,0,0.5); border: 1px solid #555; display: flex; justify-content: center; align-items: center; font-size: 10px; text-align: center; cursor: pointer; position: relative; }
+        .inventory-slot:hover, .bank-slot:hover, .trade-slot:hover { background-color: rgba(255,255,255,0.1); }
+        .item-quantity { position: absolute; bottom: 2px; right: 4px; font-size: 12px; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px #000; }
+        .context-menu { display: none; position: fixed; z-index: 102; background-color: #05060a; border: 1px solid #00f0ff; list-style: none; padding: 5px; margin: 0; font-size: 14px; }
+        .context-menu li { padding: 8px; cursor: pointer; }
+        .context-menu li:hover { background-color: #00f0ff; color: #05060a; }
+        #xp-bar-container { position: fixed; bottom: 0; left: 0; width: 100%; height: 8px; background-color: rgba(0,0,0,0.5); z-index: 9; }
+        #xp-bar { width: 0%; height: 100%; background-color: #a832a4; box-shadow: 0 0 10px #a832a4; transition: width 0.5s ease; }
+        #bank-container { width: 250px; }
+        #bank-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
+        #shop-container { width: 600px; }
+        .shop-tabs { display: flex; justify-content: center; margin-bottom: 10px; }
+        .shop-tab { padding: 8px 15px; cursor: pointer; border: 1px solid #555; background-color: #05060a; }
+        .shop-tab.active { background: #00f0ff; color: #05060a; border-color: #00f0ff; }
+        .shop-content { display: none; }
+        .shop-content.active { display: block; }
+        .shop-grid { display: grid; grid-template-columns: 1fr; gap: 5px; max-height: 300px; overflow-y: auto; padding: 5px; border: 1px solid #333; }
+        .shop-item, .market-item { display: grid; grid-template-columns: 2fr 1fr 1fr; align-items: center; background-color: rgba(0,0,0,0.5); border: 1px solid #555; padding: 8px; }
+        .market-item { grid-template-columns: 2fr 1fr 1fr 1fr; }
+        .shop-item-name, .market-item-name { font-size: 14px; }
+        .shop-item-buy, .shop-item-sell, .market-buy-btn { background: #00f0ff; color: #05060a; border: none; padding: 5px 10px; cursor: pointer; }
+        .shop-item-buy:disabled, .market-buy-btn:disabled { background: #555; cursor: default; }
+        #market-sell-panel { margin-top: 15px; border-top: 1px solid #555; padding-top: 10px; }
+        #market-sell-panel select, #market-sell-panel input { background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; font-family: inherit; margin: 0 5px; }
+        #market-sell-panel button { background: #00f0ff; color: #05060a; border: none; padding: 8px 15px; cursor: pointer; font-family: inherit; }
+        #left-ui-container { display: none; position: fixed; top: 20px; left: 20px; width: 300px; z-index: 15; }
+        #hud-container { text-align: left; font-size: 16px; margin-bottom: 10px; }
+        #hud-info .hud-line { display: flex; align-items: center; justify-content: space-between; margin: 6px 0; }
+        #hud-info strong { color: #ffff00; }
+        .hud-bar { width: 100%; height: 15px; background-color: rgba(0,0,0,0.5); border: 1px solid #555; margin-top: 2px; }
+        .hud-bar > div { height: 100%; transition: width 0.3s ease; }
+        #health-bar-fill { background-color: #ff3355; }
+        #energy-bar-fill { background-color: #aaaaff; }
+        #keybind-info { font-size: 12px; color: #999; margin-top: 15px; border-top: 1px solid #333; padding-top: 10px; }
+        #keybind-info p { margin: 4px 0; }
+        #keybind-info strong { color: #00f0ff; }
+        #party-panel { display: none; } #party-panel h3 { margin: 0 0 10px 0; text-align: center; color: #ffff00; }
+        .party-member { margin-bottom: 8px; } .party-member-name { font-size: 14px; margin-bottom: 3px; }
+        .party-member-health-bar { width: 100%; height: 10px; background-color: rgba(0,0,0,0.5); border: 1px solid #555; }
+        .party-member-health-fill { height: 100%; background-color: #33ff99; }
+        #portrait-container { width: 220px; height: 100px; border: 1px solid #00f0ff; background-color: rgba(5, 6, 10, 0.85); margin-top: 10px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); box-sizing: border-box; }
+        .npc-trade-columns { display: flex; justify-content: space-between; gap: 15px; }
+        #npc-buy-panel, #npc-sell-panel { width: 48%; }
+        #npc-buy-panel h3, #npc-sell-panel h3 { margin-top: 0; text-align: center; color: #ffff00; }
+        #trade-container { width: 550px; padding: 15px; }
+        #trade-header { margin-bottom: 15px; font-size: 1.2em; }
+        .trade-window { display: flex; justify-content: space-between; gap: 10px; }
+        .trade-panel { width: 48%; }
+        .trade-panel h3 { margin: 0 0 10px 0; color: #ffff00; font-size: 1em; }
+        .trade-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; min-height: 100px; background-color: rgba(0,0,0,0.3); padding: 5px; border: 1px solid #555; margin-bottom: 10px; }
+        .trade-bits-input { width: 100%; box-sizing: border-box; background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; margin-bottom: 10px; font-family: inherit; }
+        #other-trade-bits { padding: 8px; background-color: rgba(0,0,0,0.3); border: 1px solid #555; text-align: right; margin-bottom: 10px; }
+        #trade-status { margin-top: 15px; height: 20px; color: #ffff00; font-weight: bold; }
+        #trade-buttons { margin-top: 10px; display: flex; gap: 10px; }
+        .trade-slot.offered::after { content: '✓'; position: absolute; top: 0; right: 2px; color: #33ff99; font-weight: bold; }
+        #party-invite-popup, #trade-request-popup { display: none; position: fixed; bottom: 200px; left: 50%; transform: translateX(-50%); z-index: 100; padding: 15px; text-align: center; }
+        #party-invite-popup p, #trade-request-popup p { margin: 0 0 10px 0; font-size: 14px; }
+    </style>
+</head>
 
-<div id="left-ui-container">
-    <div id="hud-container" class="ui-panel">
-        <div id="hud-info"></div>
-        <div id="keybind-info">
-            <p><strong>[E]</strong> Interact / <strong>[RMB]</strong> Context Menu</p>
-            <p><strong>[H]</strong> Home / <strong>[Shift]</strong> Boost</p>
-            <p><strong>[Space]</strong> Melee / <strong>[LMB]</strong> Range</p>
-            <p><strong>[Q]</strong> Class Ability</p>
-            <p><strong>[Esc]</strong> Close Menu</p>
-        </div>
-    </div>
-    <div id="party-panel" class="ui-panel">
-        <h3>PARTY</h3>
-        <div id="party-members-list"></div>
-    </div>
-</div>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <ul id="item-context-menu" class="context-menu"></ul>
+    <ul id="ground-item-context-menu" class="context-menu"></ul>
+    <ul id="player-context-menu" class="context-menu"></ul>
 
-<div id="right-ui-container">
-    <div id="minimap-container"><canvas id="minimapCanvas" width="220" height="220"></canvas></div>
-    <div id="coords"></div>
-    <div id="equipment-panel" class="ui-panel"><h3>EQUIPMENT</h3><div id="equip-slot-Weapon" class="equip-slot" data-slot-type="Weapon"><strong data-slot="Weapon">Weapon:</strong> <span id="equip-Weapon">None</span></div><div id="equip-slot-Module" class="equip-slot" data-slot-type="Module"><strong data-slot="Module">Module:</strong> <span id="equip-Module">None</span></div><div id="equip-slot-Plating" class="equip-slot" data-slot-type="Plating"><strong data-slot="Plating">Plating:</strong> <span id="equip-Plating">None</span></div><div id="equip-slot-Utility" class="equip-slot" data-slot-type="Utility"><strong data-slot="Utility">Utility:</strong> <span id="equip-Utility">None</span></div></div>
-    <div id="inventory-panel" class="ui-panel"><h3>INVENTORY</h3><div id="inventory-grid"></div></div>
-    <div id="portrait-container"></div>
-</div>
-
-<div id="bank-container" class="ui-panel">
-    <h2 id="bank-title">BANK</h2>
-    <div id="bank-grid"></div>
-</div>
-
-<div id="x-prompt-container" class="ui-panel">
-    <h2 id="prompt-title">Enter Amount</h2>
-    <input type="number" id="prompt-input" min="1" placeholder="Enter amount...">
-    <div id="prompt-buttons">
-        <button id="prompt-ok" class="prompt-button">OK</button>
-        <button id="prompt-cancel" class="prompt-button" style="background-color: #ff3355;">CANCEL</button>
-    </div>
-</div>
-
-<div id="shop-container" class="ui-panel">
-    <h2 id="shop-title">EXCHANGE</h2>
-    <div class="shop-tabs">
-        <div class="shop-tab active" id="shop-tab-npc">NPC Trade</div>
-        <div class="shop-tab" id="shop-tab-market">Galactic Market</div>
-    </div>
-    <div id="npc-trade-content" class="shop-content active">
-        <div class="npc-trade-columns">
-            <div id="npc-buy-panel">
-                <h3>BUY</h3>
-                <div class="shop-grid" id="npc-buy-grid"></div>
+    <div id="chat-container">
+        <div class="chat-header">
+            <div class="chat-tabs">
+                <div id="chat-tab-all" class="chat-tab active">All</div>
+                <div id="chat-tab-party" class="chat-tab">Party</div>
             </div>
-            <div id="npc-sell-panel">
-                <h3>SELL ITEMS</h3>
-                <div class="shop-grid" id="npc-sell-grid"></div>
+            <button id="leave-party-btn">Leave</button>
+        </div>
+        <ul id="chat-log"></ul>
+        <input type="text" id="chat-input" placeholder="Press Enter to chat..." maxlength="100">
+    </div>
+    <div id="login-container" class="ui-panel"><div id="login-form" class="login-form"><h2>LOGIN</h2><input type="text" id="login-username" placeholder="Username" required><input type="password" id="login-password" placeholder="Password" required><button onclick="handleLogin()">ENTER GALACTIC OS</button><p class="login-toggle" onclick="toggleLoginRegister(false)">Need an account? Register</p></div><div id="register-form" class="login-form" style="display: none;"><h2>REGISTER</h2><input type="text" id="register-username" placeholder="Username" required><input type="password" id="register-password" placeholder="Password" required><button onclick="handleRegister()">CREATE ACCOUNT</button><p class="login-toggle" onclick="toggleLoginRegister(true)">Already have an account? Login</p></div><div id="login-error"></div></div>
+    <div id="class-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR CLASS</h2><div class="class-option" onclick="chooseClass('Operator')"><h3>OPERATOR</h3><p>High speed, low health. Ability: Invisibility.</p></div><div class="class-option" onclick="chooseClass('Guardian')"><h3>GUARDIAN</h3><p>High health, low speed. Ability: Personal Shield.</p></div><div class="class-option" onclick="chooseClass('Spectre')"><h3>SPECTRE</h3><p>Balanced stats. Ability: Short-range Blink.</p></div></div>
+    <div id="ship-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR SHIP COLOR</h2><div id="color-grid"><div class="color-option" style="background-color: #00f0ff;" onclick="chooseColor('#00f0ff')"></div><div class="color-option" style="background-color: #33ff99;" onclick="chooseColor('#33ff99')"></div><div class="color-option" style="background-color: #f07cff;" onclick="chooseColor('#f07cff')"></div><div class="color-option" style="background-color: #ff3355;" onclick="chooseColor('#ff3355')"></div><div class="color-option" style="background-color: #e3d400;" onclick="chooseColor('#e3d400')"></div><div class="color-option" style="background-color: #ffffff;" onclick="chooseColor('#ffffff')"></div></div></div>
+    
+    <div id="left-ui-container">
+        <div id="hud-container" class="ui-panel">
+            <div id="hud-info"></div>
+            <div id="keybind-info">
+                <p><strong>[E]</strong> Interact / <strong>[RMB]</strong> Context Menu</p>
+                <p><strong>[H]</strong> Home / <strong>[Shift]</strong> Boost</p>
+                <p><strong>[Space]</strong> Melee / <strong>[LMB]</strong> Range</p>
+                <p><strong>[Q]</strong> Class Ability</p>
+                <p><strong>[Esc]</strong> Close Menu</p>
+            </div>
+        </div>
+        <div id="party-panel" class="ui-panel">
+            <h3>PARTY</h3>
+            <div id="party-members-list"></div>
+        </div>
+    </div>
+
+    <div id="right-ui-container">
+        <div id="minimap-container"><canvas id="minimapCanvas" width="220" height="220"></canvas></div>
+        <div id="coords"></div>
+        <div id="equipment-panel" class="ui-panel"><h3>EQUIPMENT</h3><div id="equip-slot-Weapon" class="equip-slot" data-slot-type="Weapon"><strong data-slot="Weapon">Weapon:</strong> <span id="equip-Weapon">None</span></div><div id="equip-slot-Module" class="equip-slot" data-slot-type="Module"><strong data-slot="Module">Module:</strong> <span id="equip-Module">None</span></div><div id="equip-slot-Plating" class="equip-slot" data-slot-type="Plating"><strong data-slot="Plating">Plating:</strong> <span id="equip-Plating">None</span></div><div id="equip-slot-Utility" class="equip-slot" data-slot-type="Utility"><strong data-slot="Utility">Utility:</strong> <span id="equip-Utility">None</span></div></div>
+        <div id="inventory-panel" class="ui-panel"><h3>INVENTORY</h3><div id="inventory-grid"></div></div>
+        <div id="portrait-container"></div>
+    </div>
+
+    <div id="bank-container" class="ui-panel">
+        <h2 id="bank-title">BANK</h2>
+        <div id="bank-grid"></div>
+    </div>
+    
+    <div id="x-prompt-container" class="ui-panel">
+        <h2 id="prompt-title">Enter Amount</h2>
+        <input type="number" id="prompt-input" min="1" placeholder="Enter amount...">
+        <div id="prompt-buttons">
+            <button id="prompt-ok" class="prompt-button">OK</button>
+            <button id="prompt-cancel" class="prompt-button" style="background-color: #ff3355;">CANCEL</button>
+        </div>
+    </div>
+
+    <div id="shop-container" class="ui-panel">
+        <h2 id="shop-title">EXCHANGE</h2>
+        <div class="shop-tabs">
+            <div class="shop-tab active" id="shop-tab-npc">NPC Trade</div>
+            <div class="shop-tab" id="shop-tab-market">Galactic Market</div>
+        </div>
+        <div id="npc-trade-content" class="shop-content active">
+            <div class="npc-trade-columns">
+                <div id="npc-buy-panel">
+                    <h3>BUY</h3>
+                    <div class="shop-grid" id="npc-buy-grid"></div>
+                </div>
+                <div id="npc-sell-panel">
+                    <h3>SELL ITEMS</h3>
+                    <div class="shop-grid" id="npc-sell-grid"></div>
+                </div>
+            </div>
+        </div>
+        <div id="market-content" class="shop-content">
+            <div class="shop-grid" id="market-buy-grid"></div>
+            <div id="market-sell-panel">
+                 <select id="market-item-select"></select>
+                 <input type="number" id="market-price-input" placeholder="Price..." min="1">
+                 <button id="market-list-btn">List Item</button>
             </div>
         </div>
     </div>
-    <div id="market-content" class="shop-content">
-        <div class="shop-grid" id="market-buy-grid"></div>
-        <div id="market-sell-panel">
-             <select id="market-item-select"></select>
-             <input type="number" id="market-price-input" placeholder="Price..." min="1">
-             <button id="market-list-btn">List Item</button>
+    
+    <div id="trade-container" class="ui-panel">
+        <h2 id="trade-header">Trading with Player</h2>
+        <div class="trade-window">
+            <div id="my-trade-panel" class="trade-panel">
+                <h3>YOUR OFFER</h3>
+                <div id="my-trade-grid" class="trade-grid"></div>
+                <input type="number" id="my-trade-bits" class="trade-bits-input" placeholder="0 Data Bits" min="0">
+            </div>
+            <div id="other-trade-panel" class="trade-panel">
+                <h3 id="other-player-trade-name">THEIR OFFER</h3>
+                <div id="other-trade-grid" class="trade-grid"></div>
+                <div id="other-trade-bits">0 Data Bits</div>
+            </div>
+        </div>
+        <div id="trade-status"></div>
+        <div id="trade-buttons">
+            <button id="trade-accept-btn" class="trade-button">ACCEPT</button>
+            <button id="trade-cancel-btn" class="trade-button" style="background-color: #ff3355;">CANCEL</button>
         </div>
     </div>
-</div>
-
-<div id="trade-container" class="ui-panel">
-    <h2 id="trade-header">Trading with Player</h2>
-    <div class="trade-window">
-        <div id="my-trade-panel" class="trade-panel">
-            <h3>YOUR OFFER</h3>
-            <div id="my-trade-grid" class="trade-grid"></div>
-            <input type="number" id="my-trade-bits" class="trade-bits-input" placeholder="0 Data Bits" min="0">
-        </div>
-        <div id="other-trade-panel" class="trade-panel">
-            <h3 id="other-player-trade-name">THEIR OFFER</h3>
-            <div id="other-trade-grid" class="trade-grid"></div>
-            <div id="other-trade-bits">0 Data Bits</div>
+    
+    <div id="party-invite-popup" class="ui-panel">
+        <p id="party-invite-text">Player invites you to a party!</p>
+        <div id="party-invite-buttons">
+            <button id="party-invite-accept" class="popup-button">Accept</button>
+            <button id="party-invite-decline" class="popup-button" style="background-color: #ff3355;">Decline</button>
         </div>
     </div>
-    <div id="trade-status"></div>
-    <div id="trade-buttons">
-        <button id="trade-accept-btn" class="trade-button">ACCEPT</button>
-        <button id="trade-cancel-btn" class="trade-button" style="background-color: #ff3355;">CANCEL</button>
-    </div>
-</div>
-
-<div id="party-invite-popup" class="ui-panel">
-    <p id="party-invite-text">Player invites you to a party!</p>
-    <div id="party-invite-buttons">
-        <button id="party-invite-accept" class="popup-button">Accept</button>
-        <button id="party-invite-decline" class="popup-button" style="background-color: #ff3355;">Decline</button>
-    </div>
-</div>
-
-<div id="trade-request-popup" class="ui-panel">
-    <p id="trade-request-text">Player wants to trade!</p>
-    <div id="trade-request-buttons">
-        <button id="trade-request-accept" class="popup-button">Accept</button>
-        <button id="trade-request-decline" class="popup-button" style="background-color: #ff3355;">Decline</button>
-    </div>
-</div>
-
-<div id="death-screen" class="ui-panel"><h2>YOU ARE OFFLINE</h2><p>Your journey has ended. Your legacy is stored in the Bank.</p><button onclick="handleRespawn()">RE-ESTABLISH CONNECTION</button></div>
-
-<div id="xp-bar-container"><div id="xp-bar"></div></div>
-
-<script>
-// --- WEB AUDIO API SOUND ENGINE ---
-const Sound = {
-    context: null,
-    boostNode: null,
-    ambientNode: null,
-    init: function() {
-        try {
-            this.context = new (window.AudioContext || window.webkitAudioContext)();
-        } catch (e) {
-            console.error('Web Audio API is not supported in this browser');
-        }
-    },
-
-    playShoot: function() {
-        if (!this.context) return;
-        const now = this.context.currentTime;
-        const osc = this.context.createOscillator();
-        const gain = this.context.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(1200, now);
-        osc.frequency.linearRampToValueAtTime(400, now + 0.1);
-        gain.gain.setValueAtTime(0.08, now); // Volume lowered
-        gain.gain.linearRampToValueAtTime(0, now + 0.1);
-        osc.connect(gain);
-        gain.connect(this.context.destination);
-        osc.start(now);
-        osc.stop(now + 0.1);
-    },
-
-    playMelee: function() {
-        if (!this.context) return;
-        const now = this.context.currentTime;
-        const noise = this.context.createBufferSource();
-        const buffer = this.context.createBuffer(1, this.context.sampleRate * 0.1, this.context.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < data.length; i++) {
-            data[i] = Math.random() * 2 - 1;
-        }
-        noise.buffer = buffer;
-        const gain = this.context.createGain();
-        gain.gain.setValueAtTime(0.1, now); // Lowered volume
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-        noise.connect(gain);
-        gain.connect(this.context.destination);
-        noise.start(now);
-        noise.stop(now + 0.1);
-    },
-
-    playDamage: function() {
-        if (!this.context) return;
-        const now = this.context.currentTime;
-        const osc = this.context.createOscillator();
-        const gain = this.context.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(200, now);
-        osc.frequency.linearRampToValueAtTime(100, now + 0.1);
-        gain.gain.setValueAtTime(0.1, now); // UPDATED: Volume lowered from 0.15
-        gain.gain.linearRampToValueAtTime(0, now + 0.1);
-        osc.connect(gain);
-        gain.connect(this.context.destination);
-        osc.start(now);
-        osc.stop(now + 0.1);
-    },
-
-    playPickup: function() {
-        if (!this.context) return;
-        const now = this.context.currentTime;
-        const osc = this.context.createOscillator();
-        const gain = this.context.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(800, now);
-        osc.frequency.linearRampToValueAtTime(1600, now + 0.1);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-        osc.connect(gain);
-        gain.connect(this.context.destination);
-        osc.start(now);
-        osc.stop(now + 0.2);
-    },
     
-    playExplosion: function() {
-        if (!this.context) return;
-        const now = this.context.currentTime;
-        const osc = this.context.createOscillator();
-        const gain = this.context.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(300, now);
-        osc.frequency.exponentialRampToValueAtTime(50, now + 0.4);
-        gain.gain.setValueAtTime(0.1, now); // UPDATED: Lowered volume from 0.15
-        gain.gain.linearRampToValueAtTime(0, now + 0.4);
-        osc.connect(gain);
-        gain.connect(this.context.destination);
-        osc.start(now);
-        osc.stop(now + 0.4);
-    },
-    
-    // ADDED: New sound for Dreadnought mortar
-    playMortarLaunch: function() {
-        if (!this.context) return;
-        const now = this.context.currentTime;
-        const osc = this.context.createOscillator();
-        const gain = this.context.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(150, now);
-        osc.frequency.exponentialRampToValueAtTime(30, now + 0.5);
-        gain.gain.setValueAtTime(0.1, now); // Set to consistent volume
-        gain.gain.linearRampToValueAtTime(0, now + 0.5);
-        osc.connect(gain);
-        gain.connect(this.context.destination);
-        osc.start(now);
-        osc.stop(now + 0.5);
-    },
-    
-    playAbility: function(type) {
-        if (!this.context) return;
-        const now = this.context.currentTime;
-        const osc = this.context.createOscillator();
-        const gain = this.context.createGain();
-        let vol = 0.1; // UPDATED: Volume lowered from 0.15
+    <div id="trade-request-popup" class="ui-panel">
+        <p id="trade-request-text">Player wants to trade!</p>
+        <div id="trade-request-buttons">
+            <button id="trade-request-accept" class="popup-button">Accept</button>
+            <button id="trade-request-decline" class="popup-button" style="background-color: #ff3355;">Decline</button>
+        </div>
+    </div>
 
-        if (type === 'Guardian') { // Shield up
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(200, now);
-            osc.frequency.linearRampToValueAtTime(800, now + 0.3);
-        } else if (type === 'Operator') { // Invisibility
-             osc.type = 'triangle';
-            osc.frequency.setValueAtTime(1000, now);
-            osc.frequency.linearRampToValueAtTime(400, now + 0.2);
-        } else { // Spectre Blink & Teleport
+    <div id="death-screen" class="ui-panel"><h2>YOU ARE OFFLINE</h2><p>Your journey has ended. Your legacy is stored in the Bank.</p><button onclick="handleRespawn()">RE-ESTABLISH CONNECTION</button></div>
+
+    <div id="xp-bar-container"><div id="xp-bar"></div></div>
+
+    <script>
+    // --- WEB AUDIO API SOUND ENGINE ---
+    const Sound = {
+        context: null,
+        boostNode: null,
+        ambientNode: null,
+        init: function() {
+            try {
+                this.context = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.error('Web Audio API is not supported in this browser');
+            }
+        },
+
+        playShoot: function() {
+            if (!this.context) return;
+            const now = this.context.currentTime;
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(1200, now);
+            osc.frequency.linearRampToValueAtTime(400, now + 0.1);
+            gain.gain.setValueAtTime(0.08, now); 
+            gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            osc.connect(gain);
+            gain.connect(this.context.destination);
+            osc.start(now);
+            osc.stop(now + 0.1);
+        },
+
+        playMelee: function() {
+            if (!this.context) return;
+            const now = this.context.currentTime;
+            const noise = this.context.createBufferSource();
+            const buffer = this.context.createBuffer(1, this.context.sampleRate * 0.1, this.context.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            noise.buffer = buffer;
+            const gain = this.context.createGain();
+            gain.gain.setValueAtTime(0.1, now); 
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+            noise.connect(gain);
+            gain.connect(this.context.destination);
+            noise.start(now);
+            noise.stop(now + 0.1);
+        },
+
+        playDamage: function() {
+            if (!this.context) return;
+            const now = this.context.currentTime;
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
             osc.type = 'square';
-            osc.frequency.setValueAtTime(1500, now);
-            osc.frequency.linearRampToValueAtTime(500, now + 0.08);
+            osc.frequency.setValueAtTime(200, now);
+            osc.frequency.linearRampToValueAtTime(100, now + 0.1);
+            gain.gain.setValueAtTime(0.1, now); // UPDATED: Volume lowered from 0.15
+            gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            osc.connect(gain);
+            gain.connect(this.context.destination);
+            osc.start(now);
+            osc.stop(now + 0.1);
+        },
+
+        playPickup: function() {
+            if (!this.context) return;
+            const now = this.context.currentTime;
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.linearRampToValueAtTime(1600, now + 0.1);
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+            osc.connect(gain);
+            gain.connect(this.context.destination);
+            osc.start(now);
+            osc.stop(now + 0.2);
+        },
+        
+        playExplosion: function() {
+            if (!this.context) return;
+            const now = this.context.currentTime;
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(300, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.4);
+            gain.gain.setValueAtTime(0.1, now); // UPDATED: Lowered volume from 0.15
+            gain.gain.linearRampToValueAtTime(0, now + 0.4);
+            osc.connect(gain);
+            gain.connect(this.context.destination);
+            osc.start(now);
+            osc.stop(now + 0.4);
+        },
+        
+        playMortarLaunch: function() {
+            if (!this.context) return;
+            const now = this.context.currentTime;
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.exponentialRampToValueAtTime(30, now + 0.5);
+            gain.gain.setValueAtTime(0.1, now); 
+            gain.gain.linearRampToValueAtTime(0, now + 0.5);
+            osc.connect(gain);
+            gain.connect(this.context.destination);
+            osc.start(now);
+            osc.stop(now + 0.5);
+        },
+        
+        playAbility: function(type) {
+            if (!this.context) return;
+            const now = this.context.currentTime;
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
+            let vol = 0.1; // UPDATED: Volume lowered from 0.15
+
+            if (type === 'Guardian') { 
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(800, now + 0.3);
+            } else if (type === 'Operator') { 
+                 osc.type = 'triangle';
+                osc.frequency.setValueAtTime(1000, now);
+                osc.frequency.linearRampToValueAtTime(400, now + 0.2);
+            } else { 
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(1500, now);
+                osc.frequency.linearRampToValueAtTime(500, now + 0.08);
+            }
+            
+            gain.gain.setValueAtTime(vol, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.3);
+            osc.connect(gain);
+            gain.connect(this.context.destination);
+            osc.start(now);
+            osc.stop(now + 0.3);
+        },
+
+        startBoost: function() {
+            if (!this.context || this.boostNode) return;
+            const now = this.context.currentTime;
+            this.boostNode = this.context.createOscillator();
+            const gain = this.context.createGain();
+            this.boostNode.type = 'sine';
+            this.boostNode.frequency.setValueAtTime(60, now);
+            this.boostNode.frequency.linearRampToValueAtTime(100, now + 0.2);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.05, now + 0.2);
+            this.boostNode.connect(gain);
+            gain.connect(this.context.destination);
+            this.boostNode.start(now);
+        },
+
+        stopBoost: function() {
+            if (!this.context || !this.boostNode) return;
+            const now = this.context.currentTime;
+            this.boostNode.stop(now + 0.1);
+            this.boostNode = null;
+        },
+
+        startAmbient: function() {
+            if (!this.context || this.ambientNode) return;
+            const now = this.context.currentTime;
+            this.ambientNode = this.context.createOscillator();
+            const gain = this.context.createGain();
+            const lfo = this.context.createOscillator();
+            
+            lfo.type = 'sine';
+            lfo.frequency.setValueAtTime(0.1, now);
+            const lfoGain = this.context.createGain();
+            lfoGain.gain.setValueAtTime(5, now);
+            lfo.connect(lfoGain);
+            lfoGain.connect(this.ambientNode.frequency);
+
+            this.ambientNode.type = 'sine';
+            this.ambientNode.frequency.setValueAtTime(40, now);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.05, now + 5);
+
+            this.ambientNode.connect(gain);
+            gain.connect(this.context.destination);
+            this.ambientNode.start(now);
+            lfo.start(now);
         }
-        
-        gain.gain.setValueAtTime(vol, now);
-        gain.gain.linearRampToValueAtTime(0, now + 0.3);
-        osc.connect(gain);
-        gain.connect(this.context.destination);
-        osc.start(now);
-        osc.stop(now + 0.3);
-    },
+    };
 
-    startBoost: function() {
-        if (!this.context || this.boostNode) return;
-        const now = this.context.currentTime;
-        this.boostNode = this.context.createOscillator();
-        const gain = this.context.createGain();
-        this.boostNode.type = 'sine';
-        this.boostNode.frequency.setValueAtTime(60, now);
-        this.boostNode.frequency.linearRampToValueAtTime(100, now + 0.2);
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.05, now + 0.2);
-        this.boostNode.connect(gain);
-        gain.connect(this.context.destination);
-        this.boostNode.start(now);
-    },
+    window.addEventListener('mousedown', () => { if (!Sound.context) Sound.init(); }, { once: true });
+    window.addEventListener('keydown', () => { if (!Sound.context) Sound.init(); }, { once: true });
 
-    stopBoost: function() {
-        if (!this.context || !this.boostNode) return;
-        const now = this.context.currentTime;
-        this.boostNode.stop(now + 0.1);
-        this.boostNode = null;
-    },
 
-    startAmbient: function() {
-        if (!this.context || this.ambientNode) return;
-        const now = this.context.currentTime;
-        this.ambientNode = this.context.createOscillator();
-        const gain = this.context.createGain();
-        const lfo = this.context.createOscillator();
-        
-        lfo.type = 'sine';
-        lfo.frequency.setValueAtTime(0.1, now);
-        const lfoGain = this.context.createGain();
-        lfoGain.gain.setValueAtTime(5, now);
-        lfo.connect(lfoGain);
-        lfoGain.connect(this.ambientNode.frequency);
+    const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+    const minimapCanvas = document.getElementById('minimapCanvas'), minimapCtx = minimapCanvas.getContext('2d');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
-        this.ambientNode.type = 'sine';
-        this.ambientNode.frequency.setValueAtTime(40, now);
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.05, now + 5);
+    const loginContainer = document.getElementById('login-container');
+    const classSelectionPanel = document.getElementById('class-selection');
+    const shipSelectionPanel = document.getElementById('ship-selection');
+    const rightUI = document.getElementById('right-ui-container');
+    const leftUI = document.getElementById('left-ui-container');
+    const hudInfo = document.getElementById('hud-info');
+    const deathScreen = document.getElementById('death-screen');
+    const shopContainer = document.getElementById('shop-container');
+    const bankContainer = document.getElementById('bank-container');
+    const tradeContainer = document.getElementById('trade-container');
+    const chatContainer = document.getElementById('chat-container');
+    const chatInput = document.getElementById('chat-input');
+    const chatLog = document.getElementById('chat-log');
+    const itemContextMenu = document.getElementById('item-context-menu');
+    const groundContextMenu = document.getElementById('ground-item-context-menu');
+    const playerContextMenu = document.getElementById('player-context-menu');
+    const xPromptContainer = document.getElementById('x-prompt-container');
+    const partyInvitePopup = document.getElementById('party-invite-popup');
+    const tradeRequestPopup = document.getElementById('trade-request-popup');
+    const partyPanel = document.getElementById('party-panel');
 
-        this.ambientNode.connect(gain);
-        gain.connect(this.context.destination);
-        this.ambientNode.start(now);
-        lfo.start(now);
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}`);
+    let myPlayerId = null, localWorld = {}, gameState = { players: {}, entities: [] };
+    let camera = { x: 0, y: 0, zoom: 1 };
+    let inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, space: false, mouse: { down: false } };
+    let isGameRunning = false, isChatting = false, isShopOpen = false, isBankOpen = false, isTrading = false;
+    let loggedInUser = "Player", chosenClassName = null;
+    let currentShopName = null;
+    let currentTradeData = { myOfferItems: [], myOfferBits: 0 };
+    let _promptCallback = null;
+    let currentBankData = []; 
+    let currentPartyInvite = null;
+    let currentTradeRequest = null;
+    let chatChannel = 'all';
+
+    const TILE_SIZE = 40, CHUNK_SIZE = 16;
+    const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
+    const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'}, 15:{n:'D', c:'#00f0ff'} };
+    let particles = [];
+    let gameStars = [];
+    let loginStars = [];
+
+    function hexToRgba(hex, alpha) {
+        if (!hex || hex.length < 7) hex = '#ffffff';
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
-};
 
-window.addEventListener('mousedown', () => { if (!Sound.context) Sound.init(); }, { once: true });
-window.addEventListener('keydown', () => { if (!Sound.context) Sound.init(); }, { once: true });
-
-
-const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
-const minimapCanvas = document.getElementById('minimapCanvas'), minimapCtx = minimapCanvas.getContext('2d');
-canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-
-const loginContainer = document.getElementById('login-container');
-const classSelectionPanel = document.getElementById('class-selection');
-const shipSelectionPanel = document.getElementById('ship-selection');
-const rightUI = document.getElementById('right-ui-container');
-const leftUI = document.getElementById('left-ui-container');
-const hudInfo = document.getElementById('hud-info');
-const deathScreen = document.getElementById('death-screen');
-const shopContainer = document.getElementById('shop-container');
-const bankContainer = document.getElementById('bank-container');
-const tradeContainer = document.getElementById('trade-container');
-const chatContainer = document.getElementById('chat-container');
-const chatInput = document.getElementById('chat-input');
-const chatLog = document.getElementById('chat-log');
-const itemContextMenu = document.getElementById('item-context-menu');
-const groundContextMenu = document.getElementById('ground-item-context-menu');
-const playerContextMenu = document.getElementById('player-context-menu');
-const xPromptContainer = document.getElementById('x-prompt-container');
-const partyInvitePopup = document.getElementById('party-invite-popup');
-const tradeRequestPopup = document.getElementById('trade-request-popup');
-const partyPanel = document.getElementById('party-panel');
-
-const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const ws = new WebSocket(`${protocol}//${window.location.host}`);
-let myPlayerId = null, localWorld = {}, gameState = { players: {}, entities: [] };
-let camera = { x: 0, y: 0, zoom: 1 };
-let inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, space: false, mouse: { down: false } };
-let isGameRunning = false, isChatting = false, isShopOpen = false, isBankOpen = false, isTrading = false;
-let loggedInUser = "Player", chosenClassName = null;
-let currentShopName = null;
-let currentTradeData = { myOfferItems: [], myOfferBits: 0 };
-let _promptCallback = null;
-let currentBankData = []; 
-let currentPartyInvite = null;
-let currentTradeRequest = null;
-let chatChannel = 'all';
-
-const TILE_SIZE = 40, CHUNK_SIZE = 16;
-const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
-const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'}, 15:{n:'D', c:'#00f0ff'} };
-let particles = [];
-let gameStars = [];
-let loginStars = [];
-
-function hexToRgba(hex, alpha) {
-    if (!hex || hex.length < 7) hex = '#ffffff';
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function initGameStars() {
-    gameStars = [];
-    for (let i = 0; i < 500; i++) {
-        gameStars.push({
-            x: Math.random() * canvas.width * 3 - canvas.width * 1.5,
-            y: Math.random() * canvas.height * 3 - canvas.height * 1.5,
-            size: Math.random() * 2 + 0.5,
-            depth: Math.random() * 0.8 + 0.1 
-        });
+    function initGameStars() {
+        gameStars = [];
+        for (let i = 0; i < 500; i++) {
+            gameStars.push({
+                x: Math.random() * canvas.width * 3 - canvas.width * 1.5,
+                y: Math.random() * canvas.height * 3 - canvas.height * 1.5,
+                size: Math.random() * 2 + 0.5,
+                depth: Math.random() * 0.8 + 0.1 
+            });
+        }
     }
-}
 
-function initLoginStars() {
-    loginStars = [];
-    for (let i = 0; i < 200; i++) {
-        loginStars.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            size: Math.random() * 1.5 + 0.5,
-            alpha: Math.random() * 0.5 + 0.2,
-            twinkleSpeed: Math.random() * 0.02
-        });
+    function initLoginStars() {
+        loginStars = [];
+        for (let i = 0; i < 200; i++) {
+            loginStars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 1.5 + 0.5,
+                alpha: Math.random() * 0.5 + 0.2,
+                twinkleSpeed: Math.random() * 0.02
+            });
+        }
     }
-}
 
-ws.onmessage = (message) => {
-    try {
-        const data = JSON.parse(message.data);
-        if (data.type === 'sfx') {
-            if (data.effect === 'explosion') Sound.playExplosion();
-            else if (data.effect === 'shoot') Sound.playShoot();
-            else if (data.effect === 'melee') Sound.playMelee();
-            else if (data.effect === 'damage') Sound.playDamage();
-            else if (data.effect === 'ability') Sound.playAbility(data.class);
-            else if (data.effect === 'mortarLaunch') Sound.playMortarLaunch(); // UPDATED: Added handler for new sound
-            else if (data.effect === 'blink') {
-                for(let i=0; i<20; i++) particles.push({x: data.x, y: data.y, life: 1, size: Math.random()*3+1, color: data.color, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2});
-            } else if (data.effect === 'teleportCharge') {
-                for(let i=0; i<2; i++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const dist = Math.random() * 20 + 20;
-                    particles.push({
-                        x: data.x + Math.cos(angle) * dist,
-                        y: data.y + Math.sin(angle) * dist,
-                        vx: Math.cos(angle) * -1,
-                        vy: Math.sin(angle) * -1,
-                        life: 0.5,
-                        size: Math.random() * 2 + 1,
-                        color: data.color
-                    });
-                }
-            } else if (data.effect === 'teleportEnd') {
-                Sound.playAbility('Spectre'); // Same as blink
-                for(let i=0; i<50; i++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    particles.push({
-                        x: data.x,
-                        y: data.y,
-                        vx: Math.cos(angle) * (Math.random() * 4),
-                        vy: Math.sin(angle) * (Math.random() * 4),
-                        life: 1.5,
-                        size: Math.random() * 3 + 1,
-                        color: data.color
-                    });
+    ws.onmessage = (message) => {
+        try {
+            const data = JSON.parse(message.data);
+            if (data.type === 'sfx') {
+                if (data.effect === 'explosion') Sound.playExplosion();
+                else if (data.effect === 'shoot') Sound.playShoot();
+                else if (data.effect === 'melee') Sound.playMelee();
+                else if (data.effect === 'damage') Sound.playDamage();
+                else if (data.effect === 'ability') Sound.playAbility(data.class);
+                else if (data.effect === 'mortarLaunch') Sound.playMortarLaunch(); 
+                else if (data.effect === 'blink') {
+                    for(let i=0; i<20; i++) particles.push({x: data.x, y: data.y, life: 1, size: Math.random()*3+1, color: data.color, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2});
+                } else if (data.effect === 'teleportCharge') {
+                    for(let i=0; i<2; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = Math.random() * 20 + 20;
+                        particles.push({
+                            x: data.x + Math.cos(angle) * dist,
+                            y: data.y + Math.sin(angle) * dist,
+                            vx: Math.cos(angle) * -1,
+                            vy: Math.sin(angle) * -1,
+                            life: 0.5,
+                            size: Math.random() * 2 + 1,
+                            color: data.color
+                        });
+                    }
+                } else if (data.effect === 'teleportEnd') {
+                    Sound.playAbility('Spectre'); 
+                    for(let i=0; i<50; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        particles.push({
+                            x: data.x,
+                            y: data.y,
+                            vx: Math.cos(angle) * (Math.random() * 4),
+                            vy: Math.sin(angle) * (Math.random() * 4),
+                            life: 1.5,
+                            size: Math.random() * 3 + 1,
+                            color: data.color
+                        });
+                    }
                 }
             }
-        }
-        else if (data.type === 'init') { myPlayerId = data.playerId; localWorld = data.world; }
-        else if (data.type === 'update') { gameState = data; }
-        else if (data.type === 'chat') { addChatMessage(data); }
-        else if (data.type === 'playerDied') { showDeathScreen(); }
-        else if (data.type === 'openShop') { openShop(data.npcName, data.inventory, data.marketListings); }
-        else if (data.type === 'openBank') { openBank(data.bank); }
-        else if (data.type === 'marketUpdate') { if(isShopOpen) updateMarketView(data.marketListings); }
-        else if (data.type === 'worldChunkUpdate') { localWorld[data.key] = data.chunk; }
-        else if (data.type === 'tradeRequest') {
-            if (isTrading) return;
-            currentTradeRequest = { fromId: data.from.id, fromName: data.from.username };
-            document.getElementById('trade-request-text').textContent = `${data.from.username} wants to trade with you.`;
-            tradeRequestPopup.style.display = 'block';
-        }
-        else if (data.type === 'tradeStarted') { openTradeWindow(data.partner); }
-        else if (data.type === 'tradeUpdate') { updateOtherTradeOffer(data.offer); }
-        else if (data.type === 'tradePartnerAccepted') { document.getElementById('trade-status').textContent = 'Partner has accepted. Waiting for you.'; }
-        else if (data.type === 'tradeCancelled') { addChatMessage({sender:'SYSTEM', message:data.reason, color:'#ff3355'}); closeTradeWindow(); }
-        else if (data.type === 'tradeCompleted') { addChatMessage({sender:'SYSTEM', message:'Trade successful!', color:'#33ff99'}); closeTradeWindow(); }
-        else if (data.type === 'partyInvite') {
-            currentPartyInvite = { fromId: data.from.id, fromName: data.from.username };
-            document.getElementById('party-invite-text').textContent = `${data.from.username} sent you a party invite!`;
-            partyInvitePopup.style.display = 'block';
-        }
-        else if (data.type === 'partyUpdate') { updatePartyUI(data.party); }
-
-    } catch (error) { console.error('[CLIENT] Error processing server message:', error); }
-};
-function sendToServer(data) { if(ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data)); }
-
-function getTile(worldX, worldY) { const cX = Math.floor(worldX / TILE_SIZE), cY = Math.floor(worldY / TILE_SIZE); const chX = Math.floor(cX / CHUNK_SIZE), chY = Math.floor(cY / CHUNK_SIZE); const key = `${chX},${chY}`; const chunk = localWorld[key]; if (!chunk) return 1; const tX = (cX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; const tY = (cY % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; return chunk.tiles[tY * CHUNK_SIZE + tX]; }
-
-function drawBossHealthbar(boss) {
-    const myPlayer = gameState.players[myPlayerId];
-    if (!myPlayer || Math.hypot(myPlayer.x - boss.x, myPlayer.y - boss.y) > boss.aggroRadius) return;
-    const barWidth = 200, barHeight = 15;
-    const barX = boss.x - barWidth / 2;
-    const barY = boss.y - boss.radius - 25;
-    ctx.fillStyle = 'rgba(255, 106, 0, 0.5)';
-    ctx.fillRect(barX, barY, barWidth, barHeight);
-    ctx.fillStyle = boss.color;
-    ctx.fillRect(barX, barY, barWidth * (boss.health / boss.maxHealth), barHeight);
-    ctx.strokeStyle = '#000';
-    ctx.strokeRect(barX, barY, barWidth, barHeight);
-    ctx.font = '14px "Consolas",monospace';
-    ctx.fillStyle="#fff";
-    ctx.textAlign="center";
-    ctx.fillText(boss.bossName, boss.x, barY + 12);
-}
-
-const drawFunctions = {
-    'Player': (p) => {
-        if (p.isDead) return;
-        
-        const r = p.radius || 15;
-        
-        ctx.save();
-        if (p.isInvisible) { ctx.globalAlpha = 0.3; }
-        
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.angle);
-        ctx.fillStyle = p.color;
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = 15;
-        ctx.beginPath();
-        ctx.moveTo(r, 0);
-        ctx.lineTo(-r / 2, -r / 2);
-        ctx.lineTo(-r / 2, r / 2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore(); 
-
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        if (p.id !== myPlayerId && p.health < p.stats.maxHealth) {
-            const barW = 40, barH = 5, barX = -barW / 2, barY = -r - 30; // Adjusted Y
-            ctx.fillStyle = 'rgba(255, 51, 85, 0.7)'; ctx.fillRect(barX, barY, barW, barH);
-            ctx.fillStyle = p.color; ctx.fillRect(barX, barY, barW * (p.health / p.stats.maxHealth), barH);
-        }
-
-        ctx.font = '12px "Consolas",monospace';
-        ctx.textAlign = 'center';
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 3;
-        ctx.lineJoin = 'round';
-        ctx.strokeText(`[Lvl ${p.level}] ${p.username}`, 0, -r - 20); // Adjusted Y
-        ctx.fillStyle = '#fff';
-        ctx.fillText(`[Lvl ${p.level}] ${p.username}`, 0, -r - 20); // Adjusted Y
-        ctx.restore();
-
-        if (p.id !== myPlayerId) {
-            const screenX = (p.x - camera.x) * camera.zoom + canvas.width / 2;
-            const screenY = (p.y - camera.y) * camera.zoom + canvas.height / 2;
-            if (Math.hypot(inputs.mouse.x - screenX, inputs.mouse.y - screenY) < r) {
-                canvas.style.cursor = 'pointer';
-                canvas.oncontextmenu = (e) => showPlayerContextMenu(e, p);
+            else if (data.type === 'init') { myPlayerId = data.playerId; localWorld = data.world; }
+            else if (data.type === 'update') { gameState = data; }
+            else if (data.type === 'chat') { addChatMessage(data); }
+            else if (data.type === 'playerDied') { showDeathScreen(); }
+            else if (data.type === 'openShop') { openShop(data.npcName, data.inventory, data.marketListings); }
+            else if (data.type === 'openBank') { openBank(data.bank); }
+            else if (data.type === 'marketUpdate') { if(isShopOpen) updateMarketView(data.marketListings); }
+            else if (data.type === 'worldChunkUpdate') { localWorld[data.key] = data.chunk; }
+            else if (data.type === 'tradeRequest') {
+                if (isTrading) return;
+                currentTradeRequest = { fromId: data.from.id, fromName: data.from.username };
+                document.getElementById('trade-request-text').textContent = `${data.from.username} wants to trade with you.`;
+                tradeRequestPopup.style.display = 'block';
             }
-        }
+            else if (data.type === 'tradeStarted') { openTradeWindow(data.partner); }
+            else if (data.type === 'tradeUpdate') { updateOtherTradeOffer(data.offer); }
+            else if (data.type === 'tradePartnerAccepted') { document.getElementById('trade-status').textContent = 'Partner has accepted. Waiting for you.'; }
+            else if (data.type === 'tradeCancelled') { addChatMessage({sender:'SYSTEM', message:data.reason, color:'#ff3355'}); closeTradeWindow(); }
+            else if (data.type === 'tradeCompleted') { addChatMessage({sender:'SYSTEM', message:'Trade successful!', color:'#33ff99'}); closeTradeWindow(); }
+            else if (data.type === 'partyInvite') {
+                currentPartyInvite = { fromId: data.from.id, fromName: data.from.username };
+                document.getElementById('party-invite-text').textContent = `${data.from.username} sent you a party invite!`;
+                partyInvitePopup.style.display = 'block';
+            }
+            else if (data.type === 'partyUpdate') { updatePartyUI(data.party); }
 
-        if (p.isBoosting && p.id === myPlayerId) {
-            const angle = p.angle + Math.PI + (Math.random() - 0.5) * 0.5;
-            const x = p.x + Math.cos(angle) * (r - 2);
-            const y = p.y + Math.sin(angle) * (r - 2);
-            particles.push({x: x, y: y, vx: 0, vy: 0, life: 1, size: Math.random() * 3 + 2, color: p.color});
-        }
-        if(p.shieldActive){
-            ctx.save();
-            ctx.fillStyle = hexToRgba(p.color, 0.25);
-            ctx.shadowColor = p.color;
-            ctx.shadowBlur = 25;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        }
-        if (p.id === myPlayerId && p.isTeleporting) {
-            const chargePercent = 1 - (p.teleportTimer / p.TELEPORT_CHARGE_TIME);
-            ctx.strokeStyle = '#00f0ff';
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, r + 10, -Math.PI / 2, (-Math.PI / 2) + (chargePercent * Math.PI * 2));
-            ctx.stroke();
-        }
-    },
-    'MeleeSlash': (s) => {
-        const owner = gameState.players[s.ownerId] || gameState.entities.find(e => e.id === s.ownerId);
-        if (!owner) return;
-        const progress = 1 - (s.life / 0.2);
-        ctx.save();
-        ctx.translate(owner.x, owner.y);
-        ctx.rotate(s.angle);
-        ctx.globalAlpha = 1 - progress;
-        ctx.shadowColor = s.color;
-        ctx.shadowBlur = 20;
+        } catch (error) { console.error('[CLIENT] Error processing server message:', error); }
+    };
+    function sendToServer(data) { if(ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data)); }
 
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.5 * (1 - progress)})`;
-        ctx.beginPath();
-        ctx.arc(0, 0, s.radius * progress, -s.arc / 2, s.arc / 2);
-        ctx.arc(0, 0, 20, s.arc / 2, -s.arc / 2, true);
-        ctx.closePath();
-        ctx.fill();
+    function getTile(worldX, worldY) { const cX = Math.floor(worldX / TILE_SIZE), cY = Math.floor(worldY / TILE_SIZE); const chX = Math.floor(cX / CHUNK_SIZE), chY = Math.floor(cY / CHUNK_SIZE); const key = `${chX},${chY}`; const chunk = localWorld[key]; if (!chunk) return 1; const tX = (cX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; const tY = (cY % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE; return chunk.tiles[tY * CHUNK_SIZE + tX]; }
 
-        ctx.strokeStyle = s.color;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(0, 0, s.radius * progress, -s.arc / 2, s.arc / 2);
-        ctx.stroke();
-        
-        ctx.restore();
-    },
-    'Enemy': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 3; const r = e.radius; ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(-r / 2, -r * 0.866); ctx.lineTo(-r / 2, r * 0.866); ctx.closePath(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
-    'Stinger': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 3; const r = e.radius; ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0); ctx.closePath(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
-    'VoidSwarmer': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; const r = e.radius; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-r-15; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
-    'Warden': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 4; const r = e.radius; ctx.beginPath(); for (let i = 0; i < 5; i++) ctx.lineTo(r*Math.cos(i*2*Math.PI/5), r*Math.sin(i*2*Math.PI/5)); ctx.closePath(); ctx.stroke(); ctx.restore(); if (e.shield > 0) { ctx.fillStyle = `rgba(227, 212, 0, ${0.1 + (e.shield / e.maxShield) * 0.3})`; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 8, 0, Math.PI*2); ctx.fill(); } if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
-    'GravityWell': (e) => {
-        ctx.save();
-        ctx.translate(e.x, e.y);
-        const pulse = 0.9 + Math.sin(Date.now() / 500) * 0.1;
-        ctx.fillStyle = e.color;
-        ctx.shadowColor = '#fff';
-        ctx.shadowBlur = e.radius * pulse;
-        ctx.beginPath();
-        ctx.arc(0, 0, e.radius * pulse, 0, Math.PI * 2);
-        ctx.fill();
-        const rotation = (Date.now() / 3000) % (Math.PI * 2);
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.2 + Math.sin(Date.now() / 300) * 0.1})`;
-        for (let i = 0; i < 3; i++) {
-            ctx.beginPath();
-            ctx.arc(0, 0, e.radius + i * 20, rotation + i * (Math.PI / 1.5), rotation + i * (Math.PI / 1.5) + Math.PI);
-            ctx.stroke();
-        }
-        ctx.restore();
-    },
-    'Dreadnought': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 30; ctx.beginPath(); ctx.rect(-e.radius, -e.radius/2, e.radius*2, e.radius); ctx.fill(); ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.rect(-e.radius/2, -e.radius/1.5, e.radius, e.radius*1.3); ctx.fill(); ctx.restore(); drawBossHealthbar(e); },
-    'SerpentHead': (e) => {
-        ctx.save();
-        ctx.translate(e.x, e.y);
-        ctx.fillStyle = e.color;
-        ctx.shadowColor = e.color;
-        ctx.shadowBlur = 20;
+    function drawBossHealthbar(boss) {
+        const myPlayer = gameState.players[myPlayerId];
+        if (!myPlayer || Math.hypot(myPlayer.x - boss.x, myPlayer.y - boss.y) > boss.aggroRadius) return;
+        const barWidth = 200, barHeight = 15;
+        const barX = boss.x - barWidth / 2;
+        const barY = boss.y - boss.radius - 25;
+        ctx.fillStyle = 'rgba(255, 106, 0, 0.5)';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        ctx.fillStyle = boss.color;
+        ctx.fillRect(barX, barY, barWidth * (boss.health / boss.maxHealth), barHeight);
         ctx.strokeStyle = '#000';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
-        drawBossHealthbar(e);
-    },
-    'SerpentBody': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.shadowColor = e.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-e.radius-10; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
-    'TheOracle': (e) => {
-        ctx.save();
-        ctx.translate(e.x, e.y);
-        ctx.strokeStyle = e.color;
-        ctx.shadowColor = e.color;
-        ctx.shadowBlur = 30;
-        ctx.lineWidth = 8;
-        ctx.beginPath();
-        for(let i=0; i<6; i++) ctx.lineTo(e.radius * Math.cos(i*2*Math.PI/6), e.radius*Math.sin(i*2*Math.PI/6));
-        ctx.closePath();
-        ctx.stroke();
-        ctx.fillStyle = e.color;
-        ctx.globalAlpha = 0.15;
-        ctx.fill();
-        const rotation = (Date.now() / 6000) % (Math.PI * 2);
-        ctx.rotate(rotation);
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = e.color;
-        ctx.shadowBlur = 20;
-        const innerRadius = e.radius * 0.65;
-        ctx.globalAlpha = 0.5;
-        ctx.beginPath();
-        for(let i=0; i<6; i++) ctx.lineTo(innerRadius * Math.cos(i*2*Math.PI/6), innerRadius * Math.sin(i*2*Math.PI/6));
-        ctx.closePath();
-        ctx.stroke();
-        ctx.restore();
-        drawBossHealthbar(e);
-    },
-    'aclysmHunter': (e) => { if(e.isInvisible) return; ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = '#ff3355'; ctx.shadowBlur = 25; ctx.beginPath(); ctx.moveTo(e.radius, 0); ctx.lineTo(-e.radius, e.radius); ctx.lineTo(-e.radius, -e.radius); ctx.closePath(); ctx.fill(); ctx.restore(); drawBossHealthbar(e); },
-    'Projectile': (p) => { ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); },
-    'MortarProjectile': (p) => { ctx.strokeStyle=`rgba(255,106,0,${1-(p.life/2)})`; ctx.lineWidth=5; ctx.beginPath(); ctx.arc(p.tX, p.tY, p.radius*(1-(p.life/2))*10,0,Math.PI*2); ctx.stroke(); },
-    'Grenade': (p) => { ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); },
-    'Laser': (l) => { ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(l.angle); ctx.strokeStyle = l.color; ctx.shadowColor = l.color; ctx.shadowBlur = 15; ctx.lineWidth = 4; ctx.globalAlpha = l.life * 10; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(l.length, 0); ctx.stroke(); ctx.restore(); },
-    'Shockwave': (s) => { ctx.strokeStyle=`rgba(255,204,0,${s.life*2})`; ctx.lineWidth=8; ctx.beginPath(); ctx.arc(s.x,s.y,s.radius,0,Math.PI*2); ctx.stroke()},
-    'NPC': (n) => {
-        ctx.save();
-        ctx.translate(n.x, n.y);
-        ctx.shadowColor = n.color;
-        ctx.shadowBlur = 10;
-        
-        if (n.name === 'Bank') {
-            ctx.fillStyle = '#e3d400';
-            ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
-            ctx.fillStyle = '#fff';
-            const barHeight = n.radius * 0.3;
-            ctx.fillRect(-n.radius*0.7, -n.radius*0.6, n.radius*1.4, barHeight);
-            ctx.fillRect(-n.radius*0.7, 0, n.radius*1.4, barHeight);
-            ctx.fillRect(-n.radius*0.7, n.radius*0.6-barHeight, n.radius*1.4, barHeight);
-        } else if (n.name === 'Exchange') {
-            ctx.fillStyle = '#8a2be2';
-            ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.font = 'bold 12px "Consolas",monospace';
-            // Draw arrows
-            ctx.beginPath();
-            ctx.moveTo(-n.radius*0.6, -n.radius*0.3); ctx.lineTo(n.radius*0.6, -n.radius*0.3); ctx.lineTo(n.radius*0.4, -n.radius*0.5);
-            ctx.moveTo(n.radius*0.6, -n.radius*0.3); ctx.lineTo(n.radius*0.4, -n.radius*0.1);
-            ctx.moveTo(n.radius*0.6, n.radius*0.3); ctx.lineTo(-n.radius*0.6, n.radius*0.3); ctx.lineTo(-n.radius*0.4, n.radius*0.5);
-            ctx.moveTo(-n.radius*0.6, n.radius*0.3); ctx.lineTo(-n.radius*0.4, n.radius*0.1);
-            ctx.stroke();
-        } else {
-             ctx.fillStyle = n.color;
-             ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
-        }
-        
-        ctx.restore();
-        
-        ctx.font = '12px "Consolas"';
-        ctx.textAlign = 'center';
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 3;
-        ctx.lineJoin = 'round';
-        ctx.strokeText(n.name, n.x, n.y - n.radius - 5);
-        ctx.fillStyle = '#fff';
-        ctx.fillText(n.name, n.x, n.y - n.radius - 5);
-    },
-    'MedBay': (n) => {
-        ctx.save();
-        ctx.translate(n.x, n.y);
-        ctx.fillStyle = n.color;
-        ctx.shadowColor = n.color;
-        ctx.shadowBlur = 15;
-        ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
-        ctx.fillStyle = '#ff3355'; // Red cross
-        ctx.fillRect(-n.radius*0.6, -n.radius*0.2, n.radius*1.2, n.radius*0.4);
-        ctx.fillRect(-n.radius*0.2, -n.radius*0.6, n.radius*0.4, n.radius*1.2);
-        ctx.font = '12px "Consolas"';
-        ctx.textAlign = 'center';
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 3;
-        ctx.strokeText(n.name, 0, -n.radius-5);
-        ctx.fillStyle='#fff';
-        ctx.fillText(n.name, 0, -n.radius-5);
-        ctx.restore();
-    },
-    'AdminPanel': (n) => {
-         ctx.save();
-        ctx.translate(n.x, n.y);
-        ctx.shadowColor = n.color;
-        ctx.shadowBlur = 10;
-        ctx.fillStyle = n.color; // Dark Red
-        ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
-        
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 14px "Consolas",monospace';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('>_', -n.radius*0.7, n.radius * 0.1);
+        ctx.strokeRect(barX, barY, barWidth, barHeight);
+        ctx.font = '14px "Consolas",monospace';
+        ctx.fillStyle="#fff";
+        ctx.textAlign="center";
+        ctx.fillText(boss.bossName, boss.x, barY + 12);
+    }
 
-        ctx.restore();
-        
-        ctx.font = '12px "Consolas"';
-        ctx.textAlign = 'center';
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 3;
-        ctx.strokeText(n.name, n.x, n.y - n.radius-5);
-        ctx.fillStyle='#fff';
-        ctx.fillText(n.name, n.x, n.y - n.radius-5);
-    },
-    'Portal': (p) => {
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        const rotation = (Date.now() / 2000) % (Math.PI * 2);
-        const pulse = 0.95 + Math.sin(Date.now() / 500) * 0.05;
-        ctx.shadowColor = '#f07cff';
-        ctx.shadowBlur = 30 * pulse;
-        for (let i = 5; i > 0; i--) {
-            ctx.beginPath();
-            ctx.globalAlpha = 0.1 * i;
-            ctx.fillStyle = `hsl(${(Date.now() / 20 + i*20) % 360}, 100%, 70%)`;
-            ctx.arc(0, 0, (p.radius * 0.8 * i / 5) * pulse, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.restore();
-    },
-    'LootDrop': (l) => { ctx.fillStyle=l.color; ctx.shadowColor=l.color; ctx.shadowBlur=10; ctx.fillRect(l.x-l.radius,l.y-l.radius,l.radius*2,l.radius*2)},
-    'EquipmentDrop': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.color; ctx.shadowColor = d.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, d.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
-    'PlayerLootBag': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.item.color || TIER_COLORS[6]; ctx.shadowColor = d.item.color || TIER_COLORS[6]; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, 12, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
-    'Tombstone': (t) => {
-        ctx.save();
-        ctx.translate(t.x, t.y);
-        ctx.globalAlpha = Math.max(0, t.life / 180);
-        ctx.fillStyle = '#4a4a52';
-        ctx.strokeStyle = '#212529';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(-20, -15); ctx.lineTo(25, -20); ctx.lineTo(20, 20); ctx.lineTo(-25, 18);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = '#3a3a3e';
-        ctx.beginPath();
-        ctx.moveTo(5, -5); ctx.lineTo(15, 18); ctx.lineTo(-15, 22); ctx.lineTo(-8, 0);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        const lootBagExists = gameState.entities.some(e => e.id === t.lootBagId);
-        if (lootBagExists) {
+    const drawFunctions = {
+        'Player': (p) => {
+            if (p.isDead) return;
+            
+            const r = p.radius || 15;
+            
             ctx.save();
-            const pulse = 0.8 + Math.sin(Date.now() / 200) * 0.2;
-            ctx.globalAlpha *= (0.8 + Math.sin(Date.now() / 200) * 0.2);
+            if (p.isInvisible) { ctx.globalAlpha = 0.3; }
+            
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.angle);
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.moveTo(r, 0);
+            ctx.lineTo(-r / 2, -r / 2);
+            ctx.lineTo(-r / 2, r / 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore(); 
+
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            if (p.id !== myPlayerId && p.health < p.stats.maxHealth) {
+                const barW = 40, barH = 5, barX = -barW / 2, barY = -r - 30; 
+                ctx.fillStyle = 'rgba(255, 51, 85, 0.7)'; ctx.fillRect(barX, barY, barW, barH);
+                ctx.fillStyle = p.color; ctx.fillRect(barX, barY, barW * (p.health / p.stats.maxHealth), barH);
+            }
+
+            ctx.font = '12px "Consolas",monospace';
+            ctx.textAlign = 'center';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.strokeText(`[Lvl ${p.level}] ${p.username}`, 0, -r - 20); 
+            ctx.fillStyle = '#fff';
+            ctx.fillText(`[Lvl ${p.level}] ${p.username}`, 0, -r - 20); 
+            ctx.restore();
+
+            if (p.id !== myPlayerId) {
+                const screenX = (p.x - camera.x) * camera.zoom + canvas.width / 2;
+                const screenY = (p.y - camera.y) * camera.zoom + canvas.height / 2;
+                if (Math.hypot(inputs.mouse.x - screenX, inputs.mouse.y - screenY) < r) {
+                    canvas.style.cursor = 'pointer';
+                    canvas.oncontextmenu = (e) => showPlayerContextMenu(e, p);
+                }
+            }
+
+            if (p.isBoosting && p.id === myPlayerId) {
+                const angle = p.angle + Math.PI + (Math.random() - 0.5) * 0.5;
+                const x = p.x + Math.cos(angle) * (r - 2);
+                const y = p.y + Math.sin(angle) * (r - 2);
+                particles.push({x: x, y: y, vx: 0, vy: 0, life: 1, size: Math.random() * 3 + 2, color: p.color});
+            }
+            if(p.shieldActive){
+                ctx.save();
+                ctx.fillStyle = hexToRgba(p.color, 0.25);
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 25;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+            if (p.id === myPlayerId && p.isTeleporting) {
+                const chargePercent = 1 - (p.teleportTimer / p.TELEPORT_CHARGE_TIME);
+                ctx.strokeStyle = '#00f0ff';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, r + 10, -Math.PI / 2, (-Math.PI / 2) + (chargePercent * Math.PI * 2));
+                ctx.stroke();
+            }
+        },
+        'MeleeSlash': (s) => {
+            const owner = gameState.players[s.ownerId] || gameState.entities.find(e => e.id === s.ownerId);
+            if (!owner) return;
+            const progress = 1 - (s.life / 0.2);
+            ctx.save();
+            ctx.translate(owner.x, owner.y);
+            ctx.rotate(s.angle);
+            ctx.globalAlpha = 1 - progress;
+            ctx.shadowColor = s.color;
+            ctx.shadowBlur = 20;
+
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.5 * (1 - progress)})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, s.radius * progress, -s.arc / 2, s.arc / 2);
+            ctx.arc(0, 0, 20, s.arc / 2, -s.arc / 2, true);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = s.color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, s.radius * progress, -s.arc / 2, s.arc / 2);
+            ctx.stroke();
+            
+            ctx.restore();
+        },
+        'Enemy': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 3; const r = e.radius; ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(-r / 2, -r * 0.866); ctx.lineTo(-r / 2, r * 0.866); ctx.closePath(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
+        'Stinger': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 3; const r = e.radius; ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0); ctx.closePath(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
+        'VoidSwarmer': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; const r = e.radius; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-r-15; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
+        'Warden': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.strokeStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 10; ctx.lineWidth = 4; const r = e.radius; ctx.beginPath(); for (let i = 0; i < 5; i++) ctx.lineTo(r*Math.cos(i*2*Math.PI/5), r*Math.sin(i*2*Math.PI/5)); ctx.closePath(); ctx.stroke(); ctx.restore(); if (e.shield > 0) { ctx.fillStyle = `rgba(227, 212, 0, ${0.1 + (e.shield / e.maxShield) * 0.3})`; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 8, 0, Math.PI*2); ctx.fill(); } if(e.health < e.maxHealth){ const barW=40, barH=6, barX=e.x-barW/2, barY=e.y-r-20; ctx.fillStyle='rgba(255, 51, 85, 0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
+        'GravityWell': (e) => {
+            ctx.save();
+            ctx.translate(e.x, e.y);
+            const pulse = 0.9 + Math.sin(Date.now() / 500) * 0.1;
+            ctx.fillStyle = e.color;
+            ctx.shadowColor = '#fff';
+            ctx.shadowBlur = e.radius * pulse;
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius * pulse, 0, Math.PI * 2);
+            ctx.fill();
+            const rotation = (Date.now() / 3000) % (Math.PI * 2);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.2 + Math.sin(Date.now() / 300) * 0.1})`;
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.arc(0, 0, e.radius + i * 20, rotation + i * (Math.PI / 1.5), rotation + i * (Math.PI / 1.5) + Math.PI);
+                ctx.stroke();
+            }
+            ctx.restore();
+        },
+        'Dreadnought': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = e.color; ctx.shadowBlur = 30; ctx.beginPath(); ctx.rect(-e.radius, -e.radius/2, e.radius*2, e.radius); ctx.fill(); ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.rect(-e.radius/2, -e.radius/1.5, e.radius, e.radius*1.3); ctx.fill(); ctx.restore(); drawBossHealthbar(e); },
+        'SerpentHead': (e) => {
+            ctx.save();
+            ctx.translate(e.x, e.y);
+            ctx.fillStyle = e.color;
+            ctx.shadowColor = e.color;
+            ctx.shadowBlur = 20;
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+            drawBossHealthbar(e);
+        },
+        'SerpentBody': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.shadowColor = e.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-e.radius-10; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
+        'TheOracle': (e) => {
+            ctx.save();
+            ctx.translate(e.x, e.y);
+            ctx.strokeStyle = e.color;
+            ctx.shadowColor = e.color;
+            ctx.shadowBlur = 30;
+            ctx.lineWidth = 8;
+            ctx.beginPath();
+            for(let i=0; i<6; i++) ctx.lineTo(e.radius * Math.cos(i*2*Math.PI/6), e.radius*Math.sin(i*2*Math.PI/6));
+            ctx.closePath();
+            ctx.stroke();
+            ctx.fillStyle = e.color;
+            ctx.globalAlpha = 0.15;
+            ctx.fill();
+            const rotation = (Date.now() / 6000) % (Math.PI * 2);
+            ctx.rotate(rotation);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = e.color;
+            ctx.shadowBlur = 20;
+            const innerRadius = e.radius * 0.65;
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            for(let i=0; i<6; i++) ctx.lineTo(innerRadius * Math.cos(i*2*Math.PI/6), innerRadius * Math.sin(i*2*Math.PI/6));
+            ctx.closePath();
+            ctx.stroke();
+            ctx.restore();
+            drawBossHealthbar(e);
+        },
+        'aclysmHunter': (e) => { if(e.isInvisible) return; ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.shadowColor = '#ff3355'; ctx.shadowBlur = 25; ctx.beginPath(); ctx.moveTo(e.radius, 0); ctx.lineTo(-e.radius, e.radius); ctx.lineTo(-e.radius, -e.radius); ctx.closePath(); ctx.fill(); ctx.restore(); drawBossHealthbar(e); },
+        'Projectile': (p) => { ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); },
+        'MortarProjectile': (p) => { ctx.strokeStyle=`rgba(255,106,0,${1-(p.life/2)})`; ctx.lineWidth=5; ctx.beginPath(); ctx.arc(p.tX, p.tY, p.radius*(1-(p.life/2))*10,0,Math.PI*2); ctx.stroke(); },
+        'Grenade': (p) => { ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); },
+        'Laser': (l) => { ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(l.angle); ctx.strokeStyle = l.color; ctx.shadowColor = l.color; ctx.shadowBlur = 15; ctx.lineWidth = 4; ctx.globalAlpha = l.life * 10; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(l.length, 0); ctx.stroke(); ctx.restore(); },
+        'Shockwave': (s) => { ctx.strokeStyle=`rgba(255,204,0,${s.life*2})`; ctx.lineWidth=8; ctx.beginPath(); ctx.arc(s.x,s.y,s.radius,0,Math.PI*2); ctx.stroke()},
+        'NPC': (n) => {
+            ctx.save();
+            ctx.translate(n.x, n.y);
+            ctx.shadowColor = n.color;
+            ctx.shadowBlur = 10;
+            
+            if (n.name === 'Bank') {
+                ctx.fillStyle = '#e3d400';
+                ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
+                ctx.fillStyle = '#fff';
+                const barHeight = n.radius * 0.3;
+                ctx.fillRect(-n.radius*0.7, -n.radius*0.6, n.radius*1.4, barHeight);
+                ctx.fillRect(-n.radius*0.7, 0, n.radius*1.4, barHeight);
+                ctx.fillRect(-n.radius*0.7, n.radius*0.6-barHeight, n.radius*1.4, barHeight);
+            } else if (n.name === 'Exchange') {
+                ctx.fillStyle = '#8a2be2';
+                ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.font = 'bold 12px "Consolas",monospace';
+                // Draw arrows
+                ctx.beginPath();
+                ctx.moveTo(-n.radius*0.6, -n.radius*0.3); ctx.lineTo(n.radius*0.6, -n.radius*0.3); ctx.lineTo(n.radius*0.4, -n.radius*0.5);
+                ctx.moveTo(n.radius*0.6, -n.radius*0.3); ctx.lineTo(n.radius*0.4, -n.radius*0.1);
+                ctx.moveTo(n.radius*0.6, n.radius*0.3); ctx.lineTo(-n.radius*0.6, n.radius*0.3); ctx.lineTo(-n.radius*0.4, n.radius*0.5);
+                ctx.moveTo(-n.radius*0.6, n.radius*0.3); ctx.lineTo(-n.radius*0.4, n.radius*0.1);
+                ctx.stroke();
+            } else {
+                 ctx.fillStyle = n.color;
+                 ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
+            }
+            
+            ctx.restore();
+            
+            ctx.font = '12px "Consolas"';
+            ctx.textAlign = 'center';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.strokeText(n.name, n.x, n.y - n.radius - 5);
+            ctx.fillStyle = '#fff';
+            ctx.fillText(n.name, n.x, n.y - n.radius - 5);
+        },
+        'MedBay': (n) => {
+            ctx.save();
+            ctx.translate(n.x, n.y);
+            ctx.fillStyle = n.color;
+            ctx.shadowColor = n.color;
+            ctx.shadowBlur = 15;
+            ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
+            ctx.fillStyle = '#ff3355'; // Red cross
+            ctx.fillRect(-n.radius*0.6, -n.radius*0.2, n.radius*1.2, n.radius*0.4);
+            ctx.fillRect(-n.radius*0.2, -n.radius*0.6, n.radius*0.4, n.radius*1.2);
+            ctx.font = '12px "Consolas"';
+            ctx.textAlign = 'center';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 3;
+            ctx.strokeText(n.name, 0, -n.radius-5);
+            ctx.fillStyle='#fff';
+            ctx.fillText(n.name, 0, -n.radius-5);
+            ctx.restore();
+        },
+        'AdminPanel': (n) => {
+             ctx.save();
+            ctx.translate(n.x, n.y);
+            ctx.shadowColor = n.color;
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = n.color; // Dark Red
+            ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 14px "Consolas",monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('>_', -n.radius*0.7, n.radius * 0.1);
+
+            ctx.restore();
+            
+            ctx.font = '12px "Consolas"';
+            ctx.textAlign = 'center';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 3;
+            ctx.strokeText(n.name, n.x, n.y - n.radius-5);
+            ctx.fillStyle='#fff';
+            ctx.fillText(n.name, n.x, n.y - n.radius-5);
+        },
+        'Portal': (p) => {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            const rotation = (Date.now() / 2000) % (Math.PI * 2);
+            const pulse = 0.95 + Math.sin(Date.now() / 500) * 0.05;
+            ctx.shadowColor = '#f07cff';
+            ctx.shadowBlur = 30 * pulse;
+            for (let i = 5; i > 0; i--) {
+                ctx.beginPath();
+                ctx.globalAlpha = 0.1 * i;
+                ctx.fillStyle = `hsl(${(Date.now() / 20 + i*20) % 360}, 100%, 70%)`;
+                ctx.arc(0, 0, (p.radius * 0.8 * i / 5) * pulse, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        },
+        'LootDrop': (l) => { ctx.fillStyle=l.color; ctx.shadowColor=l.color; ctx.shadowBlur=10; ctx.fillRect(l.x-l.radius,l.y-l.radius,l.radius*2,l.radius*2)},
+        'EquipmentDrop': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.color; ctx.shadowColor = d.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, d.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
+        'PlayerLootBag': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.item.color || TIER_COLORS[6]; ctx.shadowColor = d.item.color || TIER_COLORS[6]; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, 12, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
+        'Tombstone': (t) => {
+            ctx.save();
+            ctx.translate(t.x, t.y);
+            ctx.globalAlpha = Math.max(0, t.life / 180);
+            ctx.fillStyle = '#4a4a52';
+            ctx.strokeStyle = '#212529';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-20, -15); ctx.lineTo(25, -20); ctx.lineTo(20, 20); ctx.lineTo(-25, 18);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#3a3a3e';
+            ctx.beginPath();
+            ctx.moveTo(5, -5); ctx.lineTo(15, 18); ctx.lineTo(-15, 22); ctx.lineTo(-8, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            const lootBagExists = gameState.entities.some(e => e.id === t.lootBagId);
+            if (lootBagExists) {
+                ctx.save();
+                const pulse = 0.8 + Math.sin(Date.now() / 200) * 0.2;
+                ctx.globalAlpha *= (0.8 + Math.sin(Date.now() / 200) * 0.2);
+                ctx.fillStyle = t.playerColor;
+                ctx.shadowColor = t.playerColor;
+                ctx.shadowBlur = 25 * pulse;
+                ctx.beginPath();
+                ctx.arc(0, 5, 6 * pulse, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+            ctx.globalAlpha = Math.max(0, t.life / 180);
+            ctx.shadowBlur = 0;
+            ctx.textAlign = 'center';
             ctx.fillStyle = t.playerColor;
             ctx.shadowColor = t.playerColor;
-            ctx.shadowBlur = 25 * pulse;
-            ctx.beginPath();
-            ctx.arc(0, 5, 6 * pulse, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.shadowBlur = 8;
+            ctx.font = 'bold 9px "Consolas",monospace';
+            ctx.fillText(`R.I.P. ${t.playerName}`, 0, -35);
+            ctx.font = '8px "Consolas",monospace';
+            ctx.globalAlpha *= 0.8;
+            ctx.fillText(`Disconnected by`, 0, -25);
+            ctx.fillText(`${t.causeOfDeath}`, 0, -16);
             ctx.restore();
-        }
-        ctx.globalAlpha = Math.max(0, t.life / 180);
-        ctx.shadowBlur = 0;
-        ctx.textAlign = 'center';
-        ctx.fillStyle = t.playerColor;
-        ctx.shadowColor = t.playerColor;
-        ctx.shadowBlur = 8;
-        ctx.font = 'bold 9px "Consolas",monospace';
-        ctx.fillText(`R.I.P. ${t.playerName}`, 0, -35);
-        ctx.font = '8px "Consolas",monospace';
-        ctx.globalAlpha *= 0.8;
-        ctx.fillText(`Disconnected by`, 0, -25);
-        ctx.fillText(`${t.causeOfDeath}`, 0, -16);
-        ctx.restore();
-    },
-    'floatingText': (ft) => { ctx.font = 'bold 18px "Consolas",monospace'; ctx.fillStyle = ft.color || 'rgba(255,255,100,0.8)'; ctx.globalAlpha = ft.life; ctx.textAlign = 'center'; ctx.fillText(ft.text, ft.x, ft.y); ctx.globalAlpha = 1; },
-};
-
-function drawGameStars() {
-    const myPlayer = gameState.players[myPlayerId];
-    if (!myPlayer) return;
-
-    ctx.save();
-    ctx.fillStyle = '#fff';
-    gameStars.forEach(star => {
-        const screenX = canvas.width / 2 + (star.x - camera.x * star.depth);
-        const screenY = canvas.height / 2 + (star.y - camera.y * star.depth);
-
-        if (screenX < -canvas.width) star.x += canvas.width * 2.5;
-        if (screenX > canvas.width*2) star.x -= canvas.width * 2.5;
-        if (screenY < -canvas.height) star.y += canvas.height * 2.5;
-        if (screenY > canvas.height*2) star.y -= canvas.height * 2.5;
-        
-        ctx.globalAlpha = star.depth * 0.7;
-        ctx.fillRect(screenX, screenY, star.size, star.size);
-    });
-    ctx.restore();
-}
-
-function drawLoginBackground() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#fff';
-    loginStars.forEach(star => {
-        star.alpha += star.twinkleSpeed;
-        if (star.alpha > 1 || star.alpha < 0.2) {
-            star.twinkleSpeed *= -1;
-        }
-        ctx.globalAlpha = star.alpha;
-        ctx.fillRect(star.x, star.y, star.size, star.size);
-    });
-    ctx.globalAlpha = 1;
-}
-
-function drawGrid() {
-    ctx.strokeStyle = 'rgba(40, 45, 60, 0.5)';
-    ctx.lineWidth = 1;
-    const startX = Math.floor((camera.x - canvas.width / 2 / camera.zoom) / TILE_SIZE) * TILE_SIZE;
-    const startY = Math.floor((camera.y - canvas.height / 2 / camera.zoom) / TILE_SIZE) * TILE_SIZE;
-    const endX = Math.ceil((camera.x + canvas.width / 2 / camera.zoom) / TILE_SIZE) * TILE_SIZE;
-    const endY = Math.ceil((camera.y + canvas.height / 2 / camera.zoom) / TILE_SIZE) * TILE_SIZE;
-
-    ctx.beginPath();
-    for (let x = startX; x <= endX; x += TILE_SIZE) {
-        ctx.moveTo(x, startY);
-        ctx.lineTo(x, endY);
-    }
-    for (let y = startY; y <= endY; y += TILE_SIZE) {
-        ctx.moveTo(startX, y);
-        ctx.lineTo(endX, y);
-    }
-    ctx.stroke();
-}
-
-function drawTechPattern(tX, tY) {
-    ctx.strokeStyle = 'rgba(0, 240, 255, 0.1)';
-    ctx.lineWidth = 1;
-    const size = TILE_SIZE / 2;
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-        ctx.lineTo(tX + size * Math.cos(i * Math.PI / 3), tY + size * Math.sin(i * Math.PI / 3));
-    }
-    ctx.closePath();
-    ctx.stroke();
-}
-
-function render() {
-    const myPlayer = gameState.players[myPlayerId];
-    
-    if (!isGameRunning) {
-        drawLoginBackground();
-        return;
-    }
-
-    if (!myPlayer) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        return;
-    }
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawGameStars();
-
-    camera.x = myPlayer.x; camera.y = myPlayer.y;
-    
-    ctx.save();
-    ctx.translate(canvas.width / 2, canvas.height / 2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
-    
-    drawGrid();
-
-    const b = { l: Math.floor((camera.x-canvas.width/2/camera.zoom)/TILE_SIZE)-1, r: Math.ceil((camera.x+canvas.width/2/camera.zoom)/TILE_SIZE)+1, t: Math.floor((camera.y-canvas.height/2/camera.zoom)/TILE_SIZE)-1, b: Math.ceil((camera.y+canvas.height/2/camera.zoom)/TILE_SIZE)+1, };
-    for (let y = b.t; y < b.b; y++) {
-        for (let x = b.l; x < b.r; x++) {
-            const tX = x * TILE_SIZE, tY = y * TILE_SIZE;
-            const tileId = getTile(tX, tY);
-            const tile = TILE_TYPES[tileId];
-
-            if (tileId === 15) {
-                ctx.fillStyle = TILE_TYPES[10].c;
-                ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
-                ctx.fillStyle = 'rgba(0, 240, 255, 0.15)';
-                ctx.shadowColor = 'rgba(0, 240, 255, 0.5)';
-                ctx.shadowBlur = 15;
-                ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
-                const scanLineY = tY + (Date.now() % 1500) / 1500 * TILE_SIZE;
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.shadowColor = '#fff';
-                ctx.shadowBlur = 10;
-                ctx.fillRect(tX, scanLineY, TILE_SIZE, 2);
-            } else if (tile && tileId !== 1) { 
-                if (tile.wc) {
-                    const floorTile = TILE_TYPES[tileId - 1] || TILE_TYPES[1];
-                    ctx.fillStyle = floorTile.c;
-                    ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
-                    ctx.fillStyle = tile.wc;
-                    ctx.shadowColor = tile.wc;
-                    ctx.shadowBlur = 10;
-                    ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
-                    ctx.shadowBlur = 0;
-                    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(tX + 1, tY + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-                } else {
-                    ctx.fillStyle = tile.c;
-                    ctx.shadowBlur = 0;
-                    ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
-                }
-                if (tileId === 10 || tileId === 13) {
-                     drawTechPattern(tX + TILE_SIZE / 2, tY + TILE_SIZE / 2);
-                }
-            }
-        }
-    }
-    ctx.shadowBlur = 0;
-    
-    particles.forEach(p => { p.life -= 0.05; p.x += p.vx; p.y += p.vy; ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); }); particles = particles.filter(p => p.life > 0); ctx.globalAlpha = 1;
-    
-    canvas.style.cursor = 'crosshair';
-    canvas.oncontextmenu = showGroundContextMenu;
-
-    gameState.entities.forEach(e => { if (drawFunctions[e.type]) drawFunctions[e.type](e); });
-    for (const id in gameState.players) drawFunctions['Player'](gameState.players[id]);
-    
-    ctx.restore();
-    
-    if (!myPlayer.isDead) { 
-        drawUI(myPlayer); 
-        drawMinimap(myPlayer); 
-    }
-}
-
-function gameLoop() {
-    if (isGameRunning && myPlayerId && gameState.players[myPlayerId] && !isShopOpen && !isBankOpen && !isTrading) { 
-        const myPlayer = gameState.players[myPlayerId];
-        if (!myPlayer.isDead) {
-            const worldMouseX = (inputs.mouse.x - canvas.width / 2) / camera.zoom + myPlayer.x;
-            const worldMouseY = (inputs.mouse.y - canvas.height / 2) / camera.zoom + myPlayer.y;
-            const angle = Math.atan2(worldMouseY - myPlayer.y, worldMouseX - myPlayer.x);
-            sendToServer({ type: 'input', inputs, angle });
-        }
-    }
-    render();
-    requestAnimationFrame(gameLoop);
-}
-
-function showLoginScreen() {
-    chatContainer.style.display = 'none';
-    loginContainer.style.display = 'block';
-    classSelectionPanel.style.display = 'none';
-    shipSelectionPanel.style.display = 'none';
-    rightUI.style.display = 'none';
-    leftUI.style.display = 'none';
-    deathScreen.style.display = 'none';
-    isGameRunning = false;
-    initLoginStars();
-}
-function showClassSelection() {
-    loginContainer.style.display = 'none';
-    shipSelectionPanel.style.display = 'none';
-    deathScreen.style.display = 'none';
-    classSelectionPanel.style.display = 'block';
-}
-function showShipSelection() {
-    classSelectionPanel.style.display = 'none';
-    shipSelectionPanel.style.display = 'block';
-}
-function showDeathScreen() {
-    deathScreen.style.display = 'block';
-    rightUI.style.display = 'none';
-    leftUI.style.display = 'none';
-    isGameRunning = false;
-    classSelectionPanel.style.display = 'none';
-    shipSelectionPanel.style.display = 'none';
-    closeAllPanels();
-}
-function chooseClass(className) {
-    chosenClassName = className;
-    showShipSelection();
-}
-function chooseColor(color) {
-    classSelectionPanel.style.display = 'none';
-    shipSelectionPanel.style.display = 'none';
-    deathScreen.style.display = 'none';
-    
-    rightUI.style.display = 'block';
-    leftUI.style.display = 'block';
-    chatContainer.style.display = 'block';
-    sendToServer({ type: 'playerInit', username: loggedInUser, color: color, className: chosenClassName });
-    isGameRunning = true;
-    Sound.startAmbient();
-}
-function handleRespawn() {
-    deathScreen.style.display = 'none';
-    sendToServer({type: 'playerRespawn'});
-    showClassSelection();
-}
-function handleLogin() { const u=document.getElementById('login-username').value, p=document.getElementById('login-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]&&users[u]===p){loggedInUser=u;showClassSelection()}else{e.textContent='Invalid username or password.'} }
-function handleRegister() { const u=document.getElementById('register-username').value, p=document.getElementById('register-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} if(u.length<3){e.textContent='Username must be at least 3 characters.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]){e.textContent='Username already taken.'}else{users[u]=p;localStorage.setItem('galactic_os_users',JSON.stringify(users));loggedInUser=u;showClassSelection()} }
-function toggleLoginRegister(showLogin) { document.getElementById('login-form').style.display=showLogin?'block':'none';document.getElementById('register-form').style.display=showLogin?'none':'block';document.getElementById('login-error').textContent=''; }
-
-function drawUI(player) {
-    if (!player || !player.stats) return;
-    const abilityName = player.className === 'Operator' ? 'Invis' : (player.className === 'Guardian' ? 'Shield' : 'Blink');
-    hudInfo.innerHTML = `
-        <div class="hud-line"><strong>Data Bits:</strong> <span>${player.dataBits}</span></div>
-        <div class="hud-line"><strong>Ability:</strong> <span style="color: ${player.abilityCooldown > 0 ? '#777' : '#00f0ff'}">${player.abilityCooldown > 0 ? player.abilityCooldown.toFixed(1) + 's' : 'READY'}</span></div>
-        <div class="hud-line"><strong>Teleport:</strong> <span style="color: ${player.teleportCooldown > 0 ? '#777' : '#00f0ff'}">${player.teleportCooldown > 0 ? (player.teleportCooldown/60).toFixed(1) + 'm' : (player.isTeleporting ? `CHARGING...` : 'READY')}</span></div>
-        <div class="hud-bar"><div id="health-bar-fill" style="width: ${player.health / player.stats.maxHealth * 100}%;"></div></div>
-        <p style="text-align: center; font-size: 12px;">HP: ${Math.ceil(player.health)} / ${player.stats.maxHealth}</p>
-        <div class="hud-bar"><div id="energy-bar-fill" style="width: ${player.energy / player.stats.maxEnergy * 100}%;"></div></div>
-        <p style="text-align: center; font-size: 12px;">EN: ${Math.ceil(player.energy)} / ${player.stats.maxEnergy}</p>
-    `;
-
-    document.getElementById('xp-bar').style.width = `${(player.xp / player.xpToNextLevel) * 100}%`;
-    document.getElementById('coords').textContent = `X: ${Math.floor(player.x / TILE_SIZE)} Y: ${Math.floor(player.y / TILE_SIZE)}`;
-    updateInventoryAndEquipUI(player);
-}
-
-function drawMinimap(player) {
-    const mapSize = 220, viewDist = 25 * TILE_SIZE;
-    minimapCtx.fillStyle = '#05060a';
-    minimapCtx.fillRect(0, 0, mapSize, mapSize);
-    const scale = mapSize / (viewDist * 2);
-
-    for(let y = -viewDist; y < viewDist; y += TILE_SIZE) {
-        for(let x = -viewDist; x < viewDist; x += TILE_SIZE) {
-            const tileId = getTile(player.x + x, player.y + y);
-            const tile = TILE_TYPES[tileId] || TILE_TYPES[1];
-            if(tile) {
-                minimapCtx.fillStyle = tile.wc || tile.c;
-                minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, Math.ceil(TILE_SIZE * scale) + 1, Math.ceil(TILE_SIZE * scale) + 1);
-            }
-        }
-    }
-    
-    for (const e of gameState.entities) {
-        const dX = e.x - player.x;
-        const dY = e.y - player.y;
-        if (Math.abs(dX) < viewDist && Math.abs(dY) < viewDist) {
-            let size = 3;
-            if (e.isBoss) size = 6;
-            else if (e.type === 'GravityWell') size = 4;
-            minimapCtx.fillStyle = e.color;
-            minimapCtx.fillRect(mapSize / 2 + dX * scale - size/2, mapSize / 2 + dY * scale - size/2, size, size);
-        }
-    }
-
-    for (const id in gameState.players) {
-        if (id === myPlayerId) continue;
-        const p = gameState.players[id];
-        const dX = p.x - player.x;
-        const dY = p.y - player.y;
-        if (Math.abs(dX) < viewDist && Math.abs(dY) < viewDist) {
-            minimapCtx.fillStyle = p.color;
-            minimapCtx.beginPath();
-            minimapCtx.arc(mapSize / 2 + dX * scale, mapSize / 2 + dY * scale, 3, 0, Math.PI * 2);
-            minimapCtx.fill();
-        }
-    }
-    
-    minimapCtx.fillStyle = player.color || '#00ff00';
-    minimapCtx.fillRect(mapSize/2 - 2, mapSize/2 - 2, 4, 4);
-}
-
-function updateInventoryAndEquipUI(player) {
-    for(const slot in player.equipment) {
-        const el = document.getElementById(`equip-${slot}`);
-        const slotContainer = document.getElementById(`equip-slot-${slot}`);
-        const item = player.equipment[slot];
-        slotContainer.oncontextmenu = (e) => showItemContextMenu(e, 'equipment', slot, item);
-        if(item) {
-            el.textContent = item.name;
-            el.style.color = TIER_COLORS[item.tier];
-            slotContainer.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
-        } else {
-            el.textContent = 'None';
-            el.style.color = '#777';
-            slotContainer.title = '';
-        }
-    }
-    const grid = document.getElementById('inventory-grid');
-    grid.innerHTML = '';
-    player.inventory.forEach((item, index) => {
-        const slot = document.createElement('div');
-        slot.className = 'inventory-slot';
-        slot.oncontextmenu = (e) => showItemContextMenu(e, 'inventory', index, item);
-        if(item) {
-            slot.style.borderColor = TIER_COLORS[item.tier];
-            slot.textContent = item.name;
-            slot.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
-        }
-        grid.appendChild(slot);
-    });
-}
-
-function showItemContextMenu(event, source, index, item) {
-    event.preventDefault();
-    if (!item) return;
-    hideAllContextMenus();
-    itemContextMenu.innerHTML = '';
-
-    if (source === 'inventory') {
-        itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'equipItem', itemIndex: ${index} }); hideAllContextMenus();">Equip</li>`;
-        if (isBankOpen) {
-            const myPlayer = gameState.players[myPlayerId];
-            const allSimilarItems = myPlayer.inventory.filter(i => i && i.id === item.id);
-            
-            itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: ${index}, amount: 1}); hideAllContextMenus();">Deposit-1</li>`;
-            if (allSimilarItems.length > 1) {
-                itemContextMenu.innerHTML += `<li onclick="showXPrompt('Deposit How Many?', ${allSimilarItems.length}, (amt) => sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: ${index}, amount: amt})); hideAllContextMenus();">Deposit-X</li>`;
-            }
-            itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: ${index}, amount: 'all'}); hideAllContextMenus();">Deposit-All</li>`;
-        }
-        if (isTrading) {
-            itemContextMenu.innerHTML += `<li onclick="offerTradeItem(${index}); hideAllContextMenus();">Offer</li>`;
-        }
-    } else if (source === 'equipment') {
-        itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'unequipItem', slot: '${index}' }); hideAllContextMenus();">Unequip</li>`;
-    } else if (source === 'bank') {
-        const bankItemData = currentBankData[index];
-        if (bankItemData && bankItemData.item) {
-             itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'withdraw', itemIndex: ${index}, amount: 1}); hideAllContextMenus();">Withdraw-1</li>`;
-            if (bankItemData.quantity > 1) {
-                itemContextMenu.innerHTML += `<li onclick="showXPrompt('Withdraw How Many?', ${bankItemData.quantity}, (amt) => sendToServer({ type: 'bankAction', action: 'withdraw', itemIndex: ${index}, amount: amt})); hideAllContextMenus();">Withdraw-X</li>`;
-                itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'withdraw', itemIndex: ${index}, amount: 'all'}); hideAllContextMenus();">Withdraw-All</li>`;
-            }
-        }
-    } else if (source === 'trade') {
-        itemContextMenu.innerHTML += `<li onclick="removeTradeItem(${index}); hideAllContextMenus();">Remove</li>`;
-    }
-
-    itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'dropItem', source: '${source}', index: '${index}' }); hideAllContextMenus();">Drop</li>`;
-
-    itemContextMenu.style.display = 'block';
-    itemContextMenu.style.left = `${event.clientX}px`;
-    itemContextMenu.style.top = `${event.clientY}px`;
-}
-
-function showGroundContextMenu(event) {
-    event.preventDefault();
-    hideAllContextMenus();
-    const worldMouseX = (event.clientX - canvas.width / 2) / camera.zoom + camera.x;
-    const worldMouseY = (event.clientY - canvas.height / 2) / camera.zoom + camera.y;
-    const pickupRadius = 40;
-    const itemsToShow = gameState.entities.filter(e => (e.type === 'EquipmentDrop' || e.type === 'PlayerLootBag') && e.pickupDelay <= 0 && Math.hypot(e.x - worldMouseX, e.y - worldMouseY) < pickupRadius);
-    groundContextMenu.innerHTML = '';
-    if (itemsToShow.length > 0) {
-        itemsToShow.forEach(itemEntity => {
-            if (itemEntity.type === 'PlayerLootBag') {
-                if (itemEntity.bits > 0) {
-                    const bitsLi = document.createElement('li');
-                    bitsLi.innerHTML = `Pickup <span style="color: ${TIER_COLORS[6]}">${itemEntity.bits} Data Bits</span>`;
-                    bitsLi.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: 'bits'}); Sound.playPickup(); hideAllContextMenus(); };
-                    groundContextMenu.appendChild(bitsLi);
-                }
-                itemEntity.items.forEach((item, index) => {
-                    if (!item) return;
-                    const li = document.createElement('li');
-                    li.innerHTML = `Pickup <span style="color:${TIER_COLORS[item.tier]}">${item.name}</span>`;
-                    li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: index}); Sound.playPickup(); hideAllContextMenus(); };
-                    groundContextMenu.appendChild(li);
-                });
-            } else {
-                const li = document.createElement('li');
-                li.innerHTML = `Pickup <span style="color:${TIER_COLORS[itemEntity.item.tier]}">${itemEntity.item.name}</span>`;
-                li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id}); Sound.playPickup(); hideAllContextMenus(); };
-                groundContextMenu.appendChild(li);
-            }
-        });
-        groundContextMenu.style.display = 'block';
-        groundContextMenu.style.left = `${event.clientX}px`;
-        groundContextMenu.style.top = `${event.clientY}px`;
-    }
-}
-
-function showPlayerContextMenu(event, player) {
-    event.preventDefault();
-    if (!player || player.id === myPlayerId) return;
-    hideAllContextMenus();
-    
-    playerContextMenu.innerHTML = `
-        <li onclick="sendToServer({ type: 'tradeRequest', targetId: '${player.id}' }); hideAllContextMenus();">Trade ${player.username}</li>
-        <li onclick="sendToServer({ type: 'partyInvite', targetId: '${player.id}' }); hideAllContextMenus();">Invite ${player.username}</li>
-    `;
-    
-    playerContextMenu.style.display = 'block';
-    playerContextMenu.style.left = `${event.clientX}px`;
-    playerContextMenu.style.top = `${event.clientY}px`;
-}
-
-function hideAllContextMenus() {
-    itemContextMenu.style.display = 'none';
-    groundContextMenu.style.display = 'none';
-    playerContextMenu.style.display = 'none';
-}
-
-function closeAllPanels() {
-    closeShop();
-    closeBank();
-    closeTradeWindow();
-    xPromptContainer.style.display = 'none';
-    partyInvitePopup.style.display = 'none';
-    tradeRequestPopup.style.display = 'none';
-}
-
-function openShop(npcName, npcInventory, marketListings) {
-    closeAllPanels();
-    isShopOpen = true;
-    currentShopName = npcName;
-    shopContainer.style.display = 'block';
-    document.getElementById('shop-tab-npc').onclick = () => showShopTab('npc', { npcInventory, marketListings });
-    document.getElementById('shop-tab-market').onclick = () => showShopTab('market', { npcInventory, marketListings });
-    document.getElementById('market-list-btn').onclick = listMarketItem;
-    showShopTab('npc', { npcInventory, marketListings });
-}
-function closeShop() {
-    isShopOpen = false;
-    shopContainer.style.display = 'none';
-    currentShopName = null;
-}
-
-function openBank(bankData) {
-    closeAllPanels();
-    isBankOpen = true;
-    currentBankData = bankData; // Store bank data for context menus
-    bankContainer.style.display = 'block';
-    updateBankView(bankData);
-}
-function closeBank() {
-    isBankOpen = false;
-    bankContainer.style.display = 'none';
-    currentBankData = [];
-}
-
-function openTradeWindow(partnerData) {
-    closeAllPanels();
-    isTrading = true;
-    tradeContainer.style.display = 'block';
-    document.getElementById('trade-header').textContent = `Trading with ${partnerData.username}`;
-    document.getElementById('other-player-trade-name').textContent = `${partnerData.username}'s OFFER`;
-    document.getElementById('trade-accept-btn').disabled = false;
-    document.getElementById('trade-accept-btn').textContent = 'ACCEPT';
-    document.getElementById('trade-status').textContent = '';
-    
-    document.getElementById('trade-cancel-btn').onclick = () => sendToServer({ type: 'tradeCancel' });
-    document.getElementById('trade-accept-btn').onclick = () => {
-        document.getElementById('trade-status').textContent = 'Waiting for partner...';
-        sendToServer({ type: 'tradeAccept' });
+        },
+        'floatingText': (ft) => { ctx.font = 'bold 18px "Consolas",monospace'; ctx.fillStyle = ft.color || 'rgba(255,255,100,0.8)'; ctx.globalAlpha = ft.life; ctx.textAlign = 'center'; ctx.fillText(ft.text, ft.x, ft.y); ctx.globalAlpha = 1; },
     };
-    document.getElementById('my-trade-bits').onchange = updateMyTradeOffer;
-    document.getElementById('my-trade-bits').onkeyup = updateMyTradeOffer;
+    
+    function drawGameStars() {
+        const myPlayer = gameState.players[myPlayerId];
+        if (!myPlayer) return;
 
-    renderMyTradeOffer();
-    updateOtherTradeOffer({ offer: [], offerBits: 0 });
-}
-function closeTradeWindow() {
-    isTrading = false;
-    tradeContainer.style.display = 'none';
-    currentTradeData = { myOfferItems: [], myOfferBits: 0 };
-    document.getElementById('my-trade-bits').value = '';
-}
-function offerTradeItem(inventoryIndex) {
-    const myPlayer = gameState.players[myPlayerId];
-    const item = myPlayer.inventory[inventoryIndex];
-    if (item && !currentTradeData.myOfferItems.some(i => i.originalIndex === inventoryIndex)) {
-        currentTradeData.myOfferItems.push({ item: { ...item }, originalIndex: inventoryIndex });
+        ctx.save();
+        ctx.fillStyle = '#fff';
+        gameStars.forEach(star => {
+            const screenX = canvas.width / 2 + (star.x - camera.x * star.depth);
+            const screenY = canvas.height / 2 + (star.y - camera.y * star.depth);
+
+            if (screenX < -canvas.width) star.x += canvas.width * 2.5;
+            if (screenX > canvas.width*2) star.x -= canvas.width * 2.5;
+            if (screenY < -canvas.height) star.y += canvas.height * 2.5;
+            if (screenY > canvas.height*2) star.y -= canvas.height * 2.5;
+            
+            ctx.globalAlpha = star.depth * 0.7;
+            ctx.fillRect(screenX, screenY, star.size, star.size);
+        });
+        ctx.restore();
+    }
+    
+    function drawLoginBackground() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#fff';
+        loginStars.forEach(star => {
+            star.alpha += star.twinkleSpeed;
+            if (star.alpha > 1 || star.alpha < 0.2) {
+                star.twinkleSpeed *= -1;
+            }
+            ctx.globalAlpha = star.alpha;
+            ctx.fillRect(star.x, star.y, star.size, star.size);
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    function drawGrid() {
+        ctx.strokeStyle = 'rgba(40, 45, 60, 0.5)';
+        ctx.lineWidth = 1;
+        const startX = Math.floor((camera.x - canvas.width / 2 / camera.zoom) / TILE_SIZE) * TILE_SIZE;
+        const startY = Math.floor((camera.y - canvas.height / 2 / camera.zoom) / TILE_SIZE) * TILE_SIZE;
+        const endX = Math.ceil((camera.x + canvas.width / 2 / camera.zoom) / TILE_SIZE) * TILE_SIZE;
+        const endY = Math.ceil((camera.y + canvas.height / 2 / camera.zoom) / TILE_SIZE) * TILE_SIZE;
+
+        ctx.beginPath();
+        for (let x = startX; x <= endX; x += TILE_SIZE) {
+            ctx.moveTo(x, startY);
+            ctx.lineTo(x, endY);
+        }
+        for (let y = startY; y <= endY; y += TILE_SIZE) {
+            ctx.moveTo(startX, y);
+            ctx.lineTo(endX, y);
+        }
+        ctx.stroke();
+    }
+    
+    function drawTechPattern(tX, tY) {
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.1)';
+        ctx.lineWidth = 1;
+        const size = TILE_SIZE / 2;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            ctx.lineTo(tX + size * Math.cos(i * Math.PI / 3), tY + size * Math.sin(i * Math.PI / 3));
+        }
+        ctx.closePath();
+        ctx.stroke();
+    }
+
+    function render() {
+        const myPlayer = gameState.players[myPlayerId];
+        
+        if (!isGameRunning) {
+            drawLoginBackground();
+            return;
+        }
+
+        if (!myPlayer) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawGameStars();
+
+        camera.x = myPlayer.x; camera.y = myPlayer.y;
+        
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
+        
+        drawGrid();
+
+        const b = { l: Math.floor((camera.x-canvas.width/2/camera.zoom)/TILE_SIZE)-1, r: Math.ceil((camera.x+canvas.width/2/camera.zoom)/TILE_SIZE)+1, t: Math.floor((camera.y-canvas.height/2/camera.zoom)/TILE_SIZE)-1, b: Math.ceil((camera.y+canvas.height/2/camera.zoom)/TILE_SIZE)+1, };
+        for (let y = b.t; y < b.b; y++) {
+            for (let x = b.l; x < b.r; x++) {
+                const tX = x * TILE_SIZE, tY = y * TILE_SIZE;
+                const tileId = getTile(tX, tY);
+                const tile = TILE_TYPES[tileId];
+
+                if (tileId === 15) {
+                    ctx.fillStyle = TILE_TYPES[10].c;
+                    ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = 'rgba(0, 240, 255, 0.15)';
+                    ctx.shadowColor = 'rgba(0, 240, 255, 0.5)';
+                    ctx.shadowBlur = 15;
+                    ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
+                    const scanLineY = tY + (Date.now() % 1500) / 1500 * TILE_SIZE;
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                    ctx.shadowColor = '#fff';
+                    ctx.shadowBlur = 10;
+                    ctx.fillRect(tX, scanLineY, TILE_SIZE, 2);
+                } else if (tile && tileId !== 1) { 
+                    if (tile.wc) {
+                        const floorTile = TILE_TYPES[tileId - 1] || TILE_TYPES[1];
+                        ctx.fillStyle = floorTile.c;
+                        ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
+                        ctx.fillStyle = tile.wc;
+                        ctx.shadowColor = tile.wc;
+                        ctx.shadowBlur = 10;
+                        ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
+                        ctx.shadowBlur = 0;
+                        ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(tX + 1, tY + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+                    } else {
+                        ctx.fillStyle = tile.c;
+                        ctx.shadowBlur = 0;
+                        ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
+                    }
+                    if (tileId === 10 || tileId === 13) {
+                         drawTechPattern(tX + TILE_SIZE / 2, tY + TILE_SIZE / 2);
+                    }
+                }
+            }
+        }
+        ctx.shadowBlur = 0;
+        
+        particles.forEach(p => { p.life -= 0.05; p.x += p.vx; p.y += p.vy; ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); }); particles = particles.filter(p => p.life > 0); ctx.globalAlpha = 1;
+        
+        canvas.style.cursor = 'crosshair';
+        canvas.oncontextmenu = showGroundContextMenu;
+
+        gameState.entities.forEach(e => { if (drawFunctions[e.type]) drawFunctions[e.type](e); });
+        for (const id in gameState.players) drawFunctions['Player'](gameState.players[id]);
+        
+        ctx.restore();
+        
+        if (!myPlayer.isDead) { 
+            drawUI(myPlayer); 
+            drawMinimap(myPlayer); 
+        }
+    }
+
+    function gameLoop() {
+        if (isGameRunning && myPlayerId && gameState.players[myPlayerId] && !isShopOpen && !isBankOpen && !isTrading) { 
+            const myPlayer = gameState.players[myPlayerId];
+            if (!myPlayer.isDead) {
+                const worldMouseX = (inputs.mouse.x - canvas.width / 2) / camera.zoom + myPlayer.x;
+                const worldMouseY = (inputs.mouse.y - canvas.height / 2) / camera.zoom + myPlayer.y;
+                const angle = Math.atan2(worldMouseY - myPlayer.y, worldMouseX - myPlayer.x);
+                sendToServer({ type: 'input', inputs, angle });
+            }
+        }
+        render();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function showLoginScreen() {
+        chatContainer.style.display = 'none';
+        loginContainer.style.display = 'block';
+        classSelectionPanel.style.display = 'none';
+        shipSelectionPanel.style.display = 'none';
+        rightUI.style.display = 'none';
+        leftUI.style.display = 'none';
+        deathScreen.style.display = 'none';
+        isGameRunning = false;
+        initLoginStars();
+    }
+    function showClassSelection() {
+        loginContainer.style.display = 'none';
+        shipSelectionPanel.style.display = 'none';
+        deathScreen.style.display = 'none';
+        classSelectionPanel.style.display = 'block';
+    }
+    function showShipSelection() {
+        classSelectionPanel.style.display = 'none';
+        shipSelectionPanel.style.display = 'block';
+    }
+    function showDeathScreen() {
+        deathScreen.style.display = 'block';
+        rightUI.style.display = 'none';
+        leftUI.style.display = 'none';
+        isGameRunning = false;
+        classSelectionPanel.style.display = 'none';
+        shipSelectionPanel.style.display = 'none';
+        closeAllPanels();
+    }
+    function chooseClass(className) {
+        chosenClassName = className;
+        showShipSelection();
+    }
+    function chooseColor(color) {
+        classSelectionPanel.style.display = 'none';
+        shipSelectionPanel.style.display = 'none';
+        deathScreen.style.display = 'none';
+        
+        rightUI.style.display = 'block';
+        leftUI.style.display = 'block';
+        chatContainer.style.display = 'block';
+        sendToServer({ type: 'playerInit', username: loggedInUser, color: color, className: chosenClassName });
+        isGameRunning = true;
+        Sound.startAmbient();
+    }
+    function handleRespawn() {
+        deathScreen.style.display = 'none';
+        sendToServer({type: 'playerRespawn'});
+        showClassSelection();
+    }
+    function handleLogin() { const u=document.getElementById('login-username').value, p=document.getElementById('login-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]&&users[u]===p){loggedInUser=u;showClassSelection()}else{e.textContent='Invalid username or password.'} }
+    function handleRegister() { const u=document.getElementById('register-username').value, p=document.getElementById('register-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} if(u.length<3){e.textContent='Username must be at least 3 characters.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]){e.textContent='Username already taken.'}else{users[u]=p;localStorage.setItem('galactic_os_users',JSON.stringify(users));loggedInUser=u;showClassSelection()} }
+    function toggleLoginRegister(showLogin) { document.getElementById('login-form').style.display=showLogin?'block':'none';document.getElementById('register-form').style.display=showLogin?'none':'block';document.getElementById('login-error').textContent=''; }
+
+    function drawUI(player) {
+        if (!player || !player.stats) return;
+        const abilityName = player.className === 'Operator' ? 'Invis' : (player.className === 'Guardian' ? 'Shield' : 'Blink');
+        hudInfo.innerHTML = `
+            <div class="hud-line"><strong>Data Bits:</strong> <span>${player.dataBits}</span></div>
+            <div class="hud-line"><strong>Ability:</strong> <span style="color: ${player.abilityCooldown > 0 ? '#777' : '#00f0ff'}">${player.abilityCooldown > 0 ? player.abilityCooldown.toFixed(1) + 's' : 'READY'}</span></div>
+            <div class="hud-line"><strong>Teleport:</strong> <span style="color: ${player.teleportCooldown > 0 ? '#777' : '#00f0ff'}">${player.teleportCooldown > 0 ? (player.teleportCooldown/60).toFixed(1) + 'm' : (player.isTeleporting ? `CHARGING...` : 'READY')}</span></div>
+            <div class="hud-bar"><div id="health-bar-fill" style="width: ${player.health / player.stats.maxHealth * 100}%;"></div></div>
+            <p style="text-align: center; font-size: 12px;">HP: ${Math.ceil(player.health)} / ${player.stats.maxHealth}</p>
+            <div class="hud-bar"><div id="energy-bar-fill" style="width: ${player.energy / player.stats.maxEnergy * 100}%;"></div></div>
+            <p style="text-align: center; font-size: 12px;">EN: ${Math.ceil(player.energy)} / ${player.stats.maxEnergy}</p>
+        `;
+
+        document.getElementById('xp-bar').style.width = `${(player.xp / player.xpToNextLevel) * 100}%`;
+        document.getElementById('coords').textContent = `X: ${Math.floor(player.x / TILE_SIZE)} Y: ${Math.floor(player.y / TILE_SIZE)}`;
+        updateInventoryAndEquipUI(player);
+    }
+    
+    function drawMinimap(player) {
+        const mapSize = 220, viewDist = 25 * TILE_SIZE;
+        minimapCtx.fillStyle = '#05060a';
+        minimapCtx.fillRect(0, 0, mapSize, mapSize);
+        const scale = mapSize / (viewDist * 2);
+
+        for(let y = -viewDist; y < viewDist; y += TILE_SIZE) {
+            for(let x = -viewDist; x < viewDist; x += TILE_SIZE) {
+                const tileId = getTile(player.x + x, player.y + y);
+                const tile = TILE_TYPES[tileId] || TILE_TYPES[1];
+                if(tile) {
+                    minimapCtx.fillStyle = tile.wc || tile.c;
+                    minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, Math.ceil(TILE_SIZE * scale) + 1, Math.ceil(TILE_SIZE * scale) + 1);
+                }
+            }
+        }
+        
+        for (const e of gameState.entities) {
+            const dX = e.x - player.x;
+            const dY = e.y - player.y;
+            if (Math.abs(dX) < viewDist && Math.abs(dY) < viewDist) {
+                let size = 3;
+                if (e.isBoss) size = 6;
+                else if (e.type === 'GravityWell') size = 4;
+                minimapCtx.fillStyle = e.color;
+                minimapCtx.fillRect(mapSize / 2 + dX * scale - size/2, mapSize / 2 + dY * scale - size/2, size, size);
+            }
+        }
+
+        for (const id in gameState.players) {
+            if (id === myPlayerId) continue;
+            const p = gameState.players[id];
+            const dX = p.x - player.x;
+            const dY = p.y - player.y;
+            if (Math.abs(dX) < viewDist && Math.abs(dY) < viewDist) {
+                minimapCtx.fillStyle = p.color;
+                minimapCtx.beginPath();
+                minimapCtx.arc(mapSize / 2 + dX * scale, mapSize / 2 + dY * scale, 3, 0, Math.PI * 2);
+                minimapCtx.fill();
+            }
+        }
+        
+        minimapCtx.fillStyle = player.color || '#00ff00';
+        minimapCtx.fillRect(mapSize/2 - 2, mapSize/2 - 2, 4, 4);
+    }
+
+    function updateInventoryAndEquipUI(player) {
+        for(const slot in player.equipment) {
+            const el = document.getElementById(`equip-${slot}`);
+            const slotContainer = document.getElementById(`equip-slot-${slot}`);
+            const item = player.equipment[slot];
+            slotContainer.oncontextmenu = (e) => showItemContextMenu(e, 'equipment', slot, item);
+            if(item) {
+                el.textContent = item.name;
+                el.style.color = TIER_COLORS[item.tier];
+                slotContainer.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
+            } else {
+                el.textContent = 'None';
+                el.style.color = '#777';
+                slotContainer.title = '';
+            }
+        }
+        const grid = document.getElementById('inventory-grid');
+        grid.innerHTML = '';
+        player.inventory.forEach((item, index) => {
+            const slot = document.createElement('div');
+            slot.className = 'inventory-slot';
+            slot.oncontextmenu = (e) => showItemContextMenu(e, 'inventory', index, item);
+            if(item) {
+                slot.style.borderColor = TIER_COLORS[item.tier];
+                slot.textContent = item.name;
+                slot.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
+            }
+            grid.appendChild(slot);
+        });
+    }
+
+    function showItemContextMenu(event, source, index, item) {
+        event.preventDefault();
+        if (!item) return;
+        hideAllContextMenus();
+        itemContextMenu.innerHTML = '';
+
+        if (source === 'inventory') {
+            itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'equipItem', itemIndex: ${index} }); hideAllContextMenus();">Equip</li>`;
+            if (isBankOpen) {
+                const myPlayer = gameState.players[myPlayerId];
+                const allSimilarItems = myPlayer.inventory.filter(i => i && i.id === item.id);
+                
+                itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: ${index}, amount: 1}); hideAllContextMenus();">Deposit-1</li>`;
+                if (allSimilarItems.length > 1) {
+                    itemContextMenu.innerHTML += `<li onclick="showXPrompt('Deposit How Many?', ${allSimilarItems.length}, (amt) => sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: ${index}, amount: amt})); hideAllContextMenus();">Deposit-X</li>`;
+                }
+                itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: ${index}, amount: 'all'}); hideAllContextMenus();">Deposit-All</li>`;
+            }
+            if (isTrading) {
+                itemContextMenu.innerHTML += `<li onclick="offerTradeItem(${index}); hideAllContextMenus();">Offer</li>`;
+            }
+        } else if (source === 'equipment') {
+            itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'unequipItem', slot: '${index}' }); hideAllContextMenus();">Unequip</li>`;
+        } else if (source === 'bank') {
+            const bankItemData = currentBankData[index];
+            if (bankItemData && bankItemData.item) {
+                 itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'withdraw', itemIndex: ${index}, amount: 1}); hideAllContextMenus();">Withdraw-1</li>`;
+                if (bankItemData.quantity > 1) {
+                    itemContextMenu.innerHTML += `<li onclick="showXPrompt('Withdraw How Many?', ${bankItemData.quantity}, (amt) => sendToServer({ type: 'bankAction', action: 'withdraw', itemIndex: ${index}, amount: amt})); hideAllContextMenus();">Withdraw-X</li>`;
+                    itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'withdraw', itemIndex: ${index}, amount: 'all'}); hideAllContextMenus();">Withdraw-All</li>`;
+                }
+            }
+        } else if (source === 'trade') {
+            itemContextMenu.innerHTML += `<li onclick="removeTradeItem(${index}); hideAllContextMenus();">Remove</li>`;
+        }
+
+        itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'dropItem', source: '${source}', index: '${index}' }); hideAllContextMenus();">Drop</li>`;
+
+        itemContextMenu.style.display = 'block';
+        itemContextMenu.style.left = `${event.clientX}px`;
+        itemContextMenu.style.top = `${event.clientY}px`;
+    }
+
+    function showGroundContextMenu(event) {
+        event.preventDefault();
+        hideAllContextMenus();
+        const worldMouseX = (event.clientX - canvas.width / 2) / camera.zoom + camera.x;
+        const worldMouseY = (event.clientY - canvas.height / 2) / camera.zoom + camera.y;
+        const pickupRadius = 40;
+        const itemsToShow = gameState.entities.filter(e => (e.type === 'EquipmentDrop' || e.type === 'PlayerLootBag') && e.pickupDelay <= 0 && Math.hypot(e.x - worldMouseX, e.y - worldMouseY) < pickupRadius);
+        groundContextMenu.innerHTML = '';
+        if (itemsToShow.length > 0) {
+            itemsToShow.forEach(itemEntity => {
+                if (itemEntity.type === 'PlayerLootBag') {
+                    if (itemEntity.bits > 0) {
+                        const bitsLi = document.createElement('li');
+                        bitsLi.innerHTML = `Pickup <span style="color: ${TIER_COLORS[6]}">${itemEntity.bits} Data Bits</span>`;
+                        bitsLi.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: 'bits'}); Sound.playPickup(); hideAllContextMenus(); };
+                        groundContextMenu.appendChild(bitsLi);
+                    }
+                    itemEntity.items.forEach((item, index) => {
+                        if (!item) return;
+                        const li = document.createElement('li');
+                        li.innerHTML = `Pickup <span style="color:${TIER_COLORS[item.tier]}">${item.name}</span>`;
+                        li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: index}); Sound.playPickup(); hideAllContextMenus(); };
+                        groundContextMenu.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    li.innerHTML = `Pickup <span style="color:${TIER_COLORS[itemEntity.item.tier]}">${itemEntity.item.name}</span>`;
+                    li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id}); Sound.playPickup(); hideAllContextMenus(); };
+                    groundContextMenu.appendChild(li);
+                }
+            });
+            groundContextMenu.style.display = 'block';
+            groundContextMenu.style.left = `${event.clientX}px`;
+            groundContextMenu.style.top = `${event.clientY}px`;
+        }
+    }
+
+    function showPlayerContextMenu(event, player) {
+        event.preventDefault();
+        if (!player || player.id === myPlayerId) return;
+        hideAllContextMenus();
+        
+        playerContextMenu.innerHTML = `
+            <li onclick="sendToServer({ type: 'tradeRequest', targetId: '${player.id}' }); hideAllContextMenus();">Trade ${player.username}</li>
+            <li onclick="sendToServer({ type: 'partyInvite', targetId: '${player.id}' }); hideAllContextMenus();">Invite ${player.username}</li>
+        `;
+        
+        playerContextMenu.style.display = 'block';
+        playerContextMenu.style.left = `${event.clientX}px`;
+        playerContextMenu.style.top = `${event.clientY}px`;
+    }
+
+    function hideAllContextMenus() {
+        itemContextMenu.style.display = 'none';
+        groundContextMenu.style.display = 'none';
+        playerContextMenu.style.display = 'none';
+    }
+
+    function closeAllPanels() {
+        closeShop();
+        closeBank();
+        closeTradeWindow();
+        xPromptContainer.style.display = 'none';
+        partyInvitePopup.style.display = 'none';
+        tradeRequestPopup.style.display = 'none';
+    }
+
+    function openShop(npcName, npcInventory, marketListings) {
+        closeAllPanels();
+        isShopOpen = true;
+        currentShopName = npcName;
+        shopContainer.style.display = 'block';
+        document.getElementById('shop-tab-npc').onclick = () => showShopTab('npc', { npcInventory, marketListings });
+        document.getElementById('shop-tab-market').onclick = () => showShopTab('market', { npcInventory, marketListings });
+        document.getElementById('market-list-btn').onclick = listMarketItem;
+        showShopTab('npc', { npcInventory, marketListings });
+    }
+    function closeShop() {
+        isShopOpen = false;
+        shopContainer.style.display = 'none';
+        currentShopName = null;
+    }
+
+    function openBank(bankData) {
+        closeAllPanels();
+        isBankOpen = true;
+        currentBankData = bankData; 
+        bankContainer.style.display = 'block';
+        updateBankView(bankData);
+    }
+    function closeBank() {
+        isBankOpen = false;
+        bankContainer.style.display = 'none';
+        currentBankData = [];
+    }
+    
+    function openTradeWindow(partnerData) {
+        closeAllPanels();
+        isTrading = true;
+        tradeContainer.style.display = 'block';
+        document.getElementById('trade-header').textContent = `Trading with ${partnerData.username}`;
+        document.getElementById('other-player-trade-name').textContent = `${partnerData.username}'s OFFER`;
+        document.getElementById('trade-accept-btn').disabled = false;
+        document.getElementById('trade-accept-btn').textContent = 'ACCEPT';
+        document.getElementById('trade-status').textContent = '';
+        
+        document.getElementById('trade-cancel-btn').onclick = () => sendToServer({ type: 'tradeCancel' });
+        document.getElementById('trade-accept-btn').onclick = () => {
+            document.getElementById('trade-status').textContent = 'Waiting for partner...';
+            sendToServer({ type: 'tradeAccept' });
+        };
+        document.getElementById('my-trade-bits').onchange = updateMyTradeOffer;
+        document.getElementById('my-trade-bits').onkeyup = updateMyTradeOffer;
+
+        renderMyTradeOffer();
+        updateOtherTradeOffer({ offer: [], offerBits: 0 });
+    }
+    function closeTradeWindow() {
+        isTrading = false;
+        tradeContainer.style.display = 'none';
+        currentTradeData = { myOfferItems: [], myOfferBits: 0 };
+        document.getElementById('my-trade-bits').value = '';
+    }
+    function offerTradeItem(inventoryIndex) {
+        const myPlayer = gameState.players[myPlayerId];
+        const item = myPlayer.inventory[inventoryIndex];
+        if (item && !currentTradeData.myOfferItems.some(i => i.originalIndex === inventoryIndex)) {
+            currentTradeData.myOfferItems.push({ item: { ...item }, originalIndex: inventoryIndex });
+            renderMyTradeOffer();
+            updateMyTradeOffer();
+        }
+    }
+    function removeTradeItem(offerIndex) {
+        currentTradeData.myOfferItems.splice(offerIndex, 1);
         renderMyTradeOffer();
         updateMyTradeOffer();
     }
-}
-function removeTradeItem(offerIndex) {
-    currentTradeData.myOfferItems.splice(offerIndex, 1);
-    renderMyTradeOffer();
-    updateMyTradeOffer();
-}
-function updateMyTradeOffer() {
-    const bits = parseInt(document.getElementById('my-trade-bits').value, 10) || 0;
-    currentTradeData.myOfferBits = bits;
-    sendToServer({ type: 'tradeUpdate', offerItems: currentTradeData.myOfferItems, offerBits: bits });
-    document.getElementById('trade-accept-btn').textContent = 'ACCEPT';
-    document.getElementById('trade-status').textContent = '';
-}
-function updateOtherTradeOffer(partnerTradeData) {
-    if (!isTrading) return;
-    const grid = document.getElementById('other-trade-grid');
-    grid.innerHTML = '';
-    partnerTradeData.offer.forEach(offerItem => {
-        const slot = document.createElement('div');
-        slot.className = 'trade-slot';
-        slot.style.borderColor = TIER_COLORS[offerItem.item.tier];
-        slot.textContent = offerItem.item.name;
-        slot.title = `${offerItem.item.name}\n` + Object.entries(offerItem.item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
-        grid.appendChild(slot);
-    });
-    document.getElementById('other-trade-bits').textContent = `${partnerTradeData.offerBits} Data Bits`;
-    document.getElementById('trade-accept-btn').textContent = 'ACCEPT';
-    document.getElementById('trade-status').textContent = '';
-}
-function renderMyTradeOffer() {
-    if (!isTrading) return;
-    const myPlayer = gameState.players[myPlayerId];
-    const grid = document.getElementById('my-trade-grid');
-    grid.innerHTML = '';
-    currentTradeData.myOfferItems.forEach((offerItem, index) => {
-        const slot = document.createElement('div');
-        slot.className = 'trade-slot';
-        slot.style.borderColor = TIER_COLORS[offerItem.item.tier];
-        slot.textContent = offerItem.item.name;
-        slot.title = `${offerItem.item.name}\n` + Object.entries(offerItem.item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
-        slot.oncontextmenu = (e) => showItemContextMenu(e, 'trade', index, offerItem.item);
-        grid.appendChild(slot);
-    });
-    myPlayer.inventory.forEach((item, index) => {
-        const slot = document.querySelector(`#inventory-grid .inventory-slot:nth-child(${index + 1})`);
-        if (slot) {
-            if (currentTradeData.myOfferItems.some(i => i.originalIndex === index)) {
-                slot.classList.add('offered');
-            } else {
-                slot.classList.remove('offered');
+    function updateMyTradeOffer() {
+        const bits = parseInt(document.getElementById('my-trade-bits').value, 10) || 0;
+        currentTradeData.myOfferBits = bits;
+        sendToServer({ type: 'tradeUpdate', offerItems: currentTradeData.myOfferItems, offerBits: bits });
+        document.getElementById('trade-accept-btn').textContent = 'ACCEPT';
+        document.getElementById('trade-status').textContent = '';
+    }
+    function updateOtherTradeOffer(partnerTradeData) {
+        if (!isTrading) return;
+        const grid = document.getElementById('other-trade-grid');
+        grid.innerHTML = '';
+        partnerTradeData.offer.forEach(offerItem => {
+            const slot = document.createElement('div');
+            slot.className = 'trade-slot';
+            slot.style.borderColor = TIER_COLORS[offerItem.item.tier];
+            slot.textContent = offerItem.item.name;
+            slot.title = `${offerItem.item.name}\n` + Object.entries(offerItem.item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
+            grid.appendChild(slot);
+        });
+        document.getElementById('other-trade-bits').textContent = `${partnerTradeData.offerBits} Data Bits`;
+        document.getElementById('trade-accept-btn').textContent = 'ACCEPT';
+        document.getElementById('trade-status').textContent = '';
+    }
+    function renderMyTradeOffer() {
+        if (!isTrading) return;
+        const myPlayer = gameState.players[myPlayerId];
+        const grid = document.getElementById('my-trade-grid');
+        grid.innerHTML = '';
+        currentTradeData.myOfferItems.forEach((offerItem, index) => {
+            const slot = document.createElement('div');
+            slot.className = 'trade-slot';
+            slot.style.borderColor = TIER_COLORS[offerItem.item.tier];
+            slot.textContent = offerItem.item.name;
+            slot.title = `${offerItem.item.name}\n` + Object.entries(offerItem.item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
+            slot.oncontextmenu = (e) => showItemContextMenu(e, 'trade', index, offerItem.item);
+            grid.appendChild(slot);
+        });
+        myPlayer.inventory.forEach((item, index) => {
+            const slot = document.querySelector(`#inventory-grid .inventory-slot:nth-child(${index + 1})`);
+            if (slot) {
+                if (currentTradeData.myOfferItems.some(i => i.originalIndex === index)) {
+                    slot.classList.add('offered');
+                } else {
+                    slot.classList.remove('offered');
+                }
             }
-        }
-    });
-}
+        });
+    }
 
-function updateBankView(bankData) {
-    const grid = document.getElementById('bank-grid');
-    grid.innerHTML = '';
-    bankData.forEach((stack, index) => {
-        const slot = document.createElement('div');
-        slot.className = 'bank-slot';
-        if (stack && stack.item) {
-            const { item, quantity } = stack;
-            slot.oncontextmenu = (e) => showItemContextMenu(e, 'bank', index, item);
-            slot.style.borderColor = TIER_COLORS[item.tier];
-            slot.textContent = item.name;
-            slot.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
-            if (quantity > 1) {
-                const quantityDisplay = document.createElement('span');
-                quantityDisplay.className = 'item-quantity';
-                quantityDisplay.textContent = quantity;
-                slot.appendChild(quantityDisplay);
+    function updateBankView(bankData) {
+        const grid = document.getElementById('bank-grid');
+        grid.innerHTML = '';
+        bankData.forEach((stack, index) => {
+            const slot = document.createElement('div');
+            slot.className = 'bank-slot';
+            if (stack && stack.item) {
+                const { item, quantity } = stack;
+                slot.oncontextmenu = (e) => showItemContextMenu(e, 'bank', index, item);
+                slot.style.borderColor = TIER_COLORS[item.tier];
+                slot.textContent = item.name;
+                slot.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
+                if (quantity > 1) {
+                    const quantityDisplay = document.createElement('span');
+                    quantityDisplay.className = 'item-quantity';
+                    quantityDisplay.textContent = quantity;
+                    slot.appendChild(quantityDisplay);
+                }
             }
-        }
-        grid.appendChild(slot);
-    });
-}
-
-function showXPrompt(title, max, callback) {
-    hideAllContextMenus();
-    _promptCallback = callback;
-    document.getElementById('prompt-title').textContent = title;
-    const input = document.getElementById('prompt-input');
-    input.value = '1';
-    input.max = max;
-    input.focus();
-    xPromptContainer.style.display = 'block';
-}
-
-function showShopTab(tab, data) {
-    document.getElementById('npc-trade-content').classList.toggle('active', tab === 'npc');
-    document.getElementById('market-content').classList.toggle('active', tab === 'market');
-    document.getElementById('shop-tab-npc').classList.toggle('active', tab === 'npc');
-    document.getElementById('shop-tab-market').classList.toggle('active', tab === 'market');
-    if(tab === 'npc') updateNpcTradeView(data.npcInventory); 
-    else if(tab === 'market') updateMarketView(data.marketListings); 
-}
-
-function updateNpcTradeView(npcInventory) {
-    const buyGrid = document.getElementById('npc-buy-grid');
-    const sellGrid = document.getElementById('npc-sell-grid');
-    const myPlayer = gameState.players[myPlayerId];
-    if(!myPlayer) return;
-    buyGrid.innerHTML = '';
-    sellGrid.innerHTML = '';
-
-    npcInventory.forEach((shopItem, index) => {
-        const div = document.createElement('div');
-        div.className = 'shop-item';
-        div.innerHTML = `<span class="shop-item-name" style="color:${TIER_COLORS[shopItem.item.tier]}">${shopItem.item.name}</span> <span>${shopItem.cost} bits</span> <button class="shop-item-buy">BUY</button>`;
-        const btn = div.querySelector('button');
-        btn.onclick = () => sendToServer({type: 'buyNpcItem', shopName: currentShopName, itemIndex: index});
-        btn.disabled = myPlayer.dataBits < shopItem.cost;
-        buyGrid.appendChild(div);
-    });
-
-    myPlayer.inventory.forEach((item, index) => {
-        if(!item) return;
-        const sellPrice = Math.floor(getItemBaseValue(item) / 3);
-        const div = document.createElement('div');
-        div.className = 'shop-item';
-        div.innerHTML = `<span class="shop-item-name" style="color:${TIER_COLORS[item.tier]}">${item.name}</span> <span>${sellPrice} bits</span> <button class="shop-item-sell">SELL</button>`;
-        const btn = div.querySelector('.shop-item-sell');
-        btn.onclick = () => {
-            sendToServer({type: 'sellItem', itemIndex: index});
-            btn.textContent = 'SOLD';
-            btn.disabled = true;
-        };
-        sellGrid.appendChild(div);
-    });
-}
-
-function updateMarketView(marketListings) {
-    const buyGrid = document.getElementById('market-buy-grid');
-    const itemSelect = document.getElementById('market-item-select');
-    const myPlayer = gameState.players[myPlayerId];
-    if(!myPlayer) return;
-    buyGrid.innerHTML = '';
-    itemSelect.innerHTML = '';
-
-    for(const id in marketListings) {
-        const listing = marketListings[id];
-        const div = document.createElement('div');
-        div.className = 'market-item';
-        div.innerHTML = `<span class="market-item-name" style="color:${TIER_COLORS[listing.item.tier]}">${listing.item.name}</span><span>${listing.seller}</span><span>${listing.price} bits</span><button>BUY</button>`;
-        const btn = div.querySelector('button');
-        btn.onclick = () => sendToServer({type: 'marketAction', action: 'buy', listingId: id});
-        btn.disabled = myPlayer.dataBits < listing.price || myPlayer.username === listing.seller;
-        buyGrid.appendChild(div);
-    }
-    myPlayer.inventory.forEach((item, index) => {
-        if(item) {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = item.name;
-            itemSelect.appendChild(option);
-        }
-    });
-}
-
-function updatePartyUI(partyMembers) {
-    const partyList = document.getElementById('party-members-list');
-    if (!partyMembers || partyMembers.length <= 1) { // Hide if only you are in the party
-        partyPanel.style.display = 'none';
-        document.getElementById('leave-party-btn').style.display = 'none';
-        return;
-    }
-
-    partyPanel.style.display = 'block';
-    document.getElementById('leave-party-btn').style.display = 'block';
-    partyList.innerHTML = '';
-
-    partyMembers.forEach(member => {
-        if (member.id === myPlayerId) return; // Don't show myself in the party list
-        const memberDiv = document.createElement('div');
-        memberDiv.className = 'party-member';
-        memberDiv.innerHTML = `
-            <div class="party-member-name">[Lvl ${member.level}] ${member.username}</div>
-            <div class="party-member-health-bar">
-                <div class="party-member-health-fill" style="width: ${member.health / member.maxHealth * 100}%;"></div>
-            </div>
-        `;
-        partyList.appendChild(memberDiv);
-    });
-}
-
-
-function listMarketItem() {
-    const itemIndex = document.getElementById('market-item-select').value;
-    const price = document.getElementById('market-price-input').value;
-    if(itemIndex !== '' && price > 0) {
-        sendToServer({type: 'marketAction', action: 'list', itemIndex: parseInt(itemIndex), price: parseInt(price)});
-        document.getElementById('market-price-input').value = '';
-    }
-}
-
-function getItemBaseValue(item) {
-    if (!item) return 0;
-    return (item.tier * item.tier) * 20;
-}
-
-chatInput.addEventListener('focus', () => { isChatting = true; });
-chatInput.addEventListener('blur', () => { isChatting = false; });
-function addChatMessage(data) {
-    const li = document.createElement('li');
-    li.innerHTML = `<strong style="color:${data.color || '#00f0ff'};">[${data.sender}]</strong>: ${data.message}`;
-    chatLog.appendChild(li);
-    chatLog.scrollTop = chatLog.scrollHeight;
-}
-
-document.getElementById('login-password').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') handleLogin();
-});
-
-document.getElementById('prompt-ok').addEventListener('click', () => {
-    const input = document.getElementById('prompt-input');
-    const value = parseInt(input.value, 10);
-    const max = parseInt(input.max, 10);
-    if (_promptCallback && value > 0 && value <= max) {
-        _promptCallback(value);
-    }
-    _promptCallback = null;
-    xPromptContainer.style.display = 'none';
-});
-
-document.getElementById('prompt-cancel').addEventListener('click', () => {
-    _promptCallback = null;
-    xPromptContainer.style.display = 'none';
-});
-
-document.getElementById('party-invite-accept').addEventListener('click', () => {
-    if (currentPartyInvite) {
-        sendToServer({ type: 'partyResponse', accepted: true, inviterId: currentPartyInvite.fromId });
-        currentPartyInvite = null;
-        partyInvitePopup.style.display = 'none';
-    }
-});
-
-document.getElementById('party-invite-decline').addEventListener('click', () => {
-    if (currentPartyInvite) {
-        sendToServer({ type: 'partyResponse', accepted: false, inviterId: currentPartyInvite.fromId });
-        currentPartyInvite = null;
-        partyInvitePopup.style.display = 'none';
-    }
-});
-
-document.getElementById('trade-request-accept').addEventListener('click', () => {
-    if (currentTradeRequest) {
-        sendToServer({ type: 'tradeResponse', accepted: true, requesterId: currentTradeRequest.fromId });
-        currentTradeRequest = null;
-        tradeRequestPopup.style.display = 'none';
-    }
-});
-
-document.getElementById('trade-request-decline').addEventListener('click', () => {
-    if (currentTradeRequest) {
-        sendToServer({ type: 'tradeResponse', accepted: false, requesterId: currentTradeRequest.fromId });
-        currentTradeRequest = null;
-        tradeRequestPopup.style.display = 'none';
-    }
-});
-
-document.getElementById('leave-party-btn').addEventListener('click', () => {
-    sendToServer({ type: 'leaveParty' });
-});
-
-document.getElementById('chat-tab-all').addEventListener('click', () => {
-    chatChannel = 'all';
-    document.getElementById('chat-tab-all').classList.add('active');
-    document.getElementById('chat-tab-party').classList.remove('active');
-});
-
-document.getElementById('chat-tab-party').addEventListener('click', () => {
-    chatChannel = 'party';
-    document.getElementById('chat-tab-all').classList.remove('active');
-    document.getElementById('chat-tab-party').classList.add('active');
-});
-
-
-document.addEventListener('keydown', e => {
-    if (isChatting) {
-        if (e.key === 'Enter') {
-            const msg = chatInput.value.trim();
-            if (msg) sendToServer({ type: 'chat', message: msg, channel: chatChannel });
-            chatInput.value = '';
-            chatInput.blur();
-        }
-        return;
+            grid.appendChild(slot);
+        });
     }
     
-    if (e.key === 'Escape') {
-        closeAllPanels();
+    function showXPrompt(title, max, callback) {
         hideAllContextMenus();
-        return;
+        _promptCallback = callback;
+        document.getElementById('prompt-title').textContent = title;
+        const input = document.getElementById('prompt-input');
+        input.value = '1';
+        input.max = max;
+        input.focus();
+        xPromptContainer.style.display = 'block';
     }
 
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        chatInput.focus();
-        return;
+    function showShopTab(tab, data) {
+        document.getElementById('npc-trade-content').classList.toggle('active', tab === 'npc');
+        document.getElementById('market-content').classList.toggle('active', tab === 'market');
+        document.getElementById('shop-tab-npc').classList.toggle('active', tab === 'npc');
+        document.getElementById('shop-tab-market').classList.toggle('active', tab === 'market');
+        if(tab === 'npc') updateNpcTradeView(data.npcInventory); 
+        else if(tab === 'market') updateMarketView(data.marketListings); 
     }
-    
-    if (isShopOpen || isBankOpen || isTrading || xPromptContainer.style.display === 'block' || partyInvitePopup.style.display === 'block') return;
 
-    const key = e.key.toLowerCase();
-    
-    if (key === 'e') {
-        if (!inputs.e) {
-            sendToServer({ type: 'interact' });
-            inputs.e = true; 
+    function updateNpcTradeView(npcInventory) {
+        const buyGrid = document.getElementById('npc-buy-grid');
+        const sellGrid = document.getElementById('npc-sell-grid');
+        const myPlayer = gameState.players[myPlayerId];
+        if(!myPlayer) return;
+        buyGrid.innerHTML = '';
+        sellGrid.innerHTML = '';
+
+        npcInventory.forEach((shopItem, index) => {
+            const div = document.createElement('div');
+            div.className = 'shop-item';
+            div.innerHTML = `<span class="shop-item-name" style="color:${TIER_COLORS[shopItem.item.tier]}">${shopItem.item.name}</span> <span>${shopItem.cost} bits</span> <button class="shop-item-buy">BUY</button>`;
+            const btn = div.querySelector('button');
+            btn.onclick = () => sendToServer({type: 'buyNpcItem', shopName: currentShopName, itemIndex: index});
+            btn.disabled = myPlayer.dataBits < shopItem.cost;
+            buyGrid.appendChild(div);
+        });
+
+        myPlayer.inventory.forEach((item, index) => {
+            if(!item) return;
+            const sellPrice = Math.floor(getItemBaseValue(item) / 3);
+            const div = document.createElement('div');
+            div.className = 'shop-item';
+            div.innerHTML = `<span class="shop-item-name" style="color:${TIER_COLORS[item.tier]}">${item.name}</span> <span>${sellPrice} bits</span> <button class="shop-item-sell">SELL</button>`;
+            const btn = div.querySelector('.shop-item-sell');
+            btn.onclick = () => {
+                sendToServer({type: 'sellItem', itemIndex: index});
+                btn.textContent = 'SOLD';
+                btn.disabled = true;
+            };
+            sellGrid.appendChild(div);
+        });
+    }
+
+    function updateMarketView(marketListings) {
+        const buyGrid = document.getElementById('market-buy-grid');
+        const itemSelect = document.getElementById('market-item-select');
+        const myPlayer = gameState.players[myPlayerId];
+        if(!myPlayer) return;
+        buyGrid.innerHTML = '';
+        itemSelect.innerHTML = '';
+
+        for(const id in marketListings) {
+            const listing = marketListings[id];
+            const div = document.createElement('div');
+            div.className = 'market-item';
+            div.innerHTML = `<span class="market-item-name" style="color:${TIER_COLORS[listing.item.tier]}">${listing.item.name}</span><span>${listing.seller}</span><span>${listing.price} bits</span><button>BUY</button>`;
+            const btn = div.querySelector('button');
+            btn.onclick = () => sendToServer({type: 'marketAction', action: 'buy', listingId: id});
+            btn.disabled = myPlayer.dataBits < listing.price || myPlayer.username === listing.seller;
+            buyGrid.appendChild(div);
         }
-        return;
+        myPlayer.inventory.forEach((item, index) => {
+            if(item) {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = item.name;
+                itemSelect.appendChild(option);
+            }
+        });
+    }
+    
+    function updatePartyUI(partyMembers) {
+        const partyList = document.getElementById('party-members-list');
+        if (!partyMembers || partyMembers.length <= 1) { 
+            partyPanel.style.display = 'none';
+            document.getElementById('leave-party-btn').style.display = 'none';
+            return;
+        }
+
+        partyPanel.style.display = 'block';
+        document.getElementById('leave-party-btn').style.display = 'block';
+        partyList.innerHTML = '';
+
+        partyMembers.forEach(member => {
+            if (member.id === myPlayerId) return; 
+            const memberDiv = document.createElement('div');
+            memberDiv.className = 'party-member';
+            memberDiv.innerHTML = `
+                <div class="party-member-name">[Lvl ${member.level}] ${member.username}</div>
+                <div class="party-member-health-bar">
+                    <div class="party-member-health-fill" style="width: ${member.health / member.maxHealth * 100}%;"></div>
+                </div>
+            `;
+            partyList.appendChild(memberDiv);
+        });
     }
 
-    if (key === 'shift') {
-        if (!inputs.shift) Sound.startBoost();
-        inputs.shift = true;
-    } else if (e.code === 'Space') {
-        inputs.space = true;
-    } else if (inputs.hasOwnProperty(key)) {
-        inputs[key] = true;
-    }
-});
 
-document.addEventListener('keyup', e => {
-    const key = e.key.toLowerCase();
-    if (key === 'e') {
-        inputs.e = false;
+    function listMarketItem() {
+        const itemIndex = document.getElementById('market-item-select').value;
+        const price = document.getElementById('market-price-input').value;
+        if(itemIndex !== '' && price > 0) {
+            sendToServer({type: 'marketAction', action: 'list', itemIndex: parseInt(itemIndex), price: parseInt(price)});
+            document.getElementById('market-price-input').value = '';
+        }
     }
-    if (key === 'shift') {
-        Sound.stopBoost();
-        inputs.shift = false;
-    } else if (e.code === 'Space') {
-        inputs.space = false;
-    } else if (inputs.hasOwnProperty(key)) {
-        inputs[key] = false;
-    }
-});
 
-window.addEventListener('resize', () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    function getItemBaseValue(item) {
+        if (!item) return 0;
+        return (item.tier * item.tier) * 20;
+    }
+
+    chatInput.addEventListener('focus', () => { isChatting = true; });
+    chatInput.addEventListener('blur', () => { isChatting = false; });
+    function addChatMessage(data) {
+        const li = document.createElement('li');
+        li.innerHTML = `<strong style="color:${data.color || '#00f0ff'};">[${data.sender}]</strong>: ${data.message}`;
+        chatLog.appendChild(li);
+        chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    document.getElementById('login-password').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleLogin();
+    });
+
+    document.getElementById('prompt-ok').addEventListener('click', () => {
+        const input = document.getElementById('prompt-input');
+        const value = parseInt(input.value, 10);
+        const max = parseInt(input.max, 10);
+        if (_promptCallback && value > 0 && value <= max) {
+            _promptCallback(value);
+        }
+        _promptCallback = null;
+        xPromptContainer.style.display = 'none';
+    });
+    
+    document.getElementById('prompt-cancel').addEventListener('click', () => {
+        _promptCallback = null;
+        xPromptContainer.style.display = 'none';
+    });
+    
+    document.getElementById('party-invite-accept').addEventListener('click', () => {
+        if (currentPartyInvite) {
+            sendToServer({ type: 'partyResponse', accepted: true, inviterId: currentPartyInvite.fromId });
+            currentPartyInvite = null;
+            partyInvitePopup.style.display = 'none';
+        }
+    });
+
+    document.getElementById('party-invite-decline').addEventListener('click', () => {
+        if (currentPartyInvite) {
+            sendToServer({ type: 'partyResponse', accepted: false, inviterId: currentPartyInvite.fromId });
+            currentPartyInvite = null;
+            partyInvitePopup.style.display = 'none';
+        }
+    });
+
+    document.getElementById('trade-request-accept').addEventListener('click', () => {
+        if (currentTradeRequest) {
+            sendToServer({ type: 'tradeResponse', accepted: true, requesterId: currentTradeRequest.fromId });
+            currentTradeRequest = null;
+            tradeRequestPopup.style.display = 'none';
+        }
+    });
+
+    document.getElementById('trade-request-decline').addEventListener('click', () => {
+        if (currentTradeRequest) {
+            sendToServer({ type: 'tradeResponse', accepted: false, requesterId: currentTradeRequest.fromId });
+            currentTradeRequest = null;
+            tradeRequestPopup.style.display = 'none';
+        }
+    });
+    
+    document.getElementById('leave-party-btn').addEventListener('click', () => {
+        sendToServer({ type: 'leaveParty' });
+    });
+    
+    document.getElementById('chat-tab-all').addEventListener('click', () => {
+        chatChannel = 'all';
+        document.getElementById('chat-tab-all').classList.add('active');
+        document.getElementById('chat-tab-party').classList.remove('active');
+    });
+    
+    document.getElementById('chat-tab-party').addEventListener('click', () => {
+        chatChannel = 'party';
+        document.getElementById('chat-tab-all').classList.remove('active');
+        document.getElementById('chat-tab-party').classList.add('active');
+    });
+
+
+    document.addEventListener('keydown', e => {
+        if (isChatting) {
+            if (e.key === 'Enter') {
+                const msg = chatInput.value.trim();
+                if (msg) sendToServer({ type: 'chat', message: msg, channel: chatChannel });
+                chatInput.value = '';
+                chatInput.blur();
+            }
+            return;
+        }
+        
+        if (e.key === 'Escape') {
+            closeAllPanels();
+            hideAllContextMenus();
+            return;
+        }
+
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            chatInput.focus();
+            return;
+        }
+        
+        if (isShopOpen || isBankOpen || isTrading || xPromptContainer.style.display === 'block' || partyInvitePopup.style.display === 'block') return;
+
+        const key = e.key.toLowerCase();
+        
+        if (key === 'e') {
+            if (!inputs.e) {
+                sendToServer({ type: 'interact' });
+                inputs.e = true; 
+            }
+            return;
+        }
+
+        if (key === 'shift') {
+            if (!inputs.shift) Sound.startBoost();
+            inputs.shift = true;
+        } else if (e.code === 'Space') {
+            inputs.space = true;
+        } else if (inputs.hasOwnProperty(key)) {
+            inputs[key] = true;
+        }
+    });
+
+    document.addEventListener('keyup', e => {
+        const key = e.key.toLowerCase();
+        if (key === 'e') {
+            inputs.e = false;
+        }
+        if (key === 'shift') {
+            Sound.stopBoost();
+            inputs.shift = false;
+        } else if (e.code === 'Space') {
+            inputs.space = false;
+        } else if (inputs.hasOwnProperty(key)) {
+            inputs[key] = false;
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        initGameStars();
+        initLoginStars();
+    });
+
+    canvas.addEventListener('mousemove', e => {
+        inputs.mouse.x = e.clientX;
+        inputs.mouse.y = e.clientY;
+    });
+
+    window.addEventListener('mousedown', (e) => {
+        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('.chat-tab')) {
+            return;
+        }
+        if(e.target.closest('.ui-panel, .context-menu')) return;
+        if(e.button === 0) {
+            inputs.mouse.down = true;
+        }
+        hideAllContextMenus();
+    });
+
+    window.addEventListener('mouseup', (e) => {
+        if(e.button === 0) inputs.mouse.down = false;
+    });
+
+    canvas.addEventListener('contextmenu', e => {
+        e.preventDefault();
+    });
+
+
+    showLoginScreen();
     initGameStars();
-    initLoginStars();
-});
-
-canvas.addEventListener('mousemove', e => {
-    inputs.mouse.x = e.clientX;
-    inputs.mouse.y = e.clientY;
-});
-
-window.addEventListener('mousedown', (e) => {
-    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('.chat-tab')) {
-        return;
-    }
-    if(e.target.closest('.ui-panel, .context-menu')) return;
-    if(e.button === 0) {
-        inputs.mouse.down = true;
-    }
-    hideAllContextMenus();
-});
-
-window.addEventListener('mouseup', (e) => {
-    if(e.button === 0) inputs.mouse.down = false;
-});
-
-canvas.addEventListener('contextmenu', e => {
-    e.preventDefault();
-});
-
-
-showLoginScreen();
-initGameStars();
-gameLoop();
+    gameLoop();
+</script>
+</body>
+</html>
