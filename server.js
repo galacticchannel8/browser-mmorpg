@@ -31,10 +31,10 @@ const players = {};
 let entities = [];
 const TILE_SIZE = 40;
 const CHUNK_SIZE = 16;
-const MAX_ENEMIES = 225; // UPDATED: Increased mob cap
+const MAX_ENEMIES = 225;
 const ENEMY_SPAWN_INTERVAL = 1;
-const DESPAWN_RADIUS = 2500; // NEW: Radius outside which enemies are candidates for despawning
-const DESPAWN_TIME = 60; // NEW: Time in seconds an enemy must be outside the radius to despawn
+const DESPAWN_RADIUS = 2500;
+const DESPAWN_TIME = 60;
 let enemySpawnTimer = ENEMY_SPAWN_INTERVAL;
 let lastTime = Date.now();
 const bossRespawnTimers = {};
@@ -53,7 +53,7 @@ function loadData(filename) {
     } catch (err) {
         console.error(`Error loading ${filename}:`, err);
     }
-    return {}; // Return empty object if file doesn't exist or is invalid
+    return {};
 }
 
 function saveData(filename, data) {
@@ -70,7 +70,27 @@ const Perlin=function(t){this.seed=t||Math.random();const r=new Uint8Array(512);
 const MAP_SEED = 'galactic_os_final_frontier';
 const perlin = new Perlin(MAP_SEED), biomeNoise = new Perlin(MAP_SEED + '_biomes');
 const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'}, 15:{n:'D', c:'#00f0ff'} };
-const cityData = [[11,11,11,11,11,11,11,15,15,11,11,11,11,11,11,11],[11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],[11,10,11,11,11,10,11,11,11,11,10,11,11,11,10,11],[11,10,11,10,10,10,10,10,10,10,10,10,10,11,10,11],[11,10,11,10,11,11,11,11,11,11,11,10,11,11,10,11],[15,10,10,10,11,10,10,10,10,10,10,10,11,10,10,15],[15,10,10,10,11,10,11,10,10,11,10,11,11,10,10,15],[11,10,11,10,11,10,10,10,10,10,10,10,11,10,10,11],[11,10,11,10,10,10,11,11,11,11,10,10,11,10,10,11],[11,10,11,11,11,10,10,10,10,10,10,11,11,11,10,11],[11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],[11,11,11,11,11,11,11,15,15,11,11,11,11,11,11,11]];
+
+// --- MODIFIED: New city layout with an open center ---
+const cityData = [
+    [11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],
+    [11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],
+    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
+    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
+    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
+    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
+    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
+    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
+    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
+    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
+    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
+    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
+    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
+    [11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],
+    [11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],
+    [11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],
+];
+
 const CITY_SPAWN_POINT = { x: 8 * TILE_SIZE, y: 8 * TILE_SIZE };
 const BOSS_LOCATIONS = { DREADNOUGHT: {x: 150*TILE_SIZE, y: 150*TILE_SIZE}, SERPENT: {x: -150*TILE_SIZE, y: -150*TILE_SIZE}, ORACLE: {x: 0, y: 300*TILE_SIZE}, VOID_HUNTER: {x: 300*TILE_SIZE, y: 0} };
 const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
@@ -315,7 +335,7 @@ class Player {
     fireMelee() {
         if (this.trade.partnerId || this.isTeleporting) return;
         this.meleeCooldown = 0.8;
-        const meleeDamage = this.stats.damage * 1.5; // Buffed from 1.2
+        const meleeDamage = this.stats.damage * 1.5;
         entities.push(new MeleeSlash(this.x, this.y, this.angle, this.id, meleeDamage, this.color));
     }
 
@@ -372,7 +392,7 @@ class Player {
         this.equipment = { Weapon: null, Module: null, Plating: null, Utility: null };
         this.inventory = Array(12).fill(null);
         this.dataBits = 0;
-        this.level = 1; // Permadeath
+        this.level = 1;
         this.xp = 0;
         this.xpToNextLevel = this.calculateXpToNextLevel();
         this.recalculateStats();
@@ -393,31 +413,50 @@ class Player {
 
     attemptInteraction() {
         if (this.isTeleporting) return;
-        const lootRadius = 80;
-        const closestLootBag = entities.find(e => e.type === 'PlayerLootBag' && e.pickupDelay <= 0 && Math.hypot(e.x - this.x, e.y - this.y) < lootRadius);
-        if (closestLootBag) {
-            if (closestLootBag.bits > 0) { this.dataBits += closestLootBag.bits; closestLootBag.bits = 0; }
-            closestLootBag.items.forEach((item, index) => { if (item && this.addToInventory(item)) { closestLootBag.items[index] = null; } });
-            return;
-        }
+        const interactRadius = 80;
 
         for(const entity of entities) {
-            if(entity instanceof NPC && Math.hypot(this.x - entity.x, this.y - entity.y) < 50) {
-                const playerSocket = getSocketByPlayerId(this.id);
-                if (playerSocket) {
-                    if (entity.name === "Bank") {
-                        if (!banks[this.username]) banks[this.username] = Array(12).fill(null);
-                        playerSocket.send(JSON.stringify({type: 'openBank', bank: banks[this.username]}));
-                    } else {
-                         playerSocket.send(JSON.stringify({type: 'openShop', npcName: entity.name, inventory: shopInventories[entity.name], marketListings: marketListings }));
+            if(Math.hypot(this.x - entity.x, this.y - entity.y) < interactRadius) {
+                if (entity instanceof Hospital) {
+                    if (this.health < this.stats.maxHealth) {
+                        this.health = this.stats.maxHealth;
+                        entities.push(new FloatingText(this.x, this.y + this.radius, `+HP`, '#33ff99'));
                     }
+                    return;
                 }
-                return;
+                if (entity instanceof AdminPanel) {
+                    if (this.username === "GalacticChannel8") { // CHANGE YOUR ADMIN NAME HERE
+                        const playerSocket = getSocketByPlayerId(this.id);
+                        if (playerSocket) playerSocket.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Admin Panel Authenticated.', color: '#ff3355'}));
+                    }
+                    return;
+                }
+                if (entity instanceof Portal) {
+                     const playerSocket = getSocketByPlayerId(this.id);
+                     if (playerSocket) playerSocket.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Teleportation System [OFFLINE].', color: '#f07cff'}));
+                    return;
+                }
+                if (entity instanceof NPC) {
+                    const playerSocket = getSocketByPlayerId(this.id);
+                    if (playerSocket) {
+                        if (entity.name === "Bank") {
+                            if (!banks[this.username]) banks[this.username] = Array(12).fill(null);
+                            playerSocket.send(JSON.stringify({type: 'openBank', bank: banks[this.username]}));
+                        } else {
+                            playerSocket.send(JSON.stringify({type: 'openShop', npcName: entity.name, inventory: shopInventories[entity.name], marketListings: marketListings }));
+                        }
+                    }
+                    return;
+                }
+                if (entity.type === 'PlayerLootBag' && entity.pickupDelay <= 0) {
+                    if (entity.bits > 0) { this.dataBits += entity.bits; entity.bits = 0; }
+                    entity.items.forEach((item, index) => { if (item && this.addToInventory(item)) { entity.items[index] = null; } });
+                    return;
+                }
             }
         }
 
-        const pickupRadius = 60;
-        const closestItem = entities.filter(e => (e.type === 'EquipmentDrop') && e.pickupDelay <= 0 && Math.hypot(e.x - this.x, e.y - this.y) < pickupRadius)
+        const closestItem = entities.filter(e => (e.type === 'EquipmentDrop') && e.pickupDelay <= 0 && Math.hypot(e.x - this.x, e.y - this.y) < interactRadius)
             .sort((a,b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y))[0];
         if(closestItem) {
             if(this.addToInventory(closestItem.item)) closestItem.isDead = true;
@@ -461,6 +500,8 @@ class Spectre extends Player {
         }
     }
 }
+
+// ... CONTINUATION OF SCRIPT ...
 
 // --- ENTITY & ENEMY CLASSES (SERVER-SIDE) ---
 class Entity { constructor(x, y, type) { this.id = `${type}_${Date.now()}_${Math.random()}`; this.x = x; this.y = y; this.type = type; } update(dt) {} getData() { const data = {}; for(const key in this) { if (typeof this[key] !== 'function' && key !== 'owner' && key !== 'head' && key !== 'segments') data[key] = this[key]; } return data; } }
@@ -741,10 +782,6 @@ class SerpentHead extends WorldBoss {
         const damageMultiplier = bodyAlive ? 0.1 : 1.0;
         super.takeDamage(amount * damageMultiplier, damager);
     }
-    // --- MODIFICATION: Removed the getData override ---
-    // This function was sending a duplicate, non-updated 'segments' array to the client,
-    // causing a "ghost" of the body to appear at the spawn point. The body segments are
-    // already handled as separate entities in the main game loop, so this is not needed.
 }
 class SerpentBody extends Enemy {
     constructor(x, y, head) {
@@ -864,6 +901,9 @@ class Laser extends Entity { constructor(x,y,p,l){ super(x,y,'Laser'); this.owne
 class Grenade extends Projectile { constructor(x,y,p,rad) { super(x,y,p,0.8,8); this.type='Grenade'; this.speed=10; this.explosionRadius = rad; } update(dt) { super.update(dt); if(this.life <= 0) { this.isDead = true; entities.push(new Shockwave(this.x, this.y, this.explosionRadius, this.damage, this.ownerId)); } } }
 class Shockwave extends Entity { constructor(x,y,mR,d,ownerId){ super(x,y,'Shockwave'); this.ownerId=ownerId; this.radius=0; this.maxRadius=mR; this.damage=d; this.life=0.5; this.hitTargets=[]; } update(dt){ this.radius += this.maxRadius * 3 * dt; this.life -= dt; if(this.life <= 0) this.isDead = true; } }
 class NPC extends Entity { constructor(x, y, name, color = '#8a2be2') { super(x, y, 'NPC'); this.name = name; this.radius = 10; this.color = color; } }
+class Hospital extends Entity { constructor(x, y) { super(x, y, 'Hospital'); this.name = 'Hospital'; this.radius = 12; this.color = '#ffffff'; } }
+class AdminPanel extends Entity { constructor(x, y) { super(x, y, 'AdminPanel'); this.name = 'Admin'; this.radius = 10; this.color = '#1a1a1a'; } }
+class Portal extends Entity { constructor(x, y) { super(x, y, 'Portal'); this.name = 'Portal'; this.radius = 25; } }
 class LootDrop extends Entity { constructor(x,y,v){ super(x + Math.random()*20-10, y + Math.random()*20-10, 'LootDrop'); this.value=v*5; this.radius=5; this.color='#ffff00'; this.life=60; } update(dt){ this.life-=dt; if (this.life <= 0) this.isDead=true; } }
 class EquipmentDrop extends Entity { constructor(x, y, item) { super(x + Math.random()*20-10, y+Math.random()*20-10, 'EquipmentDrop'); this.item = item; this.radius = 8; this.color = TIER_COLORS[item.tier] || '#fff'; this.life = 60; this.pickupDelay = 0.5; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0) this.isDead = true; } }
 class PlayerLootBag extends Entity { constructor(x, y, items, bits, color) { super(x, y, 'PlayerLootBag'); this.item = { color: color }; this.items = items; this.bits = bits; this.life = 180; this.pickupDelay = 3; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0 || (this.bits <= 0 && this.items.every(i => i === null))) this.isDead = true; } }
@@ -888,9 +928,15 @@ class Tombstone extends Entity {
 
 // --- INITIALIZE WORLD ---
 function initializeWorld() {
-    entities.push(new NPC(6.5 * TILE_SIZE, 3.5 * TILE_SIZE, 'Exchange'));
-    entities.push(new NPC(8.5 * TILE_SIZE, 3.5 * TILE_SIZE, 'Bank', '#e3d400'));
-    generateChunk(0, 0);
+    entities = []; // Clear existing entities
+    // Spawn new NPCs in the corners
+    entities.push(new Exchange(2.5 * TILE_SIZE, 2.5 * TILE_SIZE));
+    entities.push(new Bank(13.5 * TILE_SIZE, 2.5 * TILE_SIZE));
+    entities.push(new Hospital(2.5 * TILE_SIZE, 13.5 * TILE_SIZE));
+    entities.push(new AdminPanel(13.5 * TILE_SIZE, 13.5 * TILE_SIZE));
+    entities.push(new Portal(CITY_SPAWN_POINT.x, CITY_SPAWN_POINT.y));
+
+    generateChunk(0, 0); // Generate the city chunk
     const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter };
     for(const bossName in BOSS_LOCATIONS) {
         const loc = BOSS_LOCATIONS[bossName];
