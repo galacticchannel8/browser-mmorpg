@@ -225,6 +225,15 @@ All Rights Reserved.
     let gameStars = [];
     let loginStars = [];
 
+    // --- MODIFIED: Added a helper function to convert hex colors to RGBA for transparency ---
+    function hexToRgba(hex, alpha) {
+        if (!hex || hex.length < 7) hex = '#ffffff'; // Default to white if color is invalid
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
     function initGameStars() {
         gameStars = [];
         for (let i = 0; i < 500; i++) {
@@ -379,7 +388,17 @@ All Rights Reserved.
                 const y = p.y + Math.sin(angle) * (r - 2);
                 particles.push({x: x, y: y, vx: 0, vy: 0, life: 1, size: Math.random() * 3 + 2, color: p.color});
             }
-            if(p.shieldActive){ctx.fillStyle=`rgba(51, 255, 153, 0.4)`; ctx.beginPath(); ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2); ctx.fill();}
+            // --- MODIFIED: Guardian shield now uses player color and has a glow effect ---
+            if(p.shieldActive){
+                ctx.save();
+                ctx.fillStyle = hexToRgba(p.color, 0.25);
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 25;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
             if (p.id !== myPlayerId && p.health < p.stats.maxHealth) {
                 const barW = 40, barH = 5, barX = p.x - barW / 2, barY = p.y - r - 15;
                 ctx.fillStyle = 'rgba(255, 51, 85, 0.7)'; ctx.fillRect(barX, barY, barW, barH);
@@ -456,10 +475,9 @@ All Rights Reserved.
             ctx.fill();
             ctx.restore();
             drawBossHealthbar(e);
-            // SERVER-SIDE NOTE: The 'segments' array needs to have its x/y coordinates
-            // continuously updated on the server to follow the head for this to render correctly.
-            // The client-side code below correctly draws segments at their given x/y.
-            e.segments.forEach(seg => drawFunctions['SerpentBody'](seg));
+            // --- MODIFIED: Removed segment drawing from the head.
+            // The body segments are now drawn as their own separate entities from the main game state,
+            // which fixes the bug where the body would get stuck at the spawn point.
         },
         'SerpentBody': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.shadowColor = e.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-e.radius-10; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
         'TheOracle': (e) => {
@@ -476,7 +494,6 @@ All Rights Reserved.
             ctx.closePath();
             ctx.stroke();
 
-            // --- MODIFIED: Added inner texture ---
             // Inner transparent fill
             ctx.fillStyle = e.color;
             ctx.globalAlpha = 0.15;
@@ -495,7 +512,6 @@ All Rights Reserved.
             for(let i=0; i<6; i++) ctx.lineTo(innerRadius * Math.cos(i*2*Math.PI/6), innerRadius * Math.sin(i*2*Math.PI/6));
             ctx.closePath();
             ctx.stroke();
-            // --- END MODIFICATION ---
 
             ctx.restore();
             drawBossHealthbar(e);
@@ -546,19 +562,16 @@ All Rights Reserved.
             ctx.fill();
             ctx.stroke();
             
-            // --- MODIFIED: Functional Loot Orb ---
-            // Check if the associated loot bag still exists in the game state.
             const lootBagExists = gameState.entities.some(e => e.id === t.lootBagId);
             if (lootBagExists) {
-                // Draw the pulsating loot orb.
                 ctx.save();
-                const pulse = 0.8 + Math.sin(Date.now() / 200) * 0.2; // Pulsating size
-                ctx.globalAlpha *= (0.8 + Math.sin(Date.now() / 200) * 0.2); // Pulsating alpha
+                const pulse = 0.8 + Math.sin(Date.now() / 200) * 0.2;
+                ctx.globalAlpha *= (0.8 + Math.sin(Date.now() / 200) * 0.2);
                 ctx.fillStyle = t.playerColor;
                 ctx.shadowColor = t.playerColor;
                 ctx.shadowBlur = 25 * pulse;
                 ctx.beginPath();
-                ctx.arc(0, 5, 6 * pulse, 0, Math.PI * 2); // Orb positioned in the middle of wreckage
+                ctx.arc(0, 5, 6 * pulse, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.restore();
             }
@@ -680,9 +693,8 @@ All Rights Reserved.
                 const tileId = getTile(tX, tY);
                 const tile = TILE_TYPES[tileId];
 
-                // --- MODIFIED: Wall and Door Rendering ---
-                if (tileId === 15) { // Draw animated energy door
-                    ctx.fillStyle = TILE_TYPES[10].c; // Floor underneath
+                if (tileId === 15) {
+                    ctx.fillStyle = TILE_TYPES[10].c;
                     ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
                     ctx.fillStyle = 'rgba(0, 240, 255, 0.15)';
                     ctx.shadowColor = 'rgba(0, 240, 255, 0.5)';
@@ -694,7 +706,7 @@ All Rights Reserved.
                     ctx.shadowBlur = 10;
                     ctx.fillRect(tX, scanLineY, TILE_SIZE, 2);
                 } else if (tile && tileId !== 1) { 
-                    if (tile.wc) { // Draw detailed wall
+                    if (tile.wc) {
                         const floorTile = TILE_TYPES[tileId - 1] || TILE_TYPES[1];
                         ctx.fillStyle = floorTile.c;
                         ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
@@ -706,7 +718,7 @@ All Rights Reserved.
                         ctx.strokeStyle = 'rgba(0,0,0,0.4)';
                         ctx.lineWidth = 2;
                         ctx.strokeRect(tX + 1, tY + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-                    } else { // Draw normal floor
+                    } else {
                         ctx.fillStyle = tile.c;
                         ctx.shadowBlur = 0;
                         ctx.fillRect(tX, tY, TILE_SIZE, TILE_SIZE);
@@ -775,7 +787,6 @@ All Rights Reserved.
         rightUI.style.display = 'none';
         leftUI.style.display = 'none';
         isGameRunning = false;
-        // FIX: Ensure other modals are closed when death screen appears.
         classSelectionPanel.style.display = 'none';
         shipSelectionPanel.style.display = 'none';
         closeAllPanels();
@@ -785,7 +796,6 @@ All Rights Reserved.
         showShipSelection();
     }
     function chooseColor(color) {
-        // FIX: Explicitly hide all selection panels to prevent them from reappearing.
         classSelectionPanel.style.display = 'none';
         shipSelectionPanel.style.display = 'none';
         deathScreen.style.display = 'none';

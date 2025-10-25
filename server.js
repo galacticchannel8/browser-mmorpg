@@ -341,31 +341,26 @@ class Player {
         }
         this.isDead = true;
 
-        // --- MODIFIED: Cause of Death Logic ---
-        // This logic is now more specific and provides the exact killer's name.
         let causeOfDeath = 'The Void';
         if (killer) {
             if (killer.ownerId && players[killer.ownerId]) {
-                causeOfDeath = players[killer.ownerId].username; // Player's name
+                causeOfDeath = players[killer.ownerId].username;
             } else if (killer.bossName) {
-                causeOfDeath = killer.bossName; // Boss name, e.g., "DREADNOUGHT"
+                causeOfDeath = killer.bossName;
             } else if (killer.type) {
-                // Formats the enemy type for readability, e.g., "VoidSwarmer" -> "Void Swarmer"
                 causeOfDeath = killer.type.replace(/([A-Z])/g, ' $1').trim();
             }
         }
 
-        // --- MODIFIED: Link Tombstone to Loot Bag ---
         let lootBagId = null;
         const droppedItems = [...Object.values(this.equipment), ...this.inventory].filter(item => item !== null);
         const droppedBits = Math.floor(this.dataBits * 0.8);
         if(droppedItems.length > 0 || droppedBits > 0) {
             const lootBag = new PlayerLootBag(this.x, this.y, droppedItems, droppedBits, this.color);
             entities.push(lootBag);
-            lootBagId = lootBag.id; // Get the ID of the new loot bag.
+            lootBagId = lootBag.id;
         }
         
-        // Create Tombstone and pass the lootBagId to it.
         entities.push(new Tombstone(this.x, this.y, this.username, causeOfDeath, this.color, lootBagId));
         
         const playerSocket = getSocketByPlayerId(this.id);
@@ -478,7 +473,7 @@ class Enemy extends Entity {
         this.color = '#ff3355'; this.aggroRadius = 350; this.deAggroRadius = this.aggroRadius * 1.5;
         this.wanderTarget = null; this.wanderTimer = 0;
         this.xpValue = 15 * threatLevel;
-        this.timeOutsidePlayerRange = 0; // NEW: Timer for despawning
+        this.timeOutsidePlayerRange = 0;
         this.applyThreatLevel();
     }
     applyThreatLevel() { this.health = this.maxHealth = this.health * (1 + (this.threatLevel-1)*0.6); this.damageMultiplier = 1 + (this.threatLevel-1)*0.4; }
@@ -715,13 +710,9 @@ class SerpentHead extends WorldBoss {
     update(dt) {
         let targetPlayer=null; for(const pid in players){const p=players[pid]; if(!p.isDead && !p.isTeleporting && Math.hypot(p.x-this.x,p.y-this.y) < this.aggroRadius){targetPlayer=p; break;}} if(!targetPlayer) return;
         
-        // --- MODIFICATION: Explicit head movement ---
-        // Instead of relying on the generic Enemy.update(), we define the head's movement
-        // directly to ensure it moves and the body has something to follow.
         const dX = targetPlayer.x - this.x;
         const dY = targetPlayer.y - this.y;
         const distToPlayer = Math.hypot(dX, dY);
-        // Move towards the player but try to keep some distance
         if (distToPlayer > 300 && !isCity(this.x, this.y)) {
             const timeAdjustedSpeed = this.speed * (dt * 60);
             const nX = this.x + (dX / distToPlayer) * timeAdjustedSpeed;
@@ -729,7 +720,6 @@ class SerpentHead extends WorldBoss {
             if (!isSolid(getTile(nX, this.y))) this.x = nX;
             if (!isSolid(getTile(this.x, nY))) this.y = nY;
         }
-        // --- END MODIFICATION ---
 
         this.attackTimer -= dt;
         if(this.attackTimer <= 0) {
@@ -738,7 +728,6 @@ class SerpentHead extends WorldBoss {
             entities.push(new Projectile(this.x, this.y, proj, 1.2, 8));
         }
 
-        // Update body segments to follow the leader
         let leader = this;
         this.segments.forEach(seg => {
             if (!seg.isDead) {
@@ -752,11 +741,10 @@ class SerpentHead extends WorldBoss {
         const damageMultiplier = bodyAlive ? 0.1 : 1.0;
         super.takeDamage(amount * damageMultiplier, damager);
     }
-    getData() {
-        const data = super.getData();
-        data.segments = this.segments.map(seg => seg.getData());
-        return data;
-    }
+    // --- MODIFICATION: Removed the getData override ---
+    // This function was sending a duplicate, non-updated 'segments' array to the client,
+    // causing a "ghost" of the body to appear at the spawn point. The body segments are
+    // already handled as separate entities in the main game loop, so this is not needed.
 }
 class SerpentBody extends Enemy {
     constructor(x, y, head) {
@@ -773,9 +761,6 @@ class SerpentBody extends Enemy {
         const dist = Math.hypot(dX, dY);
         const targetDist = this.radius + leader.radius - 15;
         if(dist > targetDist) {
-            // --- MODIFICATION: Increased follow speed ---
-            // The follow speed must be faster than the head's speed for the body to keep up.
-            // Increased from 10 to 12.
             const timeAdjustedSpeed = 12 * (dt * 60);
             this.x += (dX / dist) * timeAdjustedSpeed;
             this.y += (dY / dist) * timeAdjustedSpeed;
@@ -883,15 +868,14 @@ class LootDrop extends Entity { constructor(x,y,v){ super(x + Math.random()*20-1
 class EquipmentDrop extends Entity { constructor(x, y, item) { super(x + Math.random()*20-10, y+Math.random()*20-10, 'EquipmentDrop'); this.item = item; this.radius = 8; this.color = TIER_COLORS[item.tier] || '#fff'; this.life = 60; this.pickupDelay = 0.5; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0) this.isDead = true; } }
 class PlayerLootBag extends Entity { constructor(x, y, items, bits, color) { super(x, y, 'PlayerLootBag'); this.item = { color: color }; this.items = items; this.bits = bits; this.life = 180; this.pickupDelay = 3; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0 || (this.bits <= 0 && this.items.every(i => i === null))) this.isDead = true; } }
 class FloatingText extends Entity { constructor(x, y, text, color = '#ff8888') { super(x, y, 'floatingText'); this.text = text; this.color = color; this.life = 1; } update(dt) { this.y -= 20 * dt; this.life -= dt; if (this.life <= 0) this.isDead = true; } }
-// MODIFIED: Tombstone now accepts a lootBagId to link it to the player's dropped items.
 class Tombstone extends Entity {
     constructor(x, y, playerName, causeOfDeath, playerColor, lootBagId = null) {
         super(x, y, 'Tombstone');
         this.playerName = playerName;
         this.causeOfDeath = causeOfDeath;
         this.playerColor = playerColor;
-        this.lootBagId = lootBagId; // Store the ID of the associated loot bag.
-        this.life = 180; // Despawns after 3 minutes
+        this.lootBagId = lootBagId;
+        this.life = 180;
     }
     update(dt) {
         this.life -= dt;
