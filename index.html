@@ -30,7 +30,7 @@ All Rights Reserved.
         .login-form input, #x-prompt-container input { width: calc(100% - 20px); background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 10px; margin-bottom: 10px; font-family: inherit; }
         .login-form button, #death-screen button, .trade-button, .prompt-button, .popup-button { background: #00f0ff; color: #05060a; border: none; padding: 10px 15px; cursor: pointer; font-family: inherit; font-weight: bold; width: 100%; }
         .login-form button:hover, #death-screen button:hover, .trade-button:hover, .prompt-button:hover, .popup-button:hover { background: #fff; }
-        .login-form button:disabled, .trade-button:disabled, .prompt-button:disabled, .popup-button:disabled { background: #555; cursor: default; }
+        .login-form button:disabled, .trade-button:disabled, .prompt-button:disabled, .popup-button:disabled, .shop-item-sell:disabled { background: #555; cursor: default; }
         #prompt-buttons, #party-invite-buttons { display: flex; gap: 10px; margin-top: 10px; }
         #login-error { color: #ff3355; margin-top: 10px; height: 20px; }
         .login-toggle { color: #00f0ff; cursor: pointer; text-decoration: underline; margin-top: 15px; }
@@ -372,14 +372,11 @@ All Rights Reserved.
         'Player': (p) => {
             if (p.isDead) return;
             
-            // --- GAMEBREAKER FIX: Restructured drawing order to make player visible ---
-            // --- and positioned health bar correctly above the name ---
             const r = p.radius || 15;
-
+            
             ctx.save();
             if (p.isInvisible) { ctx.globalAlpha = 0.3; }
             
-            // Draw ship model first
             ctx.translate(p.x, p.y);
             ctx.rotate(p.angle);
             ctx.fillStyle = p.color;
@@ -393,7 +390,6 @@ All Rights Reserved.
             ctx.fill();
             ctx.restore(); 
 
-            // Draw UI elements on top, without rotation
             ctx.save();
             ctx.translate(p.x, p.y);
             if (p.id !== myPlayerId && p.health < p.stats.maxHealth) {
@@ -412,7 +408,15 @@ All Rights Reserved.
             ctx.fillText(`[Lvl ${p.level}] ${p.username}`, 0, -r - 15);
             ctx.restore();
 
-            // Draw other effects
+            if (p.id !== myPlayerId) {
+                const screenX = (p.x - camera.x) * camera.zoom + canvas.width / 2;
+                const screenY = (p.y - camera.y) * camera.zoom + canvas.height / 2;
+                if (Math.hypot(inputs.mouse.x - screenX, inputs.mouse.y - screenY) < r) {
+                    canvas.style.cursor = 'pointer';
+                    canvas.oncontextmenu = (e) => showPlayerContextMenu(e, p);
+                }
+            }
+
             if (p.isBoosting && p.id === myPlayerId) {
                 const angle = p.angle + Math.PI + (Math.random() - 0.5) * 0.5;
                 const x = p.x + Math.cos(angle) * (r - 2);
@@ -544,9 +548,7 @@ All Rights Reserved.
             ctx.translate(n.x, n.y);
             ctx.shadowColor = n.color;
             ctx.shadowBlur = 10;
-            ctx.fillStyle = n.color;
             
-            // --- RESTORED: Draw unique icon based on name ---
             if (n.name === 'Bank') {
                 ctx.fillStyle = '#e3d400';
                 ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
@@ -569,6 +571,7 @@ All Rights Reserved.
                 ctx.moveTo(-n.radius*0.6, n.radius*0.3); ctx.lineTo(-n.radius*0.4, n.radius*0.1);
                 ctx.stroke();
             } else {
+                 ctx.fillStyle = n.color;
                  ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
             }
             
@@ -610,7 +613,6 @@ All Rights Reserved.
             ctx.fillStyle = n.color; // Dark Red
             ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
             
-            // --- RESTORED: Draw console icon ---
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 14px "Consolas",monospace';
             ctx.textAlign = 'left';
@@ -831,7 +833,9 @@ All Rights Reserved.
         
         particles.forEach(p => { p.life -= 0.05; p.x += p.vx; p.y += p.vy; ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); }); particles = particles.filter(p => p.life > 0); ctx.globalAlpha = 1;
         
+        // --- DEFINITIVE FIX for Right-Click ---
         canvas.style.cursor = 'crosshair';
+        canvas.oncontextmenu = showGroundContextMenu;
 
         gameState.entities.forEach(e => { if (drawFunctions[e.type]) drawFunctions[e.type](e); });
         for (const id in gameState.players) drawFunctions['Player'](gameState.players[id]);
@@ -1051,6 +1055,7 @@ All Rights Reserved.
     }
 
     function showGroundContextMenu(event) {
+        event.preventDefault();
         hideAllContextMenus();
         const worldMouseX = (event.clientX - canvas.width / 2) / camera.zoom + camera.x;
         const worldMouseY = (event.clientY - canvas.height / 2) / camera.zoom + camera.y;
@@ -1087,6 +1092,7 @@ All Rights Reserved.
     }
 
     function showPlayerContextMenu(event, player) {
+        event.preventDefault();
         if (!player || player.id === myPlayerId) return;
         hideAllContextMenus();
         
@@ -1301,7 +1307,12 @@ All Rights Reserved.
             const div = document.createElement('div');
             div.className = 'shop-item';
             div.innerHTML = `<span class="shop-item-name" style="color:${TIER_COLORS[item.tier]}">${item.name}</span> <span>${sellPrice} bits</span> <button class="shop-item-sell">SELL</button>`;
-            div.querySelector('button').onclick = () => sendToServer({type: 'sellItem', itemIndex: index});
+            const btn = div.querySelector('.shop-item-sell');
+            btn.onclick = () => {
+                sendToServer({type: 'sellItem', itemIndex: index});
+                btn.textContent = 'SOLD';
+                btn.disabled = true;
+            };
             sellGrid.appendChild(div);
         });
     }
@@ -1407,6 +1418,7 @@ All Rights Reserved.
         
         if (e.key === 'Escape') {
             closeAllPanels();
+            hideAllContextMenus();
             return;
         }
 
@@ -1419,6 +1431,15 @@ All Rights Reserved.
         if (isShopOpen || isBankOpen || isTrading || xPromptContainer.style.display === 'block' || partyInvitePopup.style.display === 'block') return;
 
         const key = e.key.toLowerCase();
+        
+        if (key === 'e') {
+            if (!inputs.e) { // Only fire on the first press
+                sendToServer({ type: 'interact' });
+                inputs.e = true; 
+            }
+            return;
+        }
+
         if (e.code === 'Space') {
             inputs.space = true;
         } else if (inputs.hasOwnProperty(key)) {
@@ -1428,6 +1449,9 @@ All Rights Reserved.
 
     document.addEventListener('keyup', e => {
         const key = e.key.toLowerCase();
+        if (key === 'e') {
+            inputs.e = false; // Reset on keyup
+        }
         if (e.code === 'Space') {
             inputs.space = false;
         } else if (inputs.hasOwnProperty(key)) {
@@ -1457,28 +1481,11 @@ All Rights Reserved.
         if(e.button === 0) inputs.mouse.down = false;
     });
 
+    // This listener is now just a fallback for the render-loop based one
     canvas.addEventListener('contextmenu', e => {
         e.preventDefault();
-        if (!isGameRunning || !myPlayerId) return;
-
-        const myPlayer = gameState.players[myPlayerId];
-        if (!myPlayer) return;
-
-        const worldMouseX = (e.clientX - canvas.width / 2) / camera.zoom + camera.x;
-        const worldMouseY = (e.clientY - canvas.height / 2) / camera.zoom + camera.y;
-
-        // --- FIXED: Prioritize player context menu over ground loot menu ---
-        for (const id in gameState.players) {
-            if (id === myPlayerId) continue;
-            const p = gameState.players[id];
-            if (Math.hypot(p.x - worldMouseX, p.y - worldMouseY) < p.radius) {
-                showPlayerContextMenu(e, p);
-                return; // Stop further processing
-            }
-        }
-        
-        showGroundContextMenu(e);
     });
+
 
     showLoginScreen();
     initGameStars();
