@@ -11,7 +11,7 @@ All Rights Reserved.
     <style>
         body, html { background-color: #05060a; color: #00f0ff; font-family: 'Consolas', 'Monaco', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; user-select: none; }
         #gameCanvas { background-color: #05060a; cursor: crosshair; }
-        #chat-container { display: none; /* UPDATED: Hidden by default */ position: fixed; bottom: 20px; left: 20px; width: 400px; background-color: rgba(5, 6, 10, 0.7); border: 1px solid #00f0ff; border-radius: 5px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; z-index: 10; }
+        #chat-container { display: none; position: fixed; bottom: 20px; left: 20px; width: 400px; background-color: rgba(5, 6, 10, 0.7); border: 1px solid #00f0ff; border-radius: 5px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; z-index: 10; }
         #chat-log { height: 150px; padding: 10px; overflow-y: scroll; font-size: 14px; list-style: none; margin: 0; }
         #chat-log::-webkit-scrollbar { width: 4px; } #chat-log::-webkit-scrollbar-thumb { background: #00f0ff; }
         #chat-input { width: 100%; border: none; border-top: 1px solid #00f0ff; background-color: #05060a; color: #fff; padding: 8px; font-family: 'Consolas', 'Monaco', monospace; box-sizing: border-box; }
@@ -109,6 +109,7 @@ All Rights Reserved.
 
 <body>
     <canvas id="gameCanvas"></canvas>
+    <!-- UPDATED: Added bank context menu -->
     <ul id="item-context-menu" class="context-menu"></ul>
     <ul id="bank-context-menu" class="context-menu"></ul>
     <ul id="ground-item-context-menu" class="context-menu"></ul>
@@ -245,8 +246,7 @@ All Rights Reserved.
     const groundContextMenu = document.getElementById('ground-item-context-menu');
     const playerContextMenu = document.getElementById('player-context-menu');
 
-    // UPDATED: Force secure WebSocket for Render deployment
-    const protocol = 'wss:'; 
+    const protocol = 'wss:'; // UPDATED: Force secure WebSocket for Render deployment
     const ws = new WebSocket(`${protocol}//${window.location.host}`);
     let myPlayerId = null, localWorld = {}, gameState = { players: {}, entities: [] };
     let camera = { x: 0, y: 0, zoom: 1 };
@@ -384,12 +384,12 @@ All Rights Reserved.
         'Player': (p) => {
             if (p.isDead) return;
 
+            // UPDATED: Removed the oncontextmenu handler from here for the trade fix.
             if (p.id !== myPlayerId) {
                 const screenX = (p.x - camera.x) * camera.zoom + canvas.width / 2;
                 const screenY = (p.y - camera.y) * camera.zoom + canvas.height / 2;
                 if (Math.hypot(inputs.mouse.x - screenX, inputs.mouse.y - screenY) < p.radius) {
                     canvas.style.cursor = 'pointer';
-                    canvas.oncontextmenu = (e) => showPlayerContextMenu(e, p);
                 }
             }
             
@@ -555,13 +555,36 @@ All Rights Reserved.
         'Grenade': (p) => { ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); },
         'Laser': (l) => { ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(l.angle); ctx.strokeStyle = l.color; ctx.shadowColor = l.color; ctx.shadowBlur = 15; ctx.lineWidth = 4; ctx.globalAlpha = l.life * 10; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(l.length, 0); ctx.stroke(); ctx.restore(); },
         'Shockwave': (s) => { ctx.strokeStyle=`rgba(255,204,0,${s.life*2})`; ctx.lineWidth=8; ctx.beginPath(); ctx.arc(s.x,s.y,s.radius,0,Math.PI*2); ctx.stroke()},
+        // UPDATED: New NPC visual designs
         'NPC': (n) => {
-            ctx.fillStyle=n.color;
-            ctx.shadowColor=n.color;
-            ctx.shadowBlur=10;
+            ctx.save();
+            ctx.translate(n.x, n.y);
+            ctx.fillStyle = n.color;
+            ctx.shadowColor = n.color;
+            ctx.shadowBlur = 10;
             ctx.beginPath();
-            ctx.rect(n.x-n.radius, n.y-n.radius, n.radius*2, n.radius*2);
+            ctx.rect(-n.radius, -n.radius, n.radius*2, n.radius*2);
             ctx.fill();
+
+            // Draw custom icon based on name
+            ctx.fillStyle = '#fff';
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.font = 'bold 12px "Consolas"';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            if (n.name === 'Bank') {
+                ctx.fillRect(-n.radius * 0.5, -n.radius * 0.6, n.radius, n.radius * 0.2);
+                ctx.fillRect(-n.radius * 0.5, -n.radius * 0.1, n.radius, n.radius * 0.2);
+                ctx.fillRect(-n.radius * 0.5, n.radius * 0.4, n.radius, n.radius * 0.2);
+            } else if (n.name === 'Exchange') {
+                ctx.font = 'bold 18px "Consolas"';
+                ctx.fillText('⇄', 0, 1);
+            }
+            
+            ctx.restore();
+
             ctx.font = '12px "Consolas"';
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'black';
@@ -581,22 +604,33 @@ All Rights Reserved.
             ctx.fillStyle = '#ff3355'; // Red cross
             ctx.fillRect(-n.radius*0.6, -n.radius*0.2, n.radius*1.2, n.radius*0.4);
             ctx.fillRect(-n.radius*0.2, -n.radius*0.6, n.radius*0.4, n.radius*1.2);
+            ctx.restore();
+            
             ctx.font = '12px "Consolas"';
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 3;
-            ctx.strokeText(n.name, 0, -n.radius-5);
+            ctx.strokeText(n.name, n.x, n.y - n.radius-5);
             ctx.fillStyle='#fff';
-            ctx.fillText(n.name, 0, -n.radius-5);
-            ctx.restore();
+            ctx.fillText(n.name, n.x, n.y - n.radius-5);
         },
         'AdminPanel': (n) => {
-            ctx.fillStyle=n.color;
-            ctx.shadowColor='#ff3355';
-            ctx.shadowBlur=10;
+            ctx.save();
+            ctx.translate(n.x, n.y);
+            ctx.fillStyle = n.color;
+            ctx.shadowColor = '#ff3355';
+            ctx.shadowBlur = 10;
             ctx.beginPath();
-            ctx.rect(n.x-n.radius, n.y-n.radius, n.radius*2, n.radius*2);
+            ctx.rect(-n.radius, -n.radius, n.radius*2, n.radius*2);
             ctx.fill();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px "Consolas"';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('>_', -n.radius * 0.6, 0);
+            ctx.restore();
+
             ctx.font = '12px "Consolas"';
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'black';
@@ -810,7 +844,7 @@ All Rights Reserved.
         particles.forEach(p => { p.life -= 0.05; p.x += p.vx; p.y += p.vy; ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); }); particles = particles.filter(p => p.life > 0); ctx.globalAlpha = 1;
         
         canvas.style.cursor = 'crosshair';
-        canvas.oncontextmenu = showGroundContextMenu;
+        // UPDATED: Removed the old oncontextmenu handler for the trade fix. The new handler is added via addEventListener.
 
         gameState.entities.forEach(e => { if (drawFunctions[e.type]) drawFunctions[e.type](e); });
         for (const id in gameState.players) drawFunctions['Player'](gameState.players[id]);
@@ -921,7 +955,8 @@ All Rights Reserved.
                 const tile = TILE_TYPES[tileId] || TILE_TYPES[1];
                 if(tile) {
                     minimapCtx.fillStyle = tile.wc || tile.c;
-                    minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, Math.ceil(TILE_SIZE * scale), Math.ceil(TILE_SIZE * scale));
+                    // UPDATED: Minimap rendering fix. Adding +1 forces a 1px overlap to prevent gaps.
+                    minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, Math.ceil(TILE_SIZE * scale) + 1, Math.ceil(TILE_SIZE * scale) + 1);
                 }
             }
         }
@@ -986,6 +1021,7 @@ All Rights Reserved.
         });
     }
 
+    // UPDATED: Bank deposit menu functionality added.
     function showItemContextMenu(event, source, index, item) {
         event.preventDefault();
         if (!item) return;
@@ -994,7 +1030,9 @@ All Rights Reserved.
         if (source === 'inventory') {
             itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'equipItem', itemIndex: ${index} }); hideAllContextMenus();">Equip</li>`;
             if (isBankOpen) {
-                itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: ${index}}); hideAllContextMenus();">Deposit-All</li>`;
+                itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: ${index}, amount: 1}); hideAllContextMenus();">Deposit-1</li>`;
+                itemContextMenu.innerHTML += `<li onclick="promptDepositX(${index}); hideAllContextMenus();">Deposit-X</li>`;
+                itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: ${index}, amount: 'all'}); hideAllContextMenus();">Deposit-All</li>`;
             }
             if (isTrading) {
                 itemContextMenu.innerHTML += `<li onclick="offerTradeItem(${index}); hideAllContextMenus();">Offer</li>`;
@@ -1010,6 +1048,17 @@ All Rights Reserved.
         itemContextMenu.style.display = 'block';
         itemContextMenu.style.left = `${event.clientX}px`;
         itemContextMenu.style.top = `${event.clientY}px`;
+    }
+
+    // UPDATED: New helper function for "Deposit-X"
+    function promptDepositX(index) {
+        const amountStr = prompt(`How many would you like to deposit?`);
+        if (amountStr) {
+            const amount = parseInt(amountStr, 10);
+            if (!isNaN(amount) && amount > 0) {
+                sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: index, amount: amount });
+            }
+        }
     }
 
     function showBankContextMenu(event, index, item, quantity) {
@@ -1039,15 +1088,31 @@ All Rights Reserved.
         }
     }
 
-    function showGroundContextMenu(event) {
+    // UPDATED: Replaced old ground item menu with a new, smarter right-click handler for trade fix.
+    function handleRightClick(event) {
         event.preventDefault();
         hideAllContextMenus();
+
         const worldMouseX = (event.clientX - canvas.width / 2) / camera.zoom + camera.x;
         const worldMouseY = (event.clientY - canvas.height / 2) / camera.zoom + camera.y;
+
+        // 1. Check for players first
+        for (const id in gameState.players) {
+            const p = gameState.players[id];
+            if (p.id !== myPlayerId && !p.isDead) {
+                if (Math.hypot(worldMouseX - p.x, worldMouseY - p.y) < p.radius) {
+                    showPlayerContextMenu(event, p);
+                    return; // Found a player, stop here.
+                }
+            }
+        }
+
+        // 2. If no player was clicked, check for ground items
         const pickupRadius = 40;
         const itemsToShow = gameState.entities.filter(e => (e.type === 'EquipmentDrop' || e.type === 'PlayerLootBag') && e.pickupDelay <= 0 && Math.hypot(e.x - worldMouseX, e.y - worldMouseY) < pickupRadius);
-        groundContextMenu.innerHTML = '';
+        
         if (itemsToShow.length > 0) {
+            groundContextMenu.innerHTML = '';
             itemsToShow.forEach(itemEntity => {
                 if (itemEntity.type === 'PlayerLootBag') {
                     if (itemEntity.bits > 0) {
@@ -1077,7 +1142,6 @@ All Rights Reserved.
     }
 
     function showPlayerContextMenu(event, player) {
-        event.preventDefault();
         if (!player || player.id === myPlayerId) return;
         hideAllContextMenus();
         
@@ -1279,13 +1343,15 @@ All Rights Reserved.
             slot.oncontextmenu = (e) => showItemContextMenu(e, 'trade', index, offerItem.item);
             grid.appendChild(slot);
         });
-        myPlayer.inventory.forEach((item, index) => {
-            const slot = document.querySelector(`#inventory-grid .inventory-slot:nth-child(${index + 1})`);
-            if (slot) {
-                const isOffered = currentTradeData.myOfferItems.some(i => i.originalIndex === index);
-                slot.style.opacity = isOffered ? 0.3 : 1.0;
-            }
-        });
+        if (myPlayer && myPlayer.inventory) {
+            myPlayer.inventory.forEach((item, index) => {
+                const slot = document.querySelector(`#inventory-grid .inventory-slot:nth-child(${index + 1})`);
+                if (slot) {
+                    const isOffered = currentTradeData.myOfferItems.some(i => i.originalIndex === index);
+                    slot.style.opacity = isOffered ? 0.3 : 1.0;
+                }
+            });
+        }
     }
 
     function updateBankView(bankData) {
@@ -1460,6 +1526,9 @@ All Rights Reserved.
         initGameStars();
         initLoginStars();
     });
+    
+    // UPDATED: New, robust right-click handler for trade fix.
+    canvas.addEventListener('contextmenu', handleRightClick);
 
     canvas.addEventListener('mousemove', e => {
         inputs.mouse.x = e.clientX;
