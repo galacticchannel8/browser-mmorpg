@@ -189,7 +189,6 @@ class Player {
         this.xpToNextLevel = this.calculateXpToNextLevel();
         this.stats = {};
         this.recalculateStats();
-        // --- FIX: Set health to max AFTER stats are calculated ---
         this.health = this.stats.maxHealth;
         this.energy = this.stats.maxEnergy;
         this.gunCooldown = 0;
@@ -314,7 +313,6 @@ class Player {
         }
         if (this.inputs.q) { this.useAbility(); }
         this.updateAbility(dt);
-        if (this.inputs.e) { this.attemptInteraction(); this.inputs.e = false; }
     }
 
     fireWeapon() {
@@ -359,19 +357,18 @@ class Player {
         }
         this.isDead = true;
 
-        // --- ENHANCED: Determine specific cause of death ---
         let causeOfDeath = 'The Void';
         if (killer) {
             const owner = players[killer.ownerId] || entities.find(e => e.id === killer.ownerId);
-            if (owner && players[owner.id]) { // The owner of the damage source is a player
+            if (owner && players[owner.id]) { 
                 causeOfDeath = owner.username;
-            } else if (owner && owner.bossName) { // The owner is a boss
+            } else if (owner && owner.bossName) { 
                 causeOfDeath = owner.bossName;
-            } else if (owner && owner.type) { // The owner is a regular mob
+            } else if (owner && owner.type) { 
                 causeOfDeath = owner.type.replace(/([A-Z])/g, ' $1').trim();
-            } else if (killer.bossName) { // The damaging entity itself is the boss (e.g., contact damage)
+            } else if (killer.bossName) { 
                 causeOfDeath = killer.bossName;
-            } else if (killer.type) { // The damaging entity itself is a mob
+            } else if (killer.type) { 
                 causeOfDeath = killer.type.replace(/([A-Z])/g, ' $1').trim();
             }
         }
@@ -580,6 +577,7 @@ class Enemy extends Entity {
             if (damager && players[damager.ownerId]) {
                 players[damager.ownerId].addXp(this.xpValue);
             }
+            broadcastMessage({ type: 'sfx', effect: 'explosion' });
             for (let i = 0; i < 2; i++) entities.push(new LootDrop(this.x, this.y, this.threatLevel));
             const dropChance = 0.01 + (this.threatLevel * 0.025);
             if (Math.random() < dropChance) {
@@ -712,6 +710,7 @@ class WorldBoss extends Enemy {
                 broadcastMessage({ type: 'chat', sender: 'SYSTEM', message: `${players[damager.ownerId].username} has defeated the ${this.bossName}!`, color: '#ff00ff' });
                 players[damager.ownerId].addXp(this.xpValue);
             }
+            broadcastMessage({ type: 'sfx', effect: 'explosion' });
             bossRespawnTimers[this.bossName] = 300;
             for (let i = 0; i < 2; i++) entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(5)));
             if (Math.random() < 0.5) {
@@ -1021,6 +1020,27 @@ function areInSameParty(player1Id, player2Id) {
     return partyId1 !== null && parties[partyId1].includes(player2Id);
 }
 
+function sendPartyUpdate(partyId) {
+    if (!parties[partyId]) return;
+    const partyMembers = parties[partyId].map(pid => players[pid]).filter(p => p);
+    
+    const simplePartyData = partyMembers.map(p => ({
+        id: p.id,
+        username: p.username,
+        level: p.level,
+        health: p.health,
+        maxHealth: p.stats.maxHealth
+    }));
+
+    parties[partyId].forEach(pid => {
+        const socket = getSocketByPlayerId(pid);
+        if (socket) {
+            socket.send(JSON.stringify({ type: 'partyUpdate', party: simplePartyData }));
+        }
+    });
+}
+
+
 // --- MAIN GAME LOOP ---
 function gameLoop() {
     const now = Date.now();
@@ -1209,6 +1229,11 @@ function gameLoop() {
                 }
             }
         }
+    }
+    
+    // Update all parties
+    for (const partyId in parties) {
+        sendPartyUpdate(partyId);
     }
 
     const playersData = {};
@@ -1431,11 +1456,34 @@ wss.on('connection', (ws) => {
 
                     if (inviterPartyId && !inviteePartyId) {
                         parties[inviterPartyId].push(player.id);
+                        sendPartyUpdate(inviterPartyId);
                     } else if (!inviterPartyId && inviteePartyId) {
                         parties[inviteePartyId].push(inviter.id);
+                        sendPartyUpdate(inviteePartyId);
                     } else if (!inviterPartyId && !inviteePartyId) {
                         const newPartyId = `party_${nextPartyId++}`;
                         parties[newPartyId] = [inviter.id, player.id];
+                        sendPartyUpdate(newPartyId);
+                    }
+                }
+            }
+            if (player && data.type === 'leaveParty') {
+                const partyId = getPartyIdForPlayer(player.id);
+                if (partyId) {
+                    const party = parties[partyId];
+                    const index = party.indexOf(player.id);
+                    if (index > -1) party.splice(index, 1);
+                    
+                    ws.send(JSON.stringify({ type: 'partyUpdate', party: [] })); // Clear own party UI
+                    
+                    if (party.length < 2) { 
+                        party.forEach(pid => {
+                            const socket = getSocketByPlayerId(pid);
+                            if(socket) socket.send(JSON.stringify({ type: 'partyUpdate', party: [] }));
+                        });
+                        delete parties[partyId];
+                    } else {
+                        sendPartyUpdate(partyId);
                     }
                 }
             }
@@ -1443,7 +1491,20 @@ wss.on('connection', (ws) => {
 
             if (!player || player.isDead) return;
             if (data.type === 'input') { player.inputs = data.inputs; player.angle = data.angle; }
-            if (data.type === 'chat') { broadcastMessage({ type: 'chat', sender: player.username, message: data.message, color: player.color }); }
+            if (data.type === 'chat') { 
+                const partyId = getPartyIdForPlayer(player.id);
+                const chatData = { sender: player.username, message: data.message, color: player.color, channel: data.channel };
+
+                if (data.channel === 'party' && partyId) {
+                    parties[partyId].forEach(pid => {
+                        const socket = getSocketByPlayerId(pid);
+                        if(socket) socket.send(JSON.stringify(chatData));
+                    });
+                } else {
+                     broadcastMessage(chatData);
+                }
+            }
+            if (data.type === 'interact') { player.attemptInteraction(); }
             if (data.type === 'equipItem') { const item = player.inventory[data.itemIndex]; if (item) { const currentEquipped = player.equipment[item.slot]; player.equipment[item.slot] = item; player.inventory[data.itemIndex] = currentEquipped; player.recalculateStats(); } }
             if (data.type === 'unequipItem') { const item = player.equipment[data.slot]; if (item && player.addToInventory(item)) { player.equipment[data.slot] = null; player.recalculateStats(); } }
             if (data.type === 'dropItem') { let itemToDrop = null; if (data.source === 'inventory') { itemToDrop = player.inventory[data.index]; player.inventory[data.index] = null; } else { itemToDrop = player.equipment[data.index]; player.equipment[data.index] = null; } if (itemToDrop) entities.push(new EquipmentDrop(player.x, player.y, itemToDrop)); player.recalculateStats(); }
@@ -1464,8 +1525,14 @@ wss.on('connection', (ws) => {
                 if (index > -1) {
                     party.splice(index, 1);
                 }
-                if (party.length < 2) { // Disband party if only one person is left
+                if (party.length < 2) { 
+                    party.forEach(pid => {
+                        const socket = getSocketByPlayerId(pid);
+                        if(socket) socket.send(JSON.stringify({ type: 'partyUpdate', party: [] }));
+                    });
                     delete parties[partyId];
+                } else {
+                    sendPartyUpdate(partyId);
                 }
             }
             if (player.trade.partnerId) {

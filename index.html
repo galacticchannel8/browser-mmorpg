@@ -16,6 +16,11 @@ All Rights Reserved.
         #chat-log::-webkit-scrollbar { width: 4px; } #chat-log::-webkit-scrollbar-thumb { background: #00f0ff; }
         #chat-input { width: 100%; border: none; border-top: 1px solid #00f0ff; background-color: #05060a; color: #fff; padding: 8px; font-family: 'Consolas', 'Monaco', monospace; box-sizing: border-box; }
         #chat-input:focus { outline: none; box-shadow: 0 0 10px rgba(0, 240, 255, 0.7) inset; }
+        .chat-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #00f0ff; padding: 0 5px; }
+        .chat-tabs { display: flex; }
+        .chat-tab { padding: 6px 10px; cursor: pointer; font-size: 14px; }
+        .chat-tab.active { color: #05060a; background-color: #00f0ff; }
+        #leave-party-btn { display: none; background: #ff3355; color: #fff; border: none; cursor: pointer; padding: 4px 8px; font-size: 12px; }
         .ui-panel { background-color: rgba(5, 6, 10, 0.85); border: 1px solid #00f0ff; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; padding: 10px; }
         #class-selection, #ship-selection, #login-container, #death-screen, #shop-container, #bank-container, #trade-container, #x-prompt-container { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; text-align: center; }
         .selection-panel h2 { margin-top: 0; color: #ffff00; }
@@ -31,7 +36,7 @@ All Rights Reserved.
         .login-form button, #death-screen button, .trade-button, .prompt-button, .popup-button { background: #00f0ff; color: #05060a; border: none; padding: 10px 15px; cursor: pointer; font-family: inherit; font-weight: bold; width: 100%; }
         .login-form button:hover, #death-screen button:hover, .trade-button:hover, .prompt-button:hover, .popup-button:hover { background: #fff; }
         .login-form button:disabled, .trade-button:disabled, .prompt-button:disabled, .popup-button:disabled, .shop-item-sell:disabled { background: #555; cursor: default; }
-        #prompt-buttons, #party-invite-buttons { display: flex; gap: 10px; margin-top: 10px; }
+        #prompt-buttons, #party-invite-buttons, #trade-request-buttons { display: flex; gap: 10px; margin-top: 10px; }
         #login-error { color: #ff3355; margin-top: 10px; height: 20px; }
         .login-toggle { color: #00f0ff; cursor: pointer; text-decoration: underline; margin-top: 15px; }
         #right-ui-container { display: none; position: fixed; top: 20px; right: 20px; width: 220px; z-index: 15; }
@@ -70,7 +75,7 @@ All Rights Reserved.
         #market-sell-panel select, #market-sell-panel input { background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; font-family: inherit; margin: 0 5px; }
         #market-sell-panel button { background: #00f0ff; color: #05060a; border: none; padding: 8px 15px; cursor: pointer; font-family: inherit; }
         #left-ui-container { display: none; position: fixed; top: 20px; left: 20px; width: 300px; z-index: 15; }
-        #hud-container { text-align: left; font-size: 16px; }
+        #hud-container { text-align: left; font-size: 16px; margin-bottom: 10px; }
         #hud-info .hud-line { display: flex; align-items: center; justify-content: space-between; margin: 6px 0; }
         #hud-info strong { color: #ffff00; }
         .hud-bar { width: 100%; height: 15px; background-color: rgba(0,0,0,0.5); border: 1px solid #555; margin-top: 2px; }
@@ -80,6 +85,10 @@ All Rights Reserved.
         #keybind-info { font-size: 12px; color: #999; margin-top: 15px; border-top: 1px solid #333; padding-top: 10px; }
         #keybind-info p { margin: 4px 0; }
         #keybind-info strong { color: #00f0ff; }
+        #party-panel { display: none; } #party-panel h3 { margin: 0 0 10px 0; text-align: center; color: #ffff00; }
+        .party-member { margin-bottom: 8px; } .party-member-name { font-size: 14px; margin-bottom: 3px; }
+        .party-member-health-bar { width: 100%; height: 10px; background-color: rgba(0,0,0,0.5); border: 1px solid #555; }
+        .party-member-health-fill { height: 100%; background-color: #33ff99; }
         #portrait-container { width: 220px; height: 100px; border: 1px solid #00f0ff; background-color: rgba(5, 6, 10, 0.85); margin-top: 10px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); box-sizing: border-box; }
         .npc-trade-columns { display: flex; justify-content: space-between; gap: 15px; }
         #npc-buy-panel, #npc-sell-panel { width: 48%; }
@@ -95,8 +104,8 @@ All Rights Reserved.
         #trade-status { margin-top: 15px; height: 20px; color: #ffff00; font-weight: bold; }
         #trade-buttons { margin-top: 10px; display: flex; gap: 10px; }
         .trade-slot.offered::after { content: '✓'; position: absolute; top: 0; right: 2px; color: #33ff99; font-weight: bold; }
-        #party-invite-popup { display: none; position: fixed; bottom: 200px; left: 50%; transform: translateX(-50%); z-index: 100; padding: 15px; text-align: center; }
-        #party-invite-popup p { margin: 0 0 10px 0; font-size: 14px; }
+        #party-invite-popup, #trade-request-popup { display: none; position: fixed; bottom: 200px; left: 50%; transform: translateX(-50%); z-index: 100; padding: 15px; text-align: center; }
+        #party-invite-popup p, #trade-request-popup p { margin: 0 0 10px 0; font-size: 14px; }
     </style>
 </head>
 
@@ -106,7 +115,17 @@ All Rights Reserved.
     <ul id="ground-item-context-menu" class="context-menu"></ul>
     <ul id="player-context-menu" class="context-menu"></ul>
 
-    <div id="chat-container"> <ul id="chat-log"></ul> <input type="text" id="chat-input" placeholder="Press Enter to chat..." maxlength="100"> </div>
+    <div id="chat-container">
+        <div class="chat-header">
+            <div class="chat-tabs">
+                <div id="chat-tab-all" class="chat-tab active">All</div>
+                <div id="chat-tab-party" class="chat-tab">Party</div>
+            </div>
+            <button id="leave-party-btn">Leave</button>
+        </div>
+        <ul id="chat-log"></ul>
+        <input type="text" id="chat-input" placeholder="Press Enter to chat..." maxlength="100">
+    </div>
     <div id="login-container" class="ui-panel"><div id="login-form" class="login-form"><h2>LOGIN</h2><input type="text" id="login-username" placeholder="Username" required><input type="password" id="login-password" placeholder="Password" required><button onclick="handleLogin()">ENTER GALACTIC OS</button><p class="login-toggle" onclick="toggleLoginRegister(false)">Need an account? Register</p></div><div id="register-form" class="login-form" style="display: none;"><h2>REGISTER</h2><input type="text" id="register-username" placeholder="Username" required><input type="password" id="register-password" placeholder="Password" required><button onclick="handleRegister()">CREATE ACCOUNT</button><p class="login-toggle" onclick="toggleLoginRegister(true)">Already have an account? Login</p></div><div id="login-error"></div></div>
     <div id="class-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR CLASS</h2><div class="class-option" onclick="chooseClass('Operator')"><h3>OPERATOR</h3><p>High speed, low health. Ability: Invisibility.</p></div><div class="class-option" onclick="chooseClass('Guardian')"><h3>GUARDIAN</h3><p>High health, low speed. Ability: Personal Shield.</p></div><div class="class-option" onclick="chooseClass('Spectre')"><h3>SPECTRE</h3><p>Balanced stats. Ability: Short-range Blink.</p></div></div>
     <div id="ship-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR SHIP COLOR</h2><div id="color-grid"><div class="color-option" style="background-color: #00f0ff;" onclick="chooseColor('#00f0ff')"></div><div class="color-option" style="background-color: #33ff99;" onclick="chooseColor('#33ff99')"></div><div class="color-option" style="background-color: #f07cff;" onclick="chooseColor('#f07cff')"></div><div class="color-option" style="background-color: #ff3355;" onclick="chooseColor('#ff3355')"></div><div class="color-option" style="background-color: #e3d400;" onclick="chooseColor('#e3d400')"></div><div class="color-option" style="background-color: #ffffff;" onclick="chooseColor('#ffffff')"></div></div></div>
@@ -121,6 +140,10 @@ All Rights Reserved.
                 <p><strong>[Q]</strong> Class Ability</p>
                 <p><strong>[Esc]</strong> Close Menu</p>
             </div>
+        </div>
+        <div id="party-panel" class="ui-panel">
+            <h3>PARTY</h3>
+            <div id="party-members-list"></div>
         </div>
     </div>
 
@@ -202,12 +225,107 @@ All Rights Reserved.
             <button id="party-invite-decline" class="popup-button" style="background-color: #ff3355;">Decline</button>
         </div>
     </div>
+    
+    <div id="trade-request-popup" class="ui-panel">
+        <p id="trade-request-text">Player wants to trade!</p>
+        <div id="trade-request-buttons">
+            <button id="trade-request-accept" class="popup-button">Accept</button>
+            <button id="trade-request-decline" class="popup-button" style="background-color: #ff3355;">Decline</button>
+        </div>
+    </div>
 
     <div id="death-screen" class="ui-panel"><h2>YOU ARE OFFLINE</h2><p>Your journey has ended. Your legacy is stored in the Bank.</p><button onclick="handleRespawn()">RE-ESTABLISH CONNECTION</button></div>
 
     <div id="xp-bar-container"><div id="xp-bar"></div></div>
 
     <script>
+    // --- WEB AUDIO API SOUND ENGINE ---
+    const Sound = {
+        context: null,
+        boostNode: null,
+        init: function() {
+            try {
+                this.context = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.error('Web Audio API is not supported in this browser');
+            }
+        },
+
+        playLaser: function() {
+            if (!this.context) return;
+            const now = this.context.currentTime;
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(1200, now);
+            osc.frequency.linearRampToValueAtTime(400, now + 0.1);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            osc.connect(gain);
+            gain.connect(this.context.destination);
+            osc.start(now);
+            osc.stop(now + 0.1);
+        },
+
+        playPickup: function() {
+            if (!this.context) return;
+            const now = this.context.currentTime;
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.linearRampToValueAtTime(1600, now + 0.1);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+            osc.connect(gain);
+            gain.connect(this.context.destination);
+            osc.start(now);
+            osc.stop(now + 0.2);
+        },
+        
+        playExplosion: function() {
+            if (!this.context) return;
+            const now = this.context.currentTime;
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.exponentialRampToValueAtTime(100, now + 0.4);
+            gain.gain.setValueAtTime(0.5, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.4);
+            osc.connect(gain);
+            gain.connect(this.context.destination);
+            osc.start(now);
+            osc.stop(now + 0.4);
+        },
+
+        startBoost: function() {
+            if (!this.context || this.boostNode) return;
+            const now = this.context.currentTime;
+            this.boostNode = this.context.createOscillator();
+            const gain = this.context.createGain();
+            this.boostNode.type = 'sawtooth';
+            this.boostNode.frequency.setValueAtTime(100, now);
+            this.boostNode.frequency.linearRampToValueAtTime(150, now + 0.1);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.1, now + 0.1);
+            this.boostNode.connect(gain);
+            gain.connect(this.context.destination);
+            this.boostNode.start(now);
+        },
+
+        stopBoost: function() {
+            if (!this.context || !this.boostNode) return;
+            const now = this.context.currentTime;
+            this.boostNode.stop(now + 0.1);
+            this.boostNode = null;
+        }
+    };
+
+    window.addEventListener('mousedown', () => { if (!Sound.context) Sound.init(); }, { once: true });
+    window.addEventListener('keydown', () => { if (!Sound.context) Sound.init(); }, { once: true });
+
+
     const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
     const minimapCanvas = document.getElementById('minimapCanvas'), minimapCtx = minimapCanvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
@@ -230,6 +348,8 @@ All Rights Reserved.
     const playerContextMenu = document.getElementById('player-context-menu');
     const xPromptContainer = document.getElementById('x-prompt-container');
     const partyInvitePopup = document.getElementById('party-invite-popup');
+    const tradeRequestPopup = document.getElementById('trade-request-popup');
+    const partyPanel = document.getElementById('party-panel');
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}`);
@@ -243,6 +363,7 @@ All Rights Reserved.
     let _promptCallback = null;
     let currentBankData = []; 
     let currentPartyInvite = null;
+    let currentTradeRequest = null;
 
     const TILE_SIZE = 40, CHUNK_SIZE = 16;
     const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
@@ -288,7 +409,8 @@ All Rights Reserved.
         try {
             const data = JSON.parse(message.data);
             if (data.type === 'sfx') {
-                if (data.effect === 'blink') {
+                if (data.effect === 'explosion') Sound.playExplosion();
+                else if (data.effect === 'blink') {
                     for(let i=0; i<20; i++) particles.push({x: data.x, y: data.y, life: 1, size: Math.random()*3+1, color: data.color, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2});
                 } else if (data.effect === 'teleportCharge') {
                     for(let i=0; i<2; i++) {
@@ -321,7 +443,7 @@ All Rights Reserved.
             }
             else if (data.type === 'init') { myPlayerId = data.playerId; localWorld = data.world; }
             else if (data.type === 'update') { gameState = data; }
-            else if (data.type === 'chat') { addChatMessage(data.sender, data.message, data.color); }
+            else if (data.type === 'chat') { addChatMessage(data); }
             else if (data.type === 'playerDied') { showDeathScreen(); }
             else if (data.type === 'openShop') { openShop(data.npcName, data.inventory, data.marketListings); }
             else if (data.type === 'openBank') { openBank(data.bank); }
@@ -329,20 +451,21 @@ All Rights Reserved.
             else if (data.type === 'worldChunkUpdate') { localWorld[data.key] = data.chunk; }
             else if (data.type === 'tradeRequest') {
                 if (isTrading) return;
-                if(confirm(`${data.from.username} wants to trade with you. Accept?`)) {
-                    sendToServer({ type: 'tradeResponse', requesterId: data.from.id, accepted: true });
-                }
+                currentTradeRequest = { fromId: data.from.id, fromName: data.from.username };
+                document.getElementById('trade-request-text').textContent = `${data.from.username} wants to trade with you.`;
+                tradeRequestPopup.style.display = 'block';
             }
             else if (data.type === 'tradeStarted') { openTradeWindow(data.partner); }
             else if (data.type === 'tradeUpdate') { updateOtherTradeOffer(data.offer); }
             else if (data.type === 'tradePartnerAccepted') { document.getElementById('trade-status').textContent = 'Partner has accepted. Waiting for you.'; }
-            else if (data.type === 'tradeCancelled') { addChatMessage('SYSTEM', data.reason, '#ff3355'); closeTradeWindow(); }
-            else if (data.type === 'tradeCompleted') { addChatMessage('SYSTEM', 'Trade successful!', '#33ff99'); closeTradeWindow(); }
+            else if (data.type === 'tradeCancelled') { addChatMessage({sender:'SYSTEM', message:data.reason, color:'#ff3355'}); closeTradeWindow(); }
+            else if (data.type === 'tradeCompleted') { addChatMessage({sender:'SYSTEM', message:'Trade successful!', color:'#33ff99'}); closeTradeWindow(); }
             else if (data.type === 'partyInvite') {
                 currentPartyInvite = { fromId: data.from.id, fromName: data.from.username };
                 document.getElementById('party-invite-text').textContent = `${data.from.username} sent you a party invite!`;
                 partyInvitePopup.style.display = 'block';
             }
+            else if (data.type === 'partyUpdate') { updatePartyUI(data.party); }
 
         } catch (error) { console.error('[CLIENT] Error processing server message:', error); }
     };
@@ -393,7 +516,7 @@ All Rights Reserved.
             ctx.save();
             ctx.translate(p.x, p.y);
             if (p.id !== myPlayerId && p.health < p.stats.maxHealth) {
-                const barW = 40, barH = 5, barX = -barW / 2, barY = -r - 25;
+                const barW = 40, barH = 5, barX = -barW / 2, barY = -r - 30; // Adjusted Y
                 ctx.fillStyle = 'rgba(255, 51, 85, 0.7)'; ctx.fillRect(barX, barY, barW, barH);
                 ctx.fillStyle = p.color; ctx.fillRect(barX, barY, barW * (p.health / p.stats.maxHealth), barH);
             }
@@ -403,9 +526,9 @@ All Rights Reserved.
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 3;
             ctx.lineJoin = 'round';
-            ctx.strokeText(`[Lvl ${p.level}] ${p.username}`, 0, -r - 15);
+            ctx.strokeText(`[Lvl ${p.level}] ${p.username}`, 0, -r - 20); // Adjusted Y
             ctx.fillStyle = '#fff';
-            ctx.fillText(`[Lvl ${p.level}] ${p.username}`, 0, -r - 15);
+            ctx.fillText(`[Lvl ${p.level}] ${p.username}`, 0, -r - 20); // Adjusted Y
             ctx.restore();
 
             if (p.id !== myPlayerId) {
@@ -833,7 +956,6 @@ All Rights Reserved.
         
         particles.forEach(p => { p.life -= 0.05; p.x += p.vx; p.y += p.vy; ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); }); particles = particles.filter(p => p.life > 0); ctx.globalAlpha = 1;
         
-        // --- DEFINITIVE FIX for Right-Click ---
         canvas.style.cursor = 'crosshair';
         canvas.oncontextmenu = showGroundContextMenu;
 
@@ -1068,20 +1190,20 @@ All Rights Reserved.
                     if (itemEntity.bits > 0) {
                         const bitsLi = document.createElement('li');
                         bitsLi.innerHTML = `Pickup <span style="color: ${TIER_COLORS[6]}">${itemEntity.bits} Data Bits</span>`;
-                        bitsLi.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: 'bits'}); hideAllContextMenus(); };
+                        bitsLi.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: 'bits'}); Sound.playPickup(); hideAllContextMenus(); };
                         groundContextMenu.appendChild(bitsLi);
                     }
                     itemEntity.items.forEach((item, index) => {
                         if (!item) return;
                         const li = document.createElement('li');
                         li.innerHTML = `Pickup <span style="color:${TIER_COLORS[item.tier]}">${item.name}</span>`;
-                        li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: index}); hideAllContextMenus(); };
+                        li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id, itemIndex: index}); Sound.playPickup(); hideAllContextMenus(); };
                         groundContextMenu.appendChild(li);
                     });
                 } else {
                     const li = document.createElement('li');
                     li.innerHTML = `Pickup <span style="color:${TIER_COLORS[itemEntity.item.tier]}">${itemEntity.item.name}</span>`;
-                    li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id}); hideAllContextMenus(); };
+                    li.onclick = () => { sendToServer({type: 'pickupLoot', entityId: itemEntity.id}); Sound.playPickup(); hideAllContextMenus(); };
                     groundContextMenu.appendChild(li);
                 }
             });
@@ -1098,7 +1220,6 @@ All Rights Reserved.
         
         playerContextMenu.innerHTML = `
             <li onclick="sendToServer({ type: 'tradeRequest', targetId: '${player.id}' }); hideAllContextMenus();">Trade ${player.username}</li>
-            <li onclick="sendToServer({ type: 'followPlayer', targetId: '${player.id}' }); hideAllContextMenus();">Follow ${player.username}</li>
             <li onclick="sendToServer({ type: 'partyInvite', targetId: '${player.id}' }); hideAllContextMenus();">Invite ${player.username}</li>
         `;
         
@@ -1119,6 +1240,7 @@ All Rights Reserved.
         closeTradeWindow();
         xPromptContainer.style.display = 'none';
         partyInvitePopup.style.display = 'none';
+        tradeRequestPopup.style.display = 'none';
     }
 
     function openShop(npcName, npcInventory, marketListings) {
@@ -1344,6 +1466,33 @@ All Rights Reserved.
             }
         });
     }
+    
+    function updatePartyUI(partyMembers) {
+        const partyList = document.getElementById('party-members-list');
+        if (!partyMembers || partyMembers.length === 0) {
+            partyPanel.style.display = 'none';
+            document.getElementById('leave-party-btn').style.display = 'none';
+            return;
+        }
+
+        partyPanel.style.display = 'block';
+        document.getElementById('leave-party-btn').style.display = 'block';
+        partyList.innerHTML = '';
+
+        partyMembers.forEach(member => {
+            if (member.id === myPlayerId) return; // Don't show myself in the party list
+            const memberDiv = document.createElement('div');
+            memberDiv.className = 'party-member';
+            memberDiv.innerHTML = `
+                <div class="party-member-name">[Lvl ${member.level}] ${member.username}</div>
+                <div class="party-member-health-bar">
+                    <div class="party-member-health-fill" style="width: ${member.health / member.maxHealth * 100}%;"></div>
+                </div>
+            `;
+            partyList.appendChild(memberDiv);
+        });
+    }
+
 
     function listMarketItem() {
         const itemIndex = document.getElementById('market-item-select').value;
@@ -1361,9 +1510,9 @@ All Rights Reserved.
 
     chatInput.addEventListener('focus', () => { isChatting = true; });
     chatInput.addEventListener('blur', () => { isChatting = false; });
-    function addChatMessage(sender, message, color = '#00f0ff') {
+    function addChatMessage(data) {
         const li = document.createElement('li');
-        li.innerHTML = `<strong style="color:${color};">[${sender}]</strong>: ${message}`;
+        li.innerHTML = `<strong style="color:${data.color || '#00f0ff'};">[${data.sender}]</strong>: ${data.message}`;
         chatLog.appendChild(li);
         chatLog.scrollTop = chatLog.scrollHeight;
     }
@@ -1404,6 +1553,26 @@ All Rights Reserved.
         }
     });
 
+    document.getElementById('trade-request-accept').addEventListener('click', () => {
+        if (currentTradeRequest) {
+            sendToServer({ type: 'tradeResponse', accepted: true, requesterId: currentTradeRequest.fromId });
+            currentTradeRequest = null;
+            tradeRequestPopup.style.display = 'none';
+        }
+    });
+
+    document.getElementById('trade-request-decline').addEventListener('click', () => {
+        if (currentTradeRequest) {
+            sendToServer({ type: 'tradeResponse', accepted: false, requesterId: currentTradeRequest.fromId });
+            currentTradeRequest = null;
+            tradeRequestPopup.style.display = 'none';
+        }
+    });
+    
+    document.getElementById('leave-party-btn').addEventListener('click', () => {
+        sendToServer({ type: 'leaveParty' });
+    });
+
 
     document.addEventListener('keydown', e => {
         if (isChatting) {
@@ -1433,14 +1602,17 @@ All Rights Reserved.
         const key = e.key.toLowerCase();
         
         if (key === 'e') {
-            if (!inputs.e) { // Only fire on the first press
+            if (!inputs.e) {
                 sendToServer({ type: 'interact' });
                 inputs.e = true; 
             }
             return;
         }
 
-        if (e.code === 'Space') {
+        if (key === 'shift') {
+            if (!inputs.shift) Sound.startBoost();
+            inputs.shift = true;
+        } else if (e.code === 'Space') {
             inputs.space = true;
         } else if (inputs.hasOwnProperty(key)) {
             inputs[key] = true;
@@ -1450,9 +1622,12 @@ All Rights Reserved.
     document.addEventListener('keyup', e => {
         const key = e.key.toLowerCase();
         if (key === 'e') {
-            inputs.e = false; // Reset on keyup
+            inputs.e = false;
         }
-        if (e.code === 'Space') {
+        if (key === 'shift') {
+            Sound.stopBoost();
+            inputs.shift = false;
+        } else if (e.code === 'Space') {
             inputs.space = false;
         } else if (inputs.hasOwnProperty(key)) {
             inputs[key] = false;
@@ -1473,7 +1648,10 @@ All Rights Reserved.
 
     window.addEventListener('mousedown', (e) => {
         if(e.target.closest('.ui-panel, .context-menu')) return;
-        if(e.button === 0) inputs.mouse.down = true;
+        if(e.button === 0) {
+            inputs.mouse.down = true;
+            Sound.playLaser();
+        }
         hideAllContextMenus();
     });
 
