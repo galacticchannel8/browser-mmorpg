@@ -746,7 +746,11 @@ class Dreadnought extends WorldBoss {
         for(const pid in players) { const p = players[pid]; if(!p.isDead && !p.isTeleporting && Math.hypot(p.x - this.x, p.y - this.y) < this.aggroRadius) { targetPlayer = p; break; }}
         if (!targetPlayer) return;
         const dX = targetPlayer.x - this.x, dY = targetPlayer.y - this.y; const dP = Math.hypot(dX, dY);
-        if(dP > 400 && !isCity(this.x, this.y)) { this.x += (dX / dP) * this.speed * (dt * 60); this.y += (dY / dP) * this.speed * (dt * 60); }
+        if(dP > 400) { 
+            this.x += (dX / dP) * this.speed * (dt * 60); 
+            this.y += (dY / dP) * this.speed * (dt * 60); 
+        }
+
         this.attackTimer -= dt;
         if(this.attackTimer <= 0) {
             const p = { ownerId: this.id, angle: Math.atan2(dY, dX), color: this.color, damage: 80 };
@@ -789,12 +793,10 @@ class SerpentHead extends WorldBoss {
             const dX = targetPlayer.x - this.x;
             const dY = targetPlayer.y - this.y;
             const distToPlayer = Math.hypot(dX, dY);
-            if (distToPlayer > 300 && !isCity(this.x, this.y)) {
+            if (distToPlayer > 300) {
                 const timeAdjustedSpeed = this.speed * (dt * 60);
-                const nX = this.x + (dX / distToPlayer) * timeAdjustedSpeed;
-                const nY = this.y + (dY / distToPlayer) * timeAdjustedSpeed;
-                if (!isSolid(getTile(nX, this.y))) this.x = nX;
-                if (!isSolid(getTile(this.x, nY))) this.y = nY;
+                this.x += (dX / distToPlayer) * timeAdjustedSpeed;
+                this.y += (dY / distToPlayer) * timeAdjustedSpeed;
             }
 
             this.attackTimer -= dt;
@@ -893,22 +895,18 @@ class VoidHunter extends WorldBoss {
     update(dt) {
         let targetPlayer = this.lockedTargetId ? players[this.lockedTargetId] : null;
 
-        // Check if target is still valid
         if (!targetPlayer || targetPlayer.isDead || Math.hypot(targetPlayer.x - this.x, targetPlayer.y - this.y) > this.aggroRadius) {
             this.lockedTargetId = null;
             targetPlayer = null;
         }
 
-        // Find a new target if we don't have one
         if (!this.lockedTargetId) {
             this.isInvisible = true;
-            // Return to spawn if idle
             if (Math.hypot(this.x - this.spawnX, this.y - this.spawnY) > 10) {
                 const angleToSpawn = Math.atan2(this.spawnY - this.y, this.spawnX - this.x);
                 this.x += Math.cos(angleToSpawn) * this.speed * (dt*60);
                 this.y += Math.sin(angleToSpawn) * this.speed * (dt*60);
             }
-            // Look for a new target
             for(const pid in players){
                 const p = players[pid]; 
                 if(!p.isDead && !p.isTeleporting && Math.hypot(p.x - this.x, p.y - this.y) < this.aggroRadius / 2) {
@@ -916,7 +914,7 @@ class VoidHunter extends WorldBoss {
                     break;
                 }
             }
-            return; // Wait until a target is found
+            return;
         }
         
         super.update(dt);
@@ -1420,14 +1418,11 @@ wss.on('connection', (ws) => {
                     return;
                 }
 
-                // --- DUPE FIX: Definitive item handling for trades ---
-                // 1. Return all currently offered items to inventory
                 player.trade.offer.forEach(offeredItem => {
                     player.inventory[offeredItem.originalIndex] = offeredItem.item;
                 });
                 player.trade.offer = [];
 
-                // 2. Process the new offer from the client
                 const verifiedOffer = [];
                 data.offerItems.forEach(offerItemFromClient => {
                     const originalItem = player.inventory[offerItemFromClient.originalIndex];
@@ -1436,7 +1431,6 @@ wss.on('connection', (ws) => {
                     }
                 });
 
-                // 3. Remove newly offered items from inventory
                 verifiedOffer.forEach(offeredItem => {
                     player.inventory[offeredItem.originalIndex] = null;
                 });
