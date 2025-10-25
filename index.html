@@ -243,6 +243,7 @@ All Rights Reserved.
     const Sound = {
         context: null,
         boostNode: null,
+        ambientNode: null,
         init: function() {
             try {
                 this.context = new (window.AudioContext || window.webkitAudioContext)();
@@ -259,7 +260,7 @@ All Rights Reserved.
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(1200, now);
             osc.frequency.linearRampToValueAtTime(400, now + 0.1);
-            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.setValueAtTime(0.1, now);
             gain.gain.linearRampToValueAtTime(0, now + 0.1);
             osc.connect(gain);
             gain.connect(this.context.destination);
@@ -270,12 +271,31 @@ All Rights Reserved.
         playMelee: function() {
             if (!this.context) return;
             const now = this.context.currentTime;
+            const noise = this.context.createBufferSource();
+            const buffer = this.context.createBuffer(1, this.context.sampleRate * 0.1, this.context.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            noise.buffer = buffer;
+            const gain = this.context.createGain();
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+            noise.connect(gain);
+            gain.connect(this.context.destination);
+            noise.start(now);
+            noise.stop(now + 0.1);
+        },
+
+        playDamage: function() {
+            if (!this.context) return;
+            const now = this.context.currentTime;
             const osc = this.context.createOscillator();
             const gain = this.context.createGain();
             osc.type = 'square';
-            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.setValueAtTime(200, now);
             osc.frequency.linearRampToValueAtTime(100, now + 0.1);
-            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.setValueAtTime(0.2, now);
             gain.gain.linearRampToValueAtTime(0, now + 0.1);
             osc.connect(gain);
             gain.connect(this.context.destination);
@@ -291,7 +311,7 @@ All Rights Reserved.
             osc.type = 'sine';
             osc.frequency.setValueAtTime(800, now);
             osc.frequency.linearRampToValueAtTime(1600, now + 0.1);
-            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.setValueAtTime(0.1, now);
             gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
             osc.connect(gain);
             gain.connect(this.context.destination);
@@ -305,14 +325,46 @@ All Rights Reserved.
             const osc = this.context.createOscillator();
             const gain = this.context.createGain();
             osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(400, now);
-            osc.frequency.exponentialRampToValueAtTime(100, now + 0.4);
-            gain.gain.setValueAtTime(0.5, now);
+            osc.frequency.setValueAtTime(300, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.4);
+            gain.gain.setValueAtTime(0.2, now);
             gain.gain.linearRampToValueAtTime(0, now + 0.4);
             osc.connect(gain);
             gain.connect(this.context.destination);
             osc.start(now);
             osc.stop(now + 0.4);
+        },
+        
+        playAbility: function(type) {
+            if (!this.context) return;
+            const now = this.context.currentTime;
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
+
+            if (type === 'Guardian') { // Shield up
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(800, now + 0.3);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+            } else if (type === 'Operator') { // Invisibility
+                 osc.type = 'triangle';
+                osc.frequency.setValueAtTime(1000, now);
+                osc.frequency.linearRampToValueAtTime(400, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+            } else { // Spectre Blink
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(1500, now);
+                osc.frequency.linearRampToValueAtTime(500, now + 0.08);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.08);
+            }
+            
+            osc.connect(gain);
+            gain.connect(this.context.destination);
+            osc.start(now);
+            osc.stop(now + 0.3);
         },
 
         startBoost: function() {
@@ -320,11 +372,11 @@ All Rights Reserved.
             const now = this.context.currentTime;
             this.boostNode = this.context.createOscillator();
             const gain = this.context.createGain();
-            this.boostNode.type = 'sine'; // Changed to sine for a smoother hum
+            this.boostNode.type = 'sine';
             this.boostNode.frequency.setValueAtTime(80, now);
-            this.boostNode.frequency.linearRampToValueAtTime(120, now + 0.1);
+            this.boostNode.frequency.linearRampToValueAtTime(120, now + 0.2);
             gain.gain.setValueAtTime(0, now);
-            gain.gain.linearRampToValueAtTime(0.08, now + 0.1); // Lowered volume
+            gain.gain.linearRampToValueAtTime(0.08, now + 0.2);
             this.boostNode.connect(gain);
             gain.connect(this.context.destination);
             this.boostNode.start(now);
@@ -335,6 +387,31 @@ All Rights Reserved.
             const now = this.context.currentTime;
             this.boostNode.stop(now + 0.1);
             this.boostNode = null;
+        },
+
+        startAmbient: function() {
+            if (!this.context || this.ambientNode) return;
+            const now = this.context.currentTime;
+            this.ambientNode = this.context.createOscillator();
+            const gain = this.context.createGain();
+            const lfo = this.context.createOscillator();
+            
+            lfo.type = 'sine';
+            lfo.frequency.setValueAtTime(0.1, now);
+            const lfoGain = this.context.createGain();
+            lfoGain.gain.setValueAtTime(5, now);
+            lfo.connect(lfoGain);
+            lfoGain.connect(this.ambientNode.frequency);
+
+            this.ambientNode.type = 'sine';
+            this.ambientNode.frequency.setValueAtTime(40, now);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.05, now + 5);
+
+            this.ambientNode.connect(gain);
+            gain.connect(this.context.destination);
+            this.ambientNode.start(now);
+            lfo.start(now);
         }
     };
 
@@ -429,6 +506,7 @@ All Rights Reserved.
                 if (data.effect === 'explosion') Sound.playExplosion();
                 else if (data.effect === 'shoot') Sound.playShoot();
                 else if (data.effect === 'melee') Sound.playMelee();
+                else if (data.effect === 'damage') Sound.playDamage();
                 else if (data.effect === 'blink') {
                     for(let i=0; i<20; i++) particles.push({x: data.x, y: data.y, life: 1, size: Math.random()*3+1, color: data.color, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2});
                 } else if (data.effect === 'teleportCharge') {
@@ -1047,6 +1125,7 @@ All Rights Reserved.
         chatContainer.style.display = 'block';
         sendToServer({ type: 'playerInit', username: loggedInUser, color: color, className: chosenClassName });
         isGameRunning = true;
+        Sound.startAmbient();
     }
     function handleRespawn() {
         deathScreen.style.display = 'none';
@@ -1591,6 +1670,18 @@ All Rights Reserved.
     document.getElementById('leave-party-btn').addEventListener('click', () => {
         sendToServer({ type: 'leaveParty' });
     });
+    
+    document.getElementById('chat-tab-all').addEventListener('click', () => {
+        chatChannel = 'all';
+        document.getElementById('chat-tab-all').classList.add('active');
+        document.getElementById('chat-tab-party').classList.remove('active');
+    });
+    
+    document.getElementById('chat-tab-party').addEventListener('click', () => {
+        chatChannel = 'party';
+        document.getElementById('chat-tab-all').classList.remove('active');
+        document.getElementById('chat-tab-party').classList.add('active');
+    });
 
 
     document.addEventListener('keydown', e => {
@@ -1666,7 +1757,7 @@ All Rights Reserved.
     });
 
     window.addEventListener('mousedown', (e) => {
-        if(e.target.closest('.ui-panel, .context-menu')) return;
+        if(e.target.closest('.ui-panel, .context-menu, #chat-container')) return;
         if(e.button === 0) {
             inputs.mouse.down = true;
         }

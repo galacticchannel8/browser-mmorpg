@@ -344,6 +344,8 @@ class Player {
         if (this.trade.partnerId) {
             cancelTrade(this.id, "Trade cancelled due to combat.");
         }
+        const socket = getSocketByPlayerId(this.id);
+        if (socket) socket.send(JSON.stringify({ type: 'sfx', effect: 'damage' }));
 
         const damageTaken = Math.max(1, amount - this.stats.defense);
         this.health = Math.max(0, this.health - damageTaken);
@@ -487,8 +489,8 @@ class Player {
     }
 }
 
-class Operator extends Player { constructor(id, u, c) { super(id, u, c, 'Operator'); this.classStats = { speed: 4.5, maxHealth: 80 }; this.recalculateStats(); this.health = this.stats.maxHealth; this.isInvisible = false; this.invisDuration = 0; } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) { this.abilityCooldown = 12; this.isInvisible = true; this.invisDuration = 3; } } updateAbility(dt) { if (this.isInvisible) { this.invisDuration -= dt; if (this.invisDuration <= 0) this.isInvisible = false; } } }
-class Guardian extends Player { constructor(id, u, c) { super(id, u, c, 'Guardian'); this.classStats = { speed: 3.5, maxHealth: 150 }; this.recalculateStats(); this.health = this.stats.maxHealth; this.shieldActive = false; this.shieldDuration = 0; this.shieldHealth = 0; } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) { this.abilityCooldown = 20; this.shieldActive = true; this.shieldDuration = 5; this.shieldHealth = 100; } } updateAbility(dt) { if (this.shieldActive) { this.shieldDuration -= dt; if (this.shieldDuration <= 0) this.shieldActive = false; } } takeDamage(amount, damager = null) { this.timeSinceLastHit = 0; if(this.isTeleporting) this.isTeleporting = false; if (this.shieldActive) { const damageAbsorbed = Math.min(this.shieldHealth, amount); this.shieldHealth -= damageAbsorbed; const damageLeft = amount - damageAbsorbed; if (this.shieldHealth <= 0) this.shieldActive = false; if (damageLeft > 0) super.takeDamage(damageLeft, damager); } else { super.takeDamage(amount, damager); } } }
+class Operator extends Player { constructor(id, u, c) { super(id, u, c, 'Operator'); this.classStats = { speed: 4.5, maxHealth: 80 }; this.recalculateStats(); this.health = this.stats.maxHealth; this.isInvisible = false; this.invisDuration = 0; } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) { this.abilityCooldown = 12; this.isInvisible = true; this.invisDuration = 3; broadcastMessage({type:'sfx', effect:'ability', class:'Operator'}); } } updateAbility(dt) { if (this.isInvisible) { this.invisDuration -= dt; if (this.invisDuration <= 0) this.isInvisible = false; } } }
+class Guardian extends Player { constructor(id, u, c) { super(id, u, c, 'Guardian'); this.classStats = { speed: 3.5, maxHealth: 150 }; this.recalculateStats(); this.health = this.stats.maxHealth; this.shieldActive = false; this.shieldDuration = 0; this.shieldHealth = 0; } useAbility() { if (this.abilityCooldown <= 0 && !this.trade.partnerId && !this.isTeleporting) { this.abilityCooldown = 20; this.shieldActive = true; this.shieldDuration = 5; this.shieldHealth = 100; broadcastMessage({type:'sfx', effect:'ability', class:'Guardian'});} } updateAbility(dt) { if (this.shieldActive) { this.shieldDuration -= dt; if (this.shieldDuration <= 0) this.shieldActive = false; } } takeDamage(amount, damager = null) { this.timeSinceLastHit = 0; if(this.isTeleporting) this.isTeleporting = false; if (this.shieldActive) { const damageAbsorbed = Math.min(this.shieldHealth, amount); this.shieldHealth -= damageAbsorbed; const damageLeft = amount - damageAbsorbed; if (this.shieldHealth <= 0) this.shieldActive = false; if (damageLeft > 0) super.takeDamage(damageLeft, damager); } else { super.takeDamage(amount, damager); } } }
 class Spectre extends Player {
     constructor(id, u, c) { super(id, u, c, 'Spectre'); this.recalculateStats(); this.health = this.stats.maxHealth; }
     useAbility() {
@@ -502,6 +504,7 @@ class Spectre extends Player {
             if(!isSolid(getTile(targetX, targetY))) {
                 this.x = targetX;
                 this.y = targetY;
+                broadcastMessage({type: 'sfx', effect: 'ability', class: 'Spectre'});
                 broadcastMessage({type: 'sfx', effect: 'blink', x: startX, y: startY, color: this.color});
                 broadcastMessage({type: 'sfx', effect: 'blink', x: this.x, y: this.y, color: this.color});
             }
@@ -572,6 +575,7 @@ class Enemy extends Entity {
         }
     }
     takeDamage(amount, damager) {
+        broadcastMessage({ type: 'sfx', effect: 'damage' });
         this.health -= amount;
         entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(amount)}`, '#ffffff'));
         if (this.health <= 0 && !this.isDead) {
@@ -624,6 +628,7 @@ class Warden extends Enemy {
         }
     }
     takeDamage(amount, damager = null) {
+        broadcastMessage({ type: 'sfx', effect: 'damage' });
         if (this.shield > 0) {
             this.shield -= amount;
             entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(amount)}`, '#e3d400'));
@@ -704,6 +709,7 @@ class WorldBoss extends Enemy {
         this.spawnY = y;
     }
     takeDamage(amount, damager = null) {
+        broadcastMessage({ type: 'sfx', effect: 'damage' });
         this.health -= amount;
         entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(amount)}`, '#ffffff'));
         if (this.health <= 0 && !this.isDead) {
@@ -747,7 +753,8 @@ class Dreadnought extends WorldBoss {
             switch(this.attackPhase) {
                 case 'idle': case 'barrage':
                     this.attackTimer = 3;
-                    for(let i=0;i<10;i++) { setTimeout(() => { if(this.isDead) return; try { const currentTarget = players[Object.keys(players).find(id => players[id] === targetPlayer)]; if(!currentTarget) return; const targetAngle = Math.atan2(currentTarget.y-this.y, currentTarget.x-this.x); p.angle = targetAngle + (Math.random() - 0.5) * 0.3; broadcastMessage({ type: 'sfx', effect: 'shoot' }); entities.push(new Projectile(this.x, this.y, p, 1.5, 10)); } catch(e){} }, i * 100); }
+                    broadcastMessage({ type: 'sfx', effect: 'shoot' });
+                    for(let i=0;i<10;i++) { setTimeout(() => { if(this.isDead) return; try { const currentTarget = players[Object.keys(players).find(id => players[id] === targetPlayer)]; if(!currentTarget) return; const targetAngle = Math.atan2(currentTarget.y-this.y, currentTarget.x-this.x); p.angle = targetAngle + (Math.random() - 0.5) * 0.3; entities.push(new Projectile(this.x, this.y, p, 1.5, 10)); } catch(e){} }, i * 100); }
                     this.attackPhase = 'mortar'; break;
                 case 'mortar':
                     this.attackTimer = 5;
@@ -858,7 +865,8 @@ class TheOracle extends WorldBoss {
             const p = { ownerId: this.id, color: this.color, damage: 50};
             switch(this.attackPhase) {
                 case 'idle': case 'barrage':
-                    for(let i=0; i<12; i++) { p.angle = (i/12) * Math.PI*2 + Date.now()/1000; broadcastMessage({ type: 'sfx', effect: 'shoot' }); entities.push(new Projectile(this.x, this.y, p)); }
+                    broadcastMessage({ type: 'sfx', effect: 'shoot' });
+                    for(let i=0; i<12; i++) { p.angle = (i/12) * Math.PI*2 + Date.now()/1000; entities.push(new Projectile(this.x, this.y, p)); }
                     this.attackTimer = 3.5;
                     this.attackPhase = 'summon';
                     break;
@@ -921,9 +929,9 @@ class VoidHunter extends WorldBoss {
                 try {
                     const currentTarget = players[this.lockedTargetId];
                     if(!currentTarget) return;
+                    broadcastMessage({ type: 'sfx', effect: 'shoot' });
                     for(let i=0; i<10; i++) {
                         const proj = { ownerId: this.id, angle: Math.atan2(currentTarget.y-this.y, currentTarget.x-this.x) + (Math.random()-0.5)*0.8, color: '#ff3355', damage: 120};
-                        broadcastMessage({ type: 'sfx', effect: 'shoot' });
                         entities.push(new Projectile(this.x, this.y, proj, 0.5));
                     }
                     setTimeout(() => {
@@ -1406,32 +1414,41 @@ wss.on('connection', (ws) => {
                 }
             }
             if (player && player.trade.partnerId && data.type === 'tradeUpdate') {
+                const partner = players[player.trade.partnerId];
+                if (!partner) {
+                    cancelTrade(player.id, "Trade partner disconnected.");
+                    return;
+                }
+
+                // --- DUPE FIX: Definitive item handling for trades ---
+                // 1. Return all currently offered items to inventory
+                player.trade.offer.forEach(offeredItem => {
+                    player.inventory[offeredItem.originalIndex] = offeredItem.item;
+                });
                 player.trade.offer = [];
-                data.offerItems.forEach(offerItem => {
-                    const originalItem = player.inventory[offerItem.originalIndex];
-                    if (originalItem && originalItem.id === offerItem.item.id) {
-                        player.trade.offer.push(offerItem);
+
+                // 2. Process the new offer from the client
+                const verifiedOffer = [];
+                data.offerItems.forEach(offerItemFromClient => {
+                    const originalItem = player.inventory[offerItemFromClient.originalIndex];
+                    if (originalItem && originalItem.id === offerItemFromClient.item.id) {
+                        verifiedOffer.push(offerItemFromClient);
                     }
                 });
-                player.inventory.forEach((item, index) => {
-                    if (item && player.trade.offer.some(o => o.originalIndex === index)) {
-                        player.inventory[index] = null;
-                    }
+
+                // 3. Remove newly offered items from inventory
+                verifiedOffer.forEach(offeredItem => {
+                    player.inventory[offeredItem.originalIndex] = null;
                 });
-                 data.offerItems.forEach(offerItem => {
-                     if (!player.inventory[offerItem.originalIndex]) {
-                         player.inventory[offerItem.originalIndex] = offerItem.item;
-                     }
-                 });
+
+                player.trade.offer = verifiedOffer;
                 player.trade.offerBits = Math.max(0, parseInt(data.offerBits, 10)) || 0;
                 player.trade.accepted = false;
-                const partner = players[player.trade.partnerId];
-                if (partner) {
-                    partner.trade.accepted = false;
-                    const partnerSocket = getSocketByPlayerId(partner.id);
-                    if (partnerSocket) {
-                        partnerSocket.send(JSON.stringify({ type: 'tradeUpdate', offer: player.trade }));
-                    }
+                partner.trade.accepted = false;
+
+                const partnerSocket = getSocketByPlayerId(partner.id);
+                if (partnerSocket) {
+                    partnerSocket.send(JSON.stringify({ type: 'tradeUpdate', offer: player.trade }));
                 }
             }
              if (player && player.trade.partnerId && data.type === 'tradeAccept') {
