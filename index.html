@@ -45,6 +45,8 @@ All Rights Reserved.
         #inventory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
         .inventory-slot, .bank-slot, .trade-slot { width: 45px; height: 45px; background-color: rgba(0,0,0,0.5); border: 1px solid #555; display: flex; justify-content: center; align-items: center; font-size: 10px; text-align: center; cursor: pointer; position: relative; }
         .inventory-slot:hover, .bank-slot:hover, .trade-slot:hover { background-color: rgba(255,255,255,0.1); }
+        /* UPDATED: Added styles for bank item quantity */
+        .quantity-display { position: absolute; bottom: 1px; right: 3px; font-size: 12px; font-weight: bold; color: #ffff00; text-shadow: 1px 1px 2px #000; pointer-events: none; }
         .context-menu { display: none; position: fixed; z-index: 102; background-color: #05060a; border: 1px solid #00f0ff; list-style: none; padding: 5px; margin: 0; font-size: 14px; }
         .context-menu li { padding: 8px; cursor: pointer; }
         .context-menu li:hover { background-color: #00f0ff; color: #05060a; }
@@ -65,7 +67,10 @@ All Rights Reserved.
         .shop-item-buy, .shop-item-sell, .market-buy-btn { background: #00f0ff; color: #05060a; border: none; padding: 5px 10px; cursor: pointer; }
         .shop-item-buy:disabled, .market-buy-btn:disabled { background: #555; cursor: default; }
         #market-sell-panel { margin-top: 15px; border-top: 1px solid #555; padding-top: 10px; }
-        #market-sell-panel select, #market-sell-panel input { background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; font-family: inherit; margin: 0 5px; }
+        /* UPDATED: Custom styles for market UI to match theme */
+        #market-sell-panel select, #market-sell-panel input { background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; font-family: inherit; margin: 0 5px; -moz-appearance: textfield; }
+        #market-sell-panel select { appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2300f0ff' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 25px; }
+        #market-sell-panel input[type=number]::-webkit-inner-spin-button, #market-sell-panel input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         #market-sell-panel button { background: #00f0ff; color: #05060a; border: none; padding: 8px 15px; cursor: pointer; font-family: inherit; }
         #left-ui-container { display: none; position: fixed; top: 20px; left: 20px; width: 300px; z-index: 15; }
         #hud-container { text-align: left; font-size: 16px; }
@@ -82,23 +87,34 @@ All Rights Reserved.
         .npc-trade-columns { display: flex; justify-content: space-between; gap: 15px; }
         #npc-buy-panel, #npc-sell-panel { width: 48%; }
         #npc-buy-panel h3, #npc-sell-panel h3 { margin-top: 0; text-align: center; color: #ffff00; }
-        #trade-container { width: 550px; padding: 15px; }
+        /* UPDATED: Styles for new trade system */
+        #trade-container { width: 600px; padding: 15px; }
         #trade-header { margin-bottom: 15px; font-size: 1.2em; }
         .trade-window { display: flex; justify-content: space-between; gap: 10px; }
         .trade-panel { width: 48%; }
-        .trade-panel h3 { margin: 0 0 10px 0; color: #ffff00; font-size: 1em; }
+        .trade-panel h3 { margin: 0 0 10px 0; color: #ffff00; font-size: 1em; display: flex; justify-content: space-between; align-items: center; }
+        .trade-status-indicator { font-size: 0.8em; font-weight: normal; color: #ff3355; }
+        .trade-status-indicator.accepted { color: #33ff99; }
         .trade-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; min-height: 100px; background-color: rgba(0,0,0,0.3); padding: 5px; border: 1px solid #555; margin-bottom: 10px; }
         .trade-bits-input { width: 100%; box-sizing: border-box; background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; margin-bottom: 10px; font-family: inherit; }
         #other-trade-bits { padding: 8px; background-color: rgba(0,0,0,0.3); border: 1px solid #555; text-align: right; margin-bottom: 10px; }
         #trade-status { margin-top: 15px; height: 20px; color: #ffff00; font-weight: bold; }
         #trade-buttons { margin-top: 10px; display: flex; gap: 10px; }
         .trade-slot.offered::after { content: '✓'; position: absolute; top: 0; right: 2px; color: #33ff99; font-weight: bold; }
+        #trade-confirm-screen { display: none; text-align: left; }
+        .trade-confirm-summary { border: 1px solid #555; padding: 10px; margin-bottom: 15px; background-color: rgba(0,0,0,0.3); }
+        .trade-confirm-summary h3 { margin-top: 0; color: #ffff00; }
+        .trade-confirm-summary ul { list-style: none; padding: 0; margin: 0; }
+        .trade-confirm-summary li { color: #00f0ff; }
+        #trade-confirm-buttons { display: flex; gap: 10px; }
     </style>
 </head>
 
 <body>
     <canvas id="gameCanvas"></canvas>
+    <!-- UPDATED: Added bank context menu -->
     <ul id="item-context-menu" class="context-menu"></ul>
+    <ul id="bank-context-menu" class="context-menu"></ul>
     <ul id="ground-item-context-menu" class="context-menu"></ul>
     <ul id="player-context-menu" class="context-menu"></ul>
 
@@ -161,24 +177,49 @@ All Rights Reserved.
         </div>
     </div>
     
+    <!-- UPDATED: New HTML structure for two-stage trade -->
     <div id="trade-container" class="ui-panel">
         <h2 id="trade-header">Trading with Player</h2>
-        <div class="trade-window">
-            <div id="my-trade-panel" class="trade-panel">
-                <h3>YOUR OFFER</h3>
-                <div id="my-trade-grid" class="trade-grid"></div>
-                <input type="number" id="my-trade-bits" class="trade-bits-input" placeholder="0 Data Bits" min="0">
+        
+        <!-- Stage 1: Offer Window -->
+        <div id="trade-offer-window">
+            <div class="trade-window">
+                <div id="my-trade-panel" class="trade-panel">
+                    <h3>YOUR OFFER <span id="my-trade-status" class="trade-status-indicator"></span></h3>
+                    <div id="my-trade-grid" class="trade-grid"></div>
+                    <input type="number" id="my-trade-bits" class="trade-bits-input" placeholder="0 Data Bits" min="0">
+                </div>
+                <div id="other-trade-panel" class="trade-panel">
+                    <h3 id="other-player-trade-name">THEIR OFFER <span id="other-trade-status" class="trade-status-indicator"></span></h3>
+                    <div id="other-trade-grid" class="trade-grid"></div>
+                    <div id="other-trade-bits">0 Data Bits</div>
+                </div>
             </div>
-            <div id="other-trade-panel" class="trade-panel">
-                <h3 id="other-player-trade-name">THEIR OFFER</h3>
-                <div id="other-trade-grid" class="trade-grid"></div>
-                <div id="other-trade-bits">0 Data Bits</div>
+            <div id="trade-status"></div>
+            <div id="trade-buttons">
+                <button id="trade-accept-btn" class="trade-button">ACCEPT</button>
+                <button id="trade-cancel-btn" class="trade-button" style="background-color: #ff3355;">CANCEL</button>
             </div>
         </div>
-        <div id="trade-status"></div>
-        <div id="trade-buttons">
-            <button id="trade-accept-btn" class="trade-button">ACCEPT</button>
-            <button id="trade-cancel-btn" class="trade-button" style="background-color: #ff3355;">CANCEL</button>
+
+        <!-- Stage 2: Confirmation Screen -->
+        <div id="trade-confirm-screen">
+            <h3>Final Confirmation</h3>
+            <p style="color: #ff3355; font-weight: bold;">Review the trade carefully. This is the final step.</p>
+            <div class="trade-window">
+                <div class="trade-confirm-summary">
+                    <h3>YOU WILL GIVE:</h3>
+                    <ul id="confirm-give-list"></ul>
+                </div>
+                <div class="trade-confirm-summary">
+                    <h3>YOU WILL RECEIVE:</h3>
+                    <ul id="confirm-receive-list"></ul>
+                </div>
+            </div>
+            <div id="trade-confirm-buttons">
+                <button id="trade-final-accept-btn" class="trade-button">ACCEPT TRADE</button>
+                <button id="trade-final-cancel-btn" class="trade-button" style="background-color: #ff3355;">CANCEL</button>
+            </div>
         </div>
     </div>
 
@@ -205,10 +246,11 @@ All Rights Reserved.
     const chatInput = document.getElementById('chat-input');
     const chatLog = document.getElementById('chat-log');
     const itemContextMenu = document.getElementById('item-context-menu');
+    const bankContextMenu = document.getElementById('bank-context-menu'); // UPDATED: Bank context menu
     const groundContextMenu = document.getElementById('ground-item-context-menu');
     const playerContextMenu = document.getElementById('player-context-menu');
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const protocol = window.location.protocol === 'https' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}`);
     let myPlayerId = null, localWorld = {}, gameState = { players: {}, entities: [] };
     let camera = { x: 0, y: 0, zoom: 1 };
@@ -216,7 +258,8 @@ All Rights Reserved.
     let isGameRunning = false, isChatting = false, isShopOpen = false, isBankOpen = false, isTrading = false;
     let loggedInUser = "Player", chosenClassName = null;
     let currentShopName = null;
-    let currentTradeData = { myOfferItems: [], myOfferBits: 0 };
+    // UPDATED: Trade state management
+    let currentTradeData = { myOfferItems: [], myOfferBits: 0, myAccepted: false, partnerAccepted: false };
 
     const TILE_SIZE = 40, CHUNK_SIZE = 16;
     const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
@@ -301,6 +344,7 @@ All Rights Reserved.
             else if (data.type === 'openBank') { openBank(data.bank); }
             else if (data.type === 'marketUpdate') { if(isShopOpen) updateMarketView(data.marketListings); }
             else if (data.type === 'worldChunkUpdate') { localWorld[data.key] = data.chunk; }
+            // UPDATED: New trade message handlers
             else if (data.type === 'tradeRequest') {
                 if (isTrading) return;
                 if(confirm(`${data.from.username} wants to trade with you. Accept?`)) {
@@ -309,7 +353,12 @@ All Rights Reserved.
             }
             else if (data.type === 'tradeStarted') { openTradeWindow(data.partner); }
             else if (data.type === 'tradeUpdate') { updateOtherTradeOffer(data.offer); }
-            else if (data.type === 'tradePartnerAccepted') { document.getElementById('trade-status').textContent = 'Partner has accepted. Waiting for you.'; }
+            else if (data.type === 'tradeStatusChange') { 
+                currentTradeData.myAccepted = data.myAccepted;
+                currentTradeData.partnerAccepted = data.partnerAccepted;
+                updateTradeStatusUI();
+            }
+            else if (data.type === 'tradeShowConfirmation') { showTradeConfirmation(data.myOffer, data.partnerOffer); }
             else if (data.type === 'tradeCancelled') { addChatMessage('SYSTEM', data.reason, '#ff3355'); closeTradeWindow(); }
             else if (data.type === 'tradeCompleted') { addChatMessage('SYSTEM', 'Trade successful!', '#33ff99'); closeTradeWindow(); }
 
@@ -528,7 +577,7 @@ All Rights Reserved.
             ctx.fillStyle='#fff';
             ctx.fillText(n.name, n.x, n.y - n.radius-5);
         },
-        'MedBay': (n) => { // CORRECTED: Renamed from 'Hospital'
+        'MedBay': (n) => {
             ctx.save();
             ctx.translate(n.x, n.y);
             ctx.fillStyle = n.color;
@@ -878,7 +927,8 @@ All Rights Reserved.
                 const tile = TILE_TYPES[tileId] || TILE_TYPES[1];
                 if(tile) {
                     minimapCtx.fillStyle = tile.wc || tile.c;
-                    minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, Math.ceil(TILE_SIZE * scale) + 1, Math.ceil(TILE_SIZE * scale) + 1);
+                    // UPDATED: Minimap rendering fix. Removed "+1" which caused the right edge to render incorrectly.
+                    minimapCtx.fillRect(mapSize/2 + x * scale, mapSize/2 + y * scale, Math.ceil(TILE_SIZE * scale), Math.ceil(TILE_SIZE * scale));
                 }
             }
         }
@@ -951,15 +1001,13 @@ All Rights Reserved.
         if (source === 'inventory') {
             itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'equipItem', itemIndex: ${index} }); hideAllContextMenus();">Equip</li>`;
             if (isBankOpen) {
-                itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: ${index}}); hideAllContextMenus();">Deposit</li>`;
+                itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'deposit', itemIndex: ${index}}); hideAllContextMenus();">Deposit-All</li>`;
             }
             if (isTrading) {
                 itemContextMenu.innerHTML += `<li onclick="offerTradeItem(${index}); hideAllContextMenus();">Offer</li>`;
             }
         } else if (source === 'equipment') {
             itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'unequipItem', slot: '${index}' }); hideAllContextMenus();">Unequip</li>`;
-        } else if (source === 'bank') {
-            itemContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'withdraw', itemIndex: ${index}}); hideAllContextMenus();">Withdraw</li>`;
         } else if (source === 'trade') {
             itemContextMenu.innerHTML += `<li onclick="removeTradeItem(${index}); hideAllContextMenus();">Remove</li>`;
         }
@@ -969,6 +1017,35 @@ All Rights Reserved.
         itemContextMenu.style.display = 'block';
         itemContextMenu.style.left = `${event.clientX}px`;
         itemContextMenu.style.top = `${event.clientY}px`;
+    }
+
+    // UPDATED: New context menu for bank items
+    function showBankContextMenu(event, index, item, quantity) {
+        event.preventDefault();
+        if (!item) return;
+        hideAllContextMenus();
+
+        bankContextMenu.innerHTML = '';
+        bankContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'withdraw', itemIndex: ${index}, amount: 1 }); hideAllContextMenus();">Withdraw-1</li>`;
+        if (quantity > 1) {
+            bankContextMenu.innerHTML += `<li onclick="promptWithdrawX(${index}, ${quantity}); hideAllContextMenus();">Withdraw-X</li>`;
+            bankContextMenu.innerHTML += `<li onclick="sendToServer({ type: 'bankAction', action: 'withdraw', itemIndex: ${index}, amount: 'all' }); hideAllContextMenus();">Withdraw-All</li>`;
+        }
+
+        bankContextMenu.style.display = 'block';
+        bankContextMenu.style.left = `${event.clientX}px`;
+        bankContextMenu.style.top = `${event.clientY}px`;
+    }
+
+    // UPDATED: Helper function for "Withdraw-X"
+    function promptWithdrawX(index, maxQuantity) {
+        const amountStr = prompt(`How many would you like to withdraw? (Max: ${maxQuantity})`);
+        if (amountStr) {
+            const amount = parseInt(amountStr, 10);
+            if (!isNaN(amount) && amount > 0) {
+                sendToServer({ type: 'bankAction', action: 'withdraw', itemIndex: index, amount: amount });
+            }
+        }
     }
 
     function showGroundContextMenu(event) {
@@ -1032,6 +1109,7 @@ All Rights Reserved.
         itemContextMenu.style.display = 'none';
         groundContextMenu.style.display = 'none';
         playerContextMenu.style.display = 'none';
+        bankContextMenu.style.display = 'none'; // UPDATED: Hide bank menu
     }
 
     function closeAllPanels() {
@@ -1067,34 +1145,50 @@ All Rights Reserved.
         bankContainer.style.display = 'none';
     }
     
+    // UPDATED: Complete overhaul of trade functions
     function openTradeWindow(partnerData) {
         closeAllPanels();
         isTrading = true;
         tradeContainer.style.display = 'block';
+
+        // Reset to stage 1
+        document.getElementById('trade-offer-window').style.display = 'block';
+        document.getElementById('trade-confirm-screen').style.display = 'none';
         document.getElementById('trade-header').textContent = `Trading with ${partnerData.username}`;
-        document.getElementById('other-player-trade-name').textContent = `${partnerData.username}'s OFFER`;
+        document.getElementById('other-player-trade-name').innerHTML = `${partnerData.username}'s OFFER <span id="other-trade-status" class="trade-status-indicator"></span>`;
+        
         document.getElementById('trade-accept-btn').disabled = false;
-        document.getElementById('trade-accept-btn').textContent = 'ACCEPT';
         document.getElementById('trade-status').textContent = '';
         
         document.getElementById('trade-cancel-btn').onclick = () => sendToServer({ type: 'tradeCancel' });
+        document.getElementById('trade-final-cancel-btn').onclick = () => sendToServer({ type: 'tradeCancel' });
+
         document.getElementById('trade-accept-btn').onclick = () => {
-            document.getElementById('trade-status').textContent = 'Waiting for partner...';
-            sendToServer({ type: 'tradeAccept' });
+            sendToServer({ type: 'tradeAcceptStage1' });
         };
+        document.getElementById('trade-final-accept-btn').onclick = () => {
+            document.getElementById('trade-final-accept-btn').disabled = true;
+            document.getElementById('trade-final-accept-btn').textContent = 'WAITING...';
+            sendToServer({ type: 'tradeAcceptStage2' });
+        };
+        
         document.getElementById('my-trade-bits').onchange = updateMyTradeOffer;
         document.getElementById('my-trade-bits').onkeyup = updateMyTradeOffer;
 
         renderMyTradeOffer();
         updateOtherTradeOffer({ offer: [], offerBits: 0 });
+        updateTradeStatusUI();
     }
+
     function closeTradeWindow() {
         isTrading = false;
         tradeContainer.style.display = 'none';
-        currentTradeData = { myOfferItems: [], myOfferBits: 0 };
+        currentTradeData = { myOfferItems: [], myOfferBits: 0, myAccepted: false, partnerAccepted: false };
         document.getElementById('my-trade-bits').value = '';
     }
+
     function offerTradeItem(inventoryIndex) {
+        if (currentTradeData.myAccepted) return; // Cannot change offer after accepting
         const myPlayer = gameState.players[myPlayerId];
         const item = myPlayer.inventory[inventoryIndex];
         if (item && !currentTradeData.myOfferItems.some(i => i.originalIndex === inventoryIndex)) {
@@ -1103,34 +1197,87 @@ All Rights Reserved.
             updateMyTradeOffer();
         }
     }
+
     function removeTradeItem(offerIndex) {
+        if (currentTradeData.myAccepted) return; // Cannot change offer after accepting
         currentTradeData.myOfferItems.splice(offerIndex, 1);
         renderMyTradeOffer();
         updateMyTradeOffer();
     }
+
     function updateMyTradeOffer() {
+        if (currentTradeData.myAccepted) { // Prevent changes if already accepted
+            // Maybe revert the input change, but for now just block sending
+            const bitsInput = document.getElementById('my-trade-bits');
+            bitsInput.value = currentTradeData.myOfferBits;
+            return;
+        }
         const bits = parseInt(document.getElementById('my-trade-bits').value, 10) || 0;
+        const bitsChanged = currentTradeData.myOfferBits !== bits;
         currentTradeData.myOfferBits = bits;
-        sendToServer({ type: 'tradeUpdate', offerItems: currentTradeData.myOfferItems, offerBits: bits });
-        document.getElementById('trade-accept-btn').textContent = 'ACCEPT';
-        document.getElementById('trade-status').textContent = '';
+
+        // An offer change implies resetting the 'accepted' status
+        sendToServer({ type: 'tradeUpdate', offerItems: currentTradeData.myOfferItems.map(i => i.item), offerBits: bits });
     }
+
     function updateOtherTradeOffer(partnerTradeData) {
         if (!isTrading) return;
         const grid = document.getElementById('other-trade-grid');
         grid.innerHTML = '';
-        partnerTradeData.offer.forEach(offerItem => {
+        partnerTradeData.offer.forEach(item => {
             const slot = document.createElement('div');
             slot.className = 'trade-slot';
-            slot.style.borderColor = TIER_COLORS[offerItem.item.tier];
-            slot.textContent = offerItem.item.name;
-            slot.title = `${offerItem.item.name}\n` + Object.entries(offerItem.item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
+            slot.style.borderColor = TIER_COLORS[item.tier];
+            slot.textContent = item.name;
+            slot.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
             grid.appendChild(slot);
         });
         document.getElementById('other-trade-bits').textContent = `${partnerTradeData.offerBits} Data Bits`;
-        document.getElementById('trade-accept-btn').textContent = 'ACCEPT';
-        document.getElementById('trade-status').textContent = '';
     }
+
+    function updateTradeStatusUI() {
+        const myStatus = document.getElementById('my-trade-status');
+        const otherStatus = document.getElementById('other-trade-status');
+
+        myStatus.textContent = currentTradeData.myAccepted ? 'Accepted' : 'Not Accepted';
+        myStatus.classList.toggle('accepted', currentTradeData.myAccepted);
+
+        otherStatus.textContent = currentTradeData.partnerAccepted ? 'Accepted' : 'Not Accepted';
+        otherStatus.classList.toggle('accepted', currentTradeData.partnerAccepted);
+
+        document.getElementById('trade-accept-btn').disabled = currentTradeData.myAccepted;
+        document.getElementById('my-trade-bits').disabled = currentTradeData.myAccepted;
+    }
+
+    function showTradeConfirmation(myOffer, partnerOffer) {
+        document.getElementById('trade-offer-window').style.display = 'none';
+        document.getElementById('trade-confirm-screen').style.display = 'block';
+
+        const giveList = document.getElementById('confirm-give-list');
+        const receiveList = document.getElementById('confirm-receive-list');
+        giveList.innerHTML = '';
+        receiveList.innerHTML = '';
+
+        myOffer.items.forEach(item => {
+            giveList.innerHTML += `<li style="color: ${TIER_COLORS[item.tier]}">${item.name}</li>`;
+        });
+        if (myOffer.bits > 0) {
+            giveList.innerHTML += `<li style="color: ${TIER_COLORS[6]}">${myOffer.bits} Data Bits</li>`;
+        }
+        if (giveList.innerHTML === '') giveList.innerHTML = '<li>Nothing</li>';
+        
+        partnerOffer.items.forEach(item => {
+            receiveList.innerHTML += `<li style="color: ${TIER_COLORS[item.tier]}">${item.name}</li>`;
+        });
+        if (partnerOffer.bits > 0) {
+            receiveList.innerHTML += `<li style="color: ${TIER_COLORS[6]}">${partnerOffer.bits} Data Bits</li>`;
+        }
+        if (receiveList.innerHTML === '') receiveList.innerHTML = '<li>Nothing</li>';
+
+        document.getElementById('trade-final-accept-btn').disabled = false;
+        document.getElementById('trade-final-accept-btn').textContent = 'ACCEPT TRADE';
+    }
+
     function renderMyTradeOffer() {
         if (!isTrading) return;
         const myPlayer = gameState.players[myPlayerId];
@@ -1148,26 +1295,35 @@ All Rights Reserved.
         myPlayer.inventory.forEach((item, index) => {
             const slot = document.querySelector(`#inventory-grid .inventory-slot:nth-child(${index + 1})`);
             if (slot) {
-                if (currentTradeData.myOfferItems.some(i => i.originalIndex === index)) {
-                    slot.classList.add('offered');
-                } else {
-                    slot.classList.remove('offered');
-                }
+                const isOffered = currentTradeData.myOfferItems.some(i => i.originalIndex === index);
+                slot.style.opacity = isOffered ? 0.3 : 1.0;
             }
         });
     }
 
+    // UPDATED: Bank view now handles stacked items
     function updateBankView(bankData) {
         const grid = document.getElementById('bank-grid');
         grid.innerHTML = '';
-        bankData.forEach((item, index) => {
+        bankData.forEach((bankSlotData, index) => {
             const slot = document.createElement('div');
             slot.className = 'bank-slot';
-            slot.oncontextmenu = (e) => showItemContextMenu(e, 'bank', index, item);
-            if (item) {
+            
+            if (bankSlotData && bankSlotData.item) {
+                const item = bankSlotData.item;
+                const quantity = bankSlotData.quantity;
+
+                slot.oncontextmenu = (e) => showBankContextMenu(e, index, item, quantity);
                 slot.style.borderColor = TIER_COLORS[item.tier];
                 slot.textContent = item.name;
                 slot.title = `${item.name}\n` + Object.entries(item.stats||{}).map(([k,v])=>`${k}:+${v}`).join('\n');
+
+                if (quantity > 1) {
+                    const quantityEl = document.createElement('div');
+                    quantityEl.className = 'quantity-display';
+                    quantityEl.textContent = quantity > 999 ? `${Math.floor(quantity/1000)}k` : quantity;
+                    slot.appendChild(quantityEl);
+                }
             }
             grid.appendChild(slot);
         });
@@ -1276,7 +1432,15 @@ All Rights Reserved.
         if (e.key === 'Escape') {
             if (isShopOpen) closeShop();
             if (isBankOpen) closeBank();
-            if (isTrading) closeTradeWindow();
+            if (isTrading) {
+                // In stage 2, escape should act as cancel
+                if (document.getElementById('trade-confirm-screen').style.display === 'block') {
+                    sendToServer({ type: 'tradeCancel' });
+                } else {
+                    closeTradeWindow();
+                }
+            }
+            hideAllContextMenus();
             return;
         }
 

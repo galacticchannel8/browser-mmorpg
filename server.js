@@ -71,7 +71,6 @@ const MAP_SEED = 'galactic_os_final_frontier';
 const perlin = new Perlin(MAP_SEED), biomeNoise = new Perlin(MAP_SEED + '_biomes');
 const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'}, 15:{n:'D', c:'#00f0ff'} };
 
-// --- CORRECTED: Restored original city walls and doors, with a cleared interior ---
 const cityData = [
     [11,11,11,11,11,11,11,15,15,11,11,11,11,11,11,11],
     [11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],
@@ -90,7 +89,19 @@ const cityData = [
 const CITY_SPAWN_POINT = { x: 8 * TILE_SIZE, y: 8 * TILE_SIZE };
 const BOSS_LOCATIONS = { DREADNOUGHT: {x: 150*TILE_SIZE, y: 150*TILE_SIZE}, SERPENT: {x: -150*TILE_SIZE, y: -150*TILE_SIZE}, ORACLE: {x: 0, y: 300*TILE_SIZE}, VOID_HUNTER: {x: 300*TILE_SIZE, y: 0} };
 const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
-function createShopWeapon(tier, type) { return { id: `wep_${type}_${tier}`, slot: 'Weapon', tier, type, name: `${type} Emitter` }; }
+
+// UPDATED: Function to create specific weapon types for the shop
+function createShopWeapon(tier, type) {
+    const baseNames = { 'Scatter': 'Scattergun', 'Beam': 'Beam Emitter', 'Launcher': 'Ordnance Launcher' };
+    return {
+        id: `wep_${type.toLowerCase()}_${tier}`,
+        slot: 'Weapon',
+        tier,
+        type,
+        name: `T${tier} ${baseNames[type]}`,
+        stats: {} // Add specific stats if desired
+    };
+}
 function generateEquipment(tier) {
     tier = Math.max(1, Math.min(6, tier));
     const slots = ['Module', 'Plating', 'Utility'];
@@ -128,13 +139,17 @@ function createShopItem(tier, slot) {
     return item;
 }
 
+// UPDATED: New weapons added to the Exchange shop inventory with higher prices
 const shopInventories = {
     'Exchange': [
         { item: createShopItem(1, 'Weapon'), cost: 75 },
         { item: createShopItem(1, 'Plating'), cost: 50 },
         { item: createShopItem(1, 'Module'), cost: 50 },
         { item: createShopItem(1, 'Utility'), cost: 50 },
-        { item: generateEquipment(2), cost: 250 }
+        { item: createShopWeapon(1, 'Scatter'), cost: 200 },
+        { item: createShopWeapon(1, 'Beam'), cost: 225 },
+        { item: createShopWeapon(1, 'Launcher'), cost: 250 },
+        { item: generateEquipment(2), cost: 350 }
     ]
 };
 
@@ -209,7 +224,14 @@ class Player {
         this.teleportCooldown = 0;
         this.teleportMaxCooldown = 600; 
 
-        this.trade = { partnerId: null, offer: [], offerBits: 0, accepted: false };
+        // UPDATED: New trade object for two-stage system
+        this.trade = {
+            partnerId: null,
+            offerItems: [],
+            offerBits: 0,
+            acceptedStage1: false,
+            acceptedStage2: false
+        };
         this.inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, space: false, mouse: { down: false } };
     }
     
@@ -436,7 +458,7 @@ class Player {
                     const playerSocket = getSocketByPlayerId(this.id);
                     if (playerSocket) {
                         if (entity.name === "Bank") {
-                            if (!banks[this.username]) banks[this.username] = Array(12).fill(null);
+                            if (!banks[this.username]) banks[this.username] = []; // UPDATED: Bank is now an array of stacks
                             playerSocket.send(JSON.stringify({type: 'openBank', bank: banks[this.username]}));
                         } else {
                             playerSocket.send(JSON.stringify({type: 'openShop', npcName: entity.name, inventory: shopInventories[entity.name], marketListings: marketListings }));
@@ -469,7 +491,7 @@ class Player {
             teleportCooldown: this.teleportCooldown, dataBits: this.dataBits, inventory: this.inventory,
             equipment: this.equipment, isInvisible: this.isInvisible, shieldActive: this.shieldActive,
             isDead: this.isDead, isBoosting: this.isBoosting, className: this.className, level: this.level,
-            xp: this.xp, xpToNextLevel: this.xpToNextLevel, trade: this.trade,
+            xp: this.xp, xpToNextLevel: this.xpToNextLevel,
             isTeleporting: this.isTeleporting, teleportTimer: this.teleportTimer, TELEPORT_CHARGE_TIME: this.TELEPORT_CHARGE_TIME
         };
     }
@@ -783,7 +805,7 @@ class SerpentHead extends WorldBoss {
 class SerpentBody extends Enemy {
     constructor(x, y, head) {
         super(x, y, 5, 'SerpentBody');
-        this.isBossComponent = true; // --- CORRECTED: Mark this as a boss part to prevent despawning ---
+        this.isBossComponent = true; 
         this.head = head;
         this.radius = 25;
         this.health = this.maxHealth = 2000;
@@ -964,7 +986,7 @@ function gameLoop() {
     if (playerIds.length > 0) {
         for (let i = entities.length - 1; i >= 0; i--) {
             const entity = entities[i];
-            if ((entity instanceof Enemy && !entity.isBoss && !entity.isBossComponent)) { // --- CORRECTED: Added isBossComponent check ---
+            if ((entity instanceof Enemy && !entity.isBoss && !entity.isBossComponent)) { 
                 let isNearPlayer = false;
                 for (const pid of playerIds) {
                     const player = players[pid];
@@ -1142,14 +1164,17 @@ function gameLoop() {
 }
 setInterval(gameLoop, 1000 / TICK_RATE);
 
-// --- TRADE LOGIC ---
+// UPDATED: New helper function to count free inventory slots
+function countFreeInventorySlots(player) {
+    return player.inventory.filter(slot => slot === null).length;
+}
+
+// --- TRADE LOGIC (UPDATED) ---
 function startTrade(player1Id, player2Id) {
-    const tradeId = `trade_${Date.now()}`;
     const p1 = players[player1Id];
     const p2 = players[player2Id];
+    if (!p1 || !p2 || p1.trade.partnerId || p2.trade.partnerId) return;
 
-    activeTrades[tradeId] = { p1: player1Id, p2: player2Id };
-    
     p1.trade.partnerId = player2Id;
     p2.trade.partnerId = player1Id;
     
@@ -1166,37 +1191,61 @@ function cancelTrade(cancellerId, reason) {
     const partnerId = player.trade.partnerId;
     const partner = players[partnerId];
     
-    [player, partner].forEach(p => {
-        if(!p) return;
-        p.trade.offer.forEach(offerItem => {
-            p.inventory[offerItem.originalIndex] = offerItem.item;
-        });
-        p.dataBits += p.trade.offerBits;
-        p.trade = { partnerId: null, offer: [], offerBits: 0, accepted: false };
+    const resetTradeState = (p) => {
+        if (!p) return;
+        p.trade = { partnerId: null, offerItems: [], offerBits: 0, acceptedStage1: false, acceptedStage2: false };
         const socket = getSocketByPlayerId(p.id);
         if(socket) socket.send(JSON.stringify({ type: 'tradeCancelled', reason: reason }));
-    });
+    };
+
+    resetTradeState(player);
+    resetTradeState(partner);
 }
 
 function finalizeTrade(p1Id, p2Id) {
     const p1 = players[p1Id];
     const p2 = players[p2Id];
 
+    // Final validation
     if (!p1 || !p2 || p1.dataBits < p1.trade.offerBits || p2.dataBits < p2.trade.offerBits) {
         cancelTrade(p1Id, "An error occurred during trade.");
         return;
     }
+
+    // Validate inventory space
+    const p1FreeSlots = countFreeInventorySlots(p1);
+    const p2FreeSlots = countFreeInventorySlots(p2);
+
+    if (p1FreeSlots < p2.trade.offerItems.length || p2FreeSlots < p1.trade.offerItems.length) {
+        cancelTrade(p1Id, "Not enough inventory space to complete the trade.");
+        return;
+    }
     
-    p1.dataBits -= p1.trade.offerBits;
-    p2.dataBits -= p2.trade.offerBits;
-    p1.dataBits += p2.trade.offerBits;
-    p2.dataBits += p1.trade.offerBits;
+    // Process Bits
+    p1.dataBits = p1.dataBits - p1.trade.offerBits + p2.trade.offerBits;
+    p2.dataBits = p2.dataBits - p2.trade.offerBits + p1.trade.offerBits;
 
-    p2.trade.offer.forEach(item => p1.addToInventory(item.item));
-    p1.trade.offer.forEach(item => p2.addToInventory(item.item));
+    // Process Items
+    const p1ItemsToGive = [...p1.trade.offerItems];
+    const p2ItemsToGive = [...p2.trade.offerItems];
 
+    // Remove items from inventories first
+    p1ItemsToGive.forEach(itemToGive => {
+        const index = p1.inventory.findIndex(invItem => invItem && invItem.id === itemToGive.id);
+        if (index !== -1) p1.inventory[index] = null;
+    });
+    p2ItemsToGive.forEach(itemToGive => {
+        const index = p2.inventory.findIndex(invItem => invItem && invItem.id === itemToGive.id);
+        if (index !== -1) p2.inventory[index] = null;
+    });
+
+    // Add items to new inventories
+    p1ItemsToGive.forEach(item => p2.addToInventory(item));
+    p2ItemsToGive.forEach(item => p1.addToInventory(item));
+
+    // Reset trade state and notify players of completion
     [p1, p2].forEach(p => {
-        p.trade = { partnerId: null, offer: [], offerBits: 0, accepted: false };
+        p.trade = { partnerId: null, offerItems: [], offerBits: 0, acceptedStage1: false, acceptedStage2: false };
         const socket = getSocketByPlayerId(p.id);
         if (socket) socket.send(JSON.stringify({ type: 'tradeCompleted' }));
     });
@@ -1235,28 +1284,45 @@ wss.on('connection', (ws) => {
                     } else if (lootBag.type === 'EquipmentDrop') { if(player.addToInventory(lootBag.item)) { lootBag.isDead = true; } }
                 }
             }
+            // UPDATED: New bank logic for stacking and partial withdrawal
             if (player && data.type === 'bankAction') {
-                const playerBank = banks[player.username] || Array(12).fill(null);
+                const playerBank = banks[player.username] || [];
                 if (data.action === 'deposit') {
                     const item = player.inventory[data.itemIndex];
                     if (item) {
-                        const bankIndex = playerBank.findIndex(slot => slot === null);
-                        if (bankIndex !== -1) {
-                            playerBank[bankIndex] = item;
-                            player.inventory[data.itemIndex] = null;
+                        const existingStack = playerBank.find(stack => stack.item.id === item.id);
+                        if (existingStack) {
+                            existingStack.quantity++;
+                        } else {
+                            playerBank.push({ item: item, quantity: 1 });
                         }
+                        player.inventory[data.itemIndex] = null;
                     }
                 } else if (data.action === 'withdraw') {
-                    const item = playerBank[data.itemIndex];
-                    if (item && player.addToInventory(item)) {
-                        playerBank[data.itemIndex] = null;
+                    const bankStack = playerBank[data.itemIndex];
+                    if (bankStack) {
+                        const amountToWithdraw = data.amount === 'all' ? bankStack.quantity : Math.min(bankStack.quantity, data.amount || 1);
+                        if (amountToWithdraw > 0) {
+                            if (countFreeInventorySlots(player) >= amountToWithdraw) {
+                                for(let i = 0; i < amountToWithdraw; i++) {
+                                    player.addToInventory(bankStack.item);
+                                }
+                                bankStack.quantity -= amountToWithdraw;
+                                if (bankStack.quantity <= 0) {
+                                    playerBank.splice(data.itemIndex, 1);
+                                }
+                            }
+                        }
                     }
                 }
                 banks[player.username] = playerBank;
                 saveData('banks.json', banks);
                 ws.send(JSON.stringify({ type: 'openBank', bank: playerBank }));
             }
+
             if (player && data.type === 'marketAction') { /* ... existing market code ... */ }
+            
+            // UPDATED: New two-stage trade logic
             if (player && data.type === 'tradeRequest') {
                 const targetPlayer = players[data.targetId];
                 if (targetPlayer && !targetPlayer.trade.partnerId) {
@@ -1273,42 +1339,45 @@ wss.on('connection', (ws) => {
                 }
             }
             if (player && player.trade.partnerId && data.type === 'tradeUpdate') {
-                player.trade.offer = [];
-                data.offerItems.forEach(offerItem => {
-                    const originalItem = player.inventory[offerItem.originalIndex];
-                    if (originalItem && originalItem.id === offerItem.item.id) {
-                        player.trade.offer.push(offerItem);
-                    }
-                });
-                player.inventory.forEach((item, index) => {
-                    if (item && player.trade.offer.some(o => o.originalIndex === index)) {
-                        player.inventory[index] = null;
-                    }
-                });
-                 data.offerItems.forEach(offerItem => {
-                     if (!player.inventory[offerItem.originalIndex]) {
-                         player.inventory[offerItem.originalIndex] = offerItem.item;
-                     }
-                 });
-                player.trade.offerBits = Math.max(0, parseInt(data.offerBits, 10)) || 0;
-                player.trade.accepted = false;
                 const partner = players[player.trade.partnerId];
-                if (partner) {
-                    partner.trade.accepted = false;
+                if (!partner) return;
+                player.trade.offerItems = data.offerItems;
+                player.trade.offerBits = Math.max(0, parseInt(data.offerBits, 10)) || 0;
+                player.trade.acceptedStage1 = false;
+                partner.trade.acceptedStage1 = false;
+                
+                const partnerSocket = getSocketByPlayerId(partner.id);
+                if (partnerSocket) {
+                    partnerSocket.send(JSON.stringify({ type: 'tradeUpdate', offer: { offer: player.trade.offerItems, offerBits: player.trade.offerBits } }));
+                    partnerSocket.send(JSON.stringify({ type: 'tradeStatusChange', myAccepted: partner.trade.acceptedStage1, partnerAccepted: player.trade.acceptedStage1 }));
+                }
+                ws.send(JSON.stringify({ type: 'tradeStatusChange', myAccepted: player.trade.acceptedStage1, partnerAccepted: partner.trade.acceptedStage1 }));
+            }
+            if (player && player.trade.partnerId && data.type === 'tradeAcceptStage1') {
+                const partner = players[player.trade.partnerId];
+                if (!partner) return;
+                player.trade.acceptedStage1 = true;
+
+                if (partner.trade.acceptedStage1) {
+                    // Both have accepted stage 1, move to confirmation
+                    const myOfferSummary = { items: player.trade.offerItems, bits: player.trade.offerBits };
+                    const partnerOfferSummary = { items: partner.trade.offerItems, bits: partner.trade.offerBits };
+                    ws.send(JSON.stringify({ type: 'tradeShowConfirmation', myOffer: myOfferSummary, partnerOffer: partnerOfferSummary }));
                     const partnerSocket = getSocketByPlayerId(partner.id);
-                    if (partnerSocket) {
-                        partnerSocket.send(JSON.stringify({ type: 'tradeUpdate', offer: player.trade }));
-                    }
+                    if(partnerSocket) partnerSocket.send(JSON.stringify({ type: 'tradeShowConfirmation', myOffer: partnerOfferSummary, partnerOffer: myOfferSummary }));
+                } else {
+                    // Just notify of status change
+                    const partnerSocket = getSocketByPlayerId(partner.id);
+                    if(partnerSocket) partnerSocket.send(JSON.stringify({ type: 'tradeStatusChange', myAccepted: partner.trade.acceptedStage1, partnerAccepted: player.trade.acceptedStage1 }));
+                    ws.send(JSON.stringify({ type: 'tradeStatusChange', myAccepted: player.trade.acceptedStage1, partnerAccepted: partner.trade.acceptedStage1 }));
                 }
             }
-             if (player && player.trade.partnerId && data.type === 'tradeAccept') {
-                player.trade.accepted = true;
+            if (player && player.trade.partnerId && data.type === 'tradeAcceptStage2') {
                 const partner = players[player.trade.partnerId];
-                if (partner && partner.trade.accepted) {
+                if (!partner) return;
+                player.trade.acceptedStage2 = true;
+                if (partner.trade.acceptedStage2) {
                     finalizeTrade(player.id, partner.id);
-                } else if (partner) {
-                    const partnerSocket = getSocketByPlayerId(partner.id);
-                    if(partnerSocket) partnerSocket.send(JSON.stringify({ type: 'tradePartnerAccepted' }));
                 }
             }
             if (player && player.trade.partnerId && data.type === 'tradeCancel') {
