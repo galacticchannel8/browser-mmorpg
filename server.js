@@ -87,21 +87,9 @@ const cityData = [
 ];
 
 const CITY_SPAWN_POINT = { x: 8 * TILE_SIZE, y: 8 * TILE_SIZE };
-// UPDATED: Adjusted Oracle position to be better centered
-const BOSS_LOCATIONS = { DREADNOUGHT: {x: 150*TILE_SIZE, y: 150*TILE_SIZE}, SERPENT: {x: -150*TILE_SIZE, y: -150*TILE_SIZE}, ORACLE: {x: 0.5 * TILE_SIZE, y: 300*TILE_SIZE}, VOID_HUNTER: {x: 300*TILE_SIZE, y: 0} };
+const BOSS_LOCATIONS = { DREADNOUGHT: {x: 150*TILE_SIZE, y: 150*TILE_SIZE}, SERPENT: {x: -150*TILE_SIZE, y: -150*TILE_SIZE}, ORACLE: {x: 0, y: 300*TILE_SIZE}, VOID_HUNTER: {x: 300*TILE_SIZE, y: 0} };
 const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
-
-function createShopWeapon(tier, type) {
-    const baseNames = { 'Scatter': 'Scattergun', 'Beam': 'Beam Emitter', 'Launcher': 'Ordnance Launcher' };
-    return {
-        id: `wep_${type.toLowerCase()}_${tier}`,
-        slot: 'Weapon',
-        tier,
-        type,
-        name: `T${tier} ${baseNames[type]}`,
-        stats: {} 
-    };
-}
+function createShopWeapon(tier, type) { return { id: `wep_${type}_${tier}`, slot: 'Weapon', tier, type, name: `${type} Emitter` }; }
 function generateEquipment(tier) {
     tier = Math.max(1, Math.min(6, tier));
     const slots = ['Module', 'Plating', 'Utility'];
@@ -145,18 +133,12 @@ const shopInventories = {
         { item: createShopItem(1, 'Plating'), cost: 50 },
         { item: createShopItem(1, 'Module'), cost: 50 },
         { item: createShopItem(1, 'Utility'), cost: 50 },
-        { item: createShopWeapon(1, 'Scatter'), cost: 200 },
-        { item: createShopWeapon(1, 'Beam'), cost: 225 },
-        { item: createShopWeapon(1, 'Launcher'), cost: 250 },
-        { item: generateEquipment(2), cost: 350 }
+        { item: generateEquipment(2), cost: 250 }
     ]
 };
 
 const localWorld = {};
-function generateChunk(chunkX, chunkY) { const key = `${chunkX},${chunkY}`; if (localWorld[key]) return; const chunk = { tiles: Array(CHUNK_SIZE * CHUNK_SIZE).fill(1) }; for(const bossName in BOSS_LOCATIONS) { const loc = BOSS_LOCATIONS[bossName]; const bossChunkX = Math.floor(loc.x / TILE_SIZE / CHUNK_SIZE); const bossChunkY = Math.floor(loc.y / TILE_SIZE / CHUNK_SIZE); if(chunkX === bossChunkX && chunkY === bossChunkY){ for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { const worldX = (chunkX * CHUNK_SIZE + x) * TILE_SIZE; const worldY = (chunkY * CHUNK_SIZE + y) * TILE_SIZE; const dist = Math.hypot(worldX - loc.x, worldY - loc.y); if (dist < 10 * TILE_SIZE) chunk.tiles[y * CHUNK_SIZE + x] = 13; 
-    // UPDATED: Arena wall generation logic thickened to prevent gaps
-    if (dist >= 9 * TILE_SIZE && dist < 10.5 * TILE_SIZE) chunk.tiles[y * CHUNK_SIZE + x] = 12; 
-} localWorld[key] = chunk; broadcastMessage({type: 'worldChunkUpdate', key: key, chunk: chunk}); return;} } if (chunkX === 0 && chunkY === 0) { for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { chunk.tiles[y * CHUNK_SIZE + x] = cityData[y]?.[x] ?? 10; } } else {
+function generateChunk(chunkX, chunkY) { const key = `${chunkX},${chunkY}`; if (localWorld[key]) return; const chunk = { tiles: Array(CHUNK_SIZE * CHUNK_SIZE).fill(1) }; for(const bossName in BOSS_LOCATIONS) { const loc = BOSS_LOCATIONS[bossName]; const bossChunkX = Math.floor(loc.x / TILE_SIZE / CHUNK_SIZE); const bossChunkY = Math.floor(loc.y / TILE_SIZE / CHUNK_SIZE); if(chunkX === bossChunkX && chunkY === bossChunkY){ for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { const worldX = (chunkX * CHUNK_SIZE + x) * TILE_SIZE; const worldY = (chunkY * CHUNK_SIZE + y) * TILE_SIZE; const dist = Math.hypot(worldX - loc.x, worldY - loc.y); if (dist < 10 * TILE_SIZE) chunk.tiles[y * CHUNK_SIZE + x] = 13; if (dist >= 9 * TILE_SIZE && dist < 10 * TILE_SIZE) chunk.tiles[y * CHUNK_SIZE + x] = 12; } localWorld[key] = chunk; broadcastMessage({type: 'worldChunkUpdate', key: key, chunk: chunk}); return;} } if (chunkX === 0 && chunkY === 0) { for (let y = 0; y < CHUNK_SIZE; y++) for (let x = 0; x < CHUNK_SIZE; x++) { chunk.tiles[y * CHUNK_SIZE + x] = cityData[y]?.[x] ?? 10; } } else {
         for (let y = 0; y < CHUNK_SIZE; y++) {
             for (let x = 0; x < CHUNK_SIZE; x++) {
                 const wX = chunkX * CHUNK_SIZE + x, wY = chunkY * CHUNK_SIZE + y;
@@ -226,13 +208,7 @@ class Player {
         this.teleportCooldown = 0;
         this.teleportMaxCooldown = 600; 
 
-        this.trade = {
-            partnerId: null,
-            offerItems: [],
-            offerBits: 0,
-            acceptedStage1: false,
-            acceptedStage2: false
-        };
+        this.trade = { partnerId: null, offer: [], offerBits: 0, accepted: false };
         this.inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, space: false, mouse: { down: false } };
     }
     
@@ -342,18 +318,12 @@ class Player {
         if (this.trade.partnerId || this.isTeleporting) return;
         const weapon = this.equipment.Weapon || { type: 'Default' };
         this.gunCooldown = 1 / this.stats.fireRate;
-        // UPDATED: Added a source object for better death messages
-        const projectileData = {
-            source: { id: this.id, name: this.username },
-            angle: this.angle,
-            color: this.color,
-            damage: this.stats.damage
-        };
+        const p = { ownerId: this.id, angle: this.angle, color: this.color, damage: this.stats.damage };
         switch(weapon.type) {
-            case 'Beam': if(this.energy > 5){ this.energy -= 5; entities.push(new Laser(this.x, this.y, projectileData, 800)); } break;
-            case 'Scatter': for(let i=0; i < 5; i++) { projectileData.angle = this.angle + (Math.random() - 0.5) * 0.4; entities.push(new Projectile(this.x, this.y, projectileData)); } break;
-            case 'Launcher': entities.push(new Grenade(this.x, this.y, projectileData, 60)); break;
-            default: entities.push(new Projectile(this.x, this.y, projectileData)); break;
+            case 'Beam': if(this.energy > 5){ this.energy -= 5; entities.push(new Laser(this.x, this.y, p, 800)); } break;
+            case 'Scatter': for(let i=0; i < 5; i++) { p.angle = this.angle + (Math.random() - 0.5) * 0.4; entities.push(new Projectile(this.x, this.y, p)); } break;
+            case 'Launcher': entities.push(new Grenade(this.x, this.y, p, 60)); break;
+            default: entities.push(new Projectile(this.x, this.y, p)); break;
         }
     }
 
@@ -361,9 +331,7 @@ class Player {
         if (this.trade.partnerId || this.isTeleporting) return;
         this.meleeCooldown = 0.8;
         const meleeDamage = this.stats.damage * 1.5;
-        // UPDATED: Added a source object for better death messages
-        const source = { id: this.id, name: this.username };
-        entities.push(new MeleeSlash(this.x, this.y, this.angle, source, meleeDamage, this.color));
+        entities.push(new MeleeSlash(this.x, this.y, this.angle, this.id, meleeDamage, this.color));
     }
 
     takeDamage(amount, damager = null) {
@@ -388,10 +356,15 @@ class Player {
         }
         this.isDead = true;
 
-        // UPDATED: Logic to get a specific killer name for the tombstone
         let causeOfDeath = 'The Void';
-        if (killer && killer.source) {
-            causeOfDeath = killer.source.name;
+        if (killer) {
+            if (killer.ownerId && players[killer.ownerId]) {
+                causeOfDeath = players[killer.ownerId].username;
+            } else if (killer.bossName) {
+                causeOfDeath = killer.bossName;
+            } else if (killer.type) {
+                causeOfDeath = killer.type.replace(/([A-Z])/g, ' $1').trim();
+            }
         }
 
         let lootBagId = null;
@@ -422,15 +395,20 @@ class Player {
         this.energy = this.stats.maxEnergy;
     }
 
-    addToInventory(item) {
-        if (!item) return false;
-        const index = this.inventory.findIndex(slot => slot === null);
-        if (index !== -1) {
-            this.inventory[index] = { ...item };
-            this.recalculateStats();
-            return true;
+    addToInventory(item, quantity = 1) {
+        if (!item) return 0;
+        let addedCount = 0;
+        for (let q = 0; q < quantity; q++) {
+            const index = this.inventory.findIndex(slot => slot === null);
+            if (index !== -1) {
+                this.inventory[index] = { ...item };
+                addedCount++;
+            } else {
+                break; // Inventory is full
+            }
         }
-        return false;
+        if (addedCount > 0) this.recalculateStats();
+        return addedCount;
     }
 
     attemptInteraction() {
@@ -447,7 +425,7 @@ class Player {
                     return;
                 }
                 if (entity instanceof AdminPanel) {
-                    if (this.username === "GalacticChannel8") {
+                    if (this.username === "GalacticChannel8") { // CHANGE YOUR ADMIN NAME HERE
                         const playerSocket = getSocketByPlayerId(this.id);
                         if (playerSocket) playerSocket.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Admin Panel Authenticated.', color: '#ff3355'}));
                     }
@@ -495,7 +473,7 @@ class Player {
             teleportCooldown: this.teleportCooldown, dataBits: this.dataBits, inventory: this.inventory,
             equipment: this.equipment, isInvisible: this.isInvisible, shieldActive: this.shieldActive,
             isDead: this.isDead, isBoosting: this.isBoosting, className: this.className, level: this.level,
-            xp: this.xp, xpToNextLevel: this.xpToNextLevel,
+            xp: this.xp, xpToNextLevel: this.xpToNextLevel, trade: this.trade,
             isTeleporting: this.isTeleporting, teleportTimer: this.teleportTimer, TELEPORT_CHARGE_TIME: this.TELEPORT_CHARGE_TIME
         };
     }
@@ -564,7 +542,7 @@ class Enemy extends Entity {
                 if (!isSolid(getTile(nX, this.y))) this.x = nX;
                 if (!isSolid(getTile(this.x, nY))) this.y = nY;
             } else {
-                targetPlayer.takeDamage(40 * this.damageMultiplier * dt, { source: { name: this.type }});
+                targetPlayer.takeDamage(40 * this.damageMultiplier * dt, this);
             }
         } else {
             this.wanderTimer -= dt;
@@ -590,8 +568,8 @@ class Enemy extends Entity {
         entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(amount)}`, '#ffffff'));
         if (this.health <= 0 && !this.isDead) {
             this.isDead = true;
-            if (damager && damager.source && players[damager.source.id]) {
-                players[damager.source.id].addXp(this.xpValue);
+            if (damager && players[damager.ownerId]) {
+                players[damager.ownerId].addXp(this.xpValue);
             }
             for (let i = 0; i < 2; i++) entities.push(new LootDrop(this.x, this.y, this.threatLevel));
             const dropChance = 0.01 + (this.threatLevel * 0.025);
@@ -603,9 +581,7 @@ class Enemy extends Entity {
         }
     }
 }
-class Stinger extends Enemy { constructor(x, y, tL) { super(x, y, tL, 'Stinger'); this.radius = 10; this.speed = 4; this.health = this.maxHealth = 40; this.color = '#f07cff'; this.shootCooldown = 1.6; this.xpValue = 20 * tL; this.applyThreatLevel(); } update(dt) { super.update(dt); this.shootCooldown -= dt; if (this.shootCooldown <= 0) { this.shootCooldown = 1.6; for(const pid in players){ const player = players[pid]; if(!player.isDead && !player.isTeleporting && Math.hypot(player.x - this.x, player.y - this.y) < this.aggroRadius){ 
-    const p = { source: { id: this.id, name: this.type }, angle: Math.atan2(player.y - this.y, player.x - this.x), color: this.color, damage: 30*this.damageMultiplier }; 
-    entities.push(new Projectile(this.x, this.y, p, 0.8)); break; } } } } }
+class Stinger extends Enemy { constructor(x, y, tL) { super(x, y, tL, 'Stinger'); this.radius = 10; this.speed = 4; this.health = this.maxHealth = 40; this.color = '#f07cff'; this.shootCooldown = 1.6; this.xpValue = 20 * tL; this.applyThreatLevel(); } update(dt) { super.update(dt); this.shootCooldown -= dt; if (this.shootCooldown <= 0) { this.shootCooldown = 1.6; for(const pid in players){ const player = players[pid]; if(!player.isDead && !player.isTeleporting && Math.hypot(player.x - this.x, player.y - this.y) < this.aggroRadius){ const p = { ownerId: this.id, angle: Math.atan2(player.y - this.y, player.x - this.x), color: this.color, damage: 30*this.damageMultiplier }; entities.push(new Projectile(this.x, this.y, p, 0.8)); break; } } } } }
 class VoidSwarmer extends Enemy {
     constructor(x, y, tL) {
         super(x, y, tL, 'VoidSwarmer');
@@ -703,7 +679,6 @@ class GravityWell extends Enemy {
     }
 }
 
-// UPDATED: All WorldBosses now have leashing capabilities
 class WorldBoss extends Enemy {
     constructor(x, y, name, color, hp, type) {
         super(x, y, 5, type);
@@ -712,22 +687,21 @@ class WorldBoss extends Enemy {
         this.color = color;
         this.health = this.maxHealth = hp;
         this.radius = 80;
-        this.aggroRadius = 1500; // Standard aggro radius
+        this.aggroRadius = 2000;
         this.attackPhase = 'idle';
         this.attackTimer = 0;
         this.xpValue = 5000;
         this.spawnX = x;
         this.spawnY = y;
-        this.leashRadius = 2500; // How far they can be pulled
     }
     takeDamage(amount, damager = null) {
         this.health -= amount;
         entities.push(new FloatingText(this.x, this.y - this.radius, `-${Math.floor(amount)}`, '#ffffff'));
         if (this.health <= 0 && !this.isDead) {
             this.isDead = true;
-            if(damager && damager.source && players[damager.source.id]) {
-                broadcastMessage({ type: 'chat', sender: 'SYSTEM', message: `${players[damager.source.id].username} has defeated the ${this.bossName}!`, color: '#ff00ff' });
-                players[damager.source.id].addXp(this.xpValue);
+            if(damager && players[damager.ownerId]) {
+                broadcastMessage({ type: 'chat', sender: 'SYSTEM', message: `${players[damager.ownerId].username} has defeated the ${this.bossName}!`, color: '#ff00ff' });
+                players[damager.ownerId].addXp(this.xpValue);
             }
             bossRespawnTimers[this.bossName] = 300;
             for (let i = 0; i < 2; i++) entities.push(new EquipmentDrop(this.x, this.y, generateEquipment(5)));
@@ -741,16 +715,17 @@ class WorldBoss extends Enemy {
     }
 }
 class Dreadnought extends WorldBoss {
-    constructor(x, y) { super(x, y, "DREADNOUGHT", '#ff6a00', 15000, "Dreadnought"); }
+    constructor(x, y) {
+        super(x, y, "DREADNOUGHT", '#ff6a00', 15000, "Dreadnought");
+        this.leashRadius = 1000;
+    }
     update(dt) {
-        const distFromSpawn = Math.hypot(this.x - this.spawnX, this.y - this.spawnY);
-        if (distFromSpawn > this.leashRadius) {
+        if (Math.hypot(this.x - this.spawnX, this.y - this.spawnY) > this.leashRadius) {
             const angleToSpawn = Math.atan2(this.spawnY - this.y, this.spawnX - this.x);
-            this.x += Math.cos(angleToSpawn) * this.speed * (dt * 60);
-            this.y += Math.sin(angleToSpawn) * this.speed * (dt * 60);
+            this.x += Math.cos(angleToSpawn) * this.speed * 2 * (dt*60);
+            this.y += Math.sin(angleToSpawn) * this.speed * 2 * (dt*60);
             return;
         }
-
         let targetPlayer = null;
         for(const pid in players) { const p = players[pid]; if(!p.isDead && !p.isTeleporting && Math.hypot(p.x - this.x, p.y - this.y) < this.aggroRadius) { targetPlayer = p; break; }}
         if (!targetPlayer) return;
@@ -758,7 +733,7 @@ class Dreadnought extends WorldBoss {
         if(dP > 400 && !isCity(this.x, this.y)) { this.x += (dX / dP) * this.speed * (dt * 60); this.y += (dY / dP) * this.speed * (dt * 60); }
         this.attackTimer -= dt;
         if(this.attackTimer <= 0) {
-            const p = { source: { id: this.id, name: this.bossName }, angle: Math.atan2(dY, dX), color: this.color, damage: 80 };
+            const p = { ownerId: this.id, angle: Math.atan2(dY, dX), color: this.color, damage: 80 };
             switch(this.attackPhase) {
                 case 'idle': case 'barrage':
                     this.attackTimer = 3;
@@ -766,18 +741,17 @@ class Dreadnought extends WorldBoss {
                     this.attackPhase = 'mortar'; break;
                 case 'mortar':
                     this.attackTimer = 5;
-                    entities.push(new MortarProjectile(this.x, this.y, targetPlayer.x, targetPlayer.y, { id: this.id, name: this.bossName }));
+                    entities.push(new MortarProjectile(this.x, this.y, targetPlayer.x, targetPlayer.y, this.id));
                     this.attackPhase = 'barrage'; break;
             }
         }
     }
 }
-// UPDATED: Serpent leashing and reduced aggro range
 class SerpentHead extends WorldBoss {
     constructor(x, y) {
         super(x, y, "SERPENT", '#33ff99', 12000, "SerpentHead");
         this.radius = 30;
-        this.aggroRadius = 1200; // Reduced from default
+        this.leashRadius = 1200;
         this.segments = [];
         let leader = this;
         for(let i=1; i<=8; i++) {
@@ -788,29 +762,28 @@ class SerpentHead extends WorldBoss {
         }
     }
     update(dt) {
-        const distFromSpawn = Math.hypot(this.x - this.spawnX, this.y - this.spawnY);
-        let targetPlayer=null; for(const pid in players){const p=players[pid]; if(!p.isDead && !p.isTeleporting && Math.hypot(p.x-this.x,p.y-this.y) < this.aggroRadius){targetPlayer=p; break;}}
-        
-        if (distFromSpawn > this.leashRadius || !targetPlayer) {
-            if (distFromSpawn > 50) { // Return to spawn if far away
-                const angleToSpawn = Math.atan2(this.spawnY - this.y, this.spawnX - this.x);
-                this.x += Math.cos(angleToSpawn) * this.speed * (dt * 60);
-                this.y += Math.sin(angleToSpawn) * this.speed * (dt * 60);
-            }
-        } else if (targetPlayer) {
+        if (Math.hypot(this.x - this.spawnX, this.y - this.spawnY) > this.leashRadius) {
+            const angleToSpawn = Math.atan2(this.spawnY - this.y, this.spawnX - this.x);
+            this.x += Math.cos(angleToSpawn) * this.speed * 2 * (dt*60);
+            this.y += Math.sin(angleToSpawn) * this.speed * 2 * (dt*60);
+        } else {
+            let targetPlayer=null; for(const pid in players){const p=players[pid]; if(!p.isDead && !p.isTeleporting && Math.hypot(p.x-this.x,p.y-this.y) < this.aggroRadius){targetPlayer=p; break;}} if(!targetPlayer) return;
+            
             const dX = targetPlayer.x - this.x;
             const dY = targetPlayer.y - this.y;
             const distToPlayer = Math.hypot(dX, dY);
             if (distToPlayer > 300 && !isCity(this.x, this.y)) {
                 const timeAdjustedSpeed = this.speed * (dt * 60);
-                this.x += (dX / distToPlayer) * timeAdjustedSpeed;
-                this.y += (dY / distToPlayer) * timeAdjustedSpeed;
+                const nX = this.x + (dX / distToPlayer) * timeAdjustedSpeed;
+                const nY = this.y + (dY / distToPlayer) * timeAdjustedSpeed;
+                if (!isSolid(getTile(nX, this.y))) this.x = nX;
+                if (!isSolid(getTile(this.x, nY))) this.y = nY;
             }
 
             this.attackTimer -= dt;
             if(this.attackTimer <= 0) {
                 this.attackTimer = 0.3;
-                const proj = { source: { id: this.id, name: this.bossName }, angle: Math.atan2(targetPlayer.y-this.y, targetPlayer.x-this.x), color: this.color, damage: 60 };
+                const proj = { ownerId: this.id, angle: Math.atan2(targetPlayer.y-this.y, targetPlayer.x-this.x), color: this.color, damage: 60 };
                 entities.push(new Projectile(this.x, this.y, proj, 1.2, 8));
             }
         }
@@ -832,7 +805,7 @@ class SerpentHead extends WorldBoss {
 class SerpentBody extends Enemy {
     constructor(x, y, head) {
         super(x, y, 5, 'SerpentBody');
-        this.isBossComponent = true; 
+        this.isBossComponent = true;
         this.head = head;
         this.radius = 25;
         this.health = this.maxHealth = 2000;
@@ -856,20 +829,21 @@ class SerpentBody extends Enemy {
             this.shootCooldown = Math.random() * 3 + 2;
             let targetPlayer=null; for(const pid in players){const p=players[pid]; if(!p.isDead && !p.isTeleporting && Math.hypot(p.x-this.x,p.y-this.y) < this.aggroRadius){targetPlayer=p; break;}}
             if (targetPlayer) {
-                 const p = { source: {id: this.id, name: this.type}, angle: Math.atan2(targetPlayer.y - this.y, targetPlayer.x - this.x), color: this.color, damage: 40 };
+                 const p = { ownerId: this.id, angle: Math.atan2(targetPlayer.y - this.y, targetPlayer.x - this.x), color: this.color, damage: 40 };
                  entities.push(new Projectile(this.x, this.y, p));
             }
         }
     }
 }
-// UPDATED: Oracle is now stationary
 class TheOracle extends WorldBoss {
     constructor(x,y) { super(x,y, "THE ORACLE", '#a832a4', 10000, "TheOracle"); }
     update(dt) {
-        // This boss does not move.
+        let targetPlayer = null; for(const pid in players) { const p = players[pid]; if(!p.isDead && !p.isTeleporting && Math.hypot(p.x-this.x, p.y-this.y) < this.aggroRadius) { targetPlayer = p; break; }}
+        if (!targetPlayer) { this.attackPhase = 'idle'; return; }
+
         this.attackTimer -= dt;
         if(this.attackTimer <= 0) {
-            const p = { source: { id: this.id, name: this.bossName }, color: this.color, damage: 50};
+            const p = { ownerId: this.id, color: this.color, damage: 50};
             switch(this.attackPhase) {
                 case 'idle': case 'barrage':
                     for(let i=0; i<12; i++) { p.angle = (i/12) * Math.PI*2 + Date.now()/1000; entities.push(new Projectile(this.x, this.y, p)); }
@@ -888,79 +862,74 @@ class TheOracle extends WorldBoss {
         }
     }
 }
-// UPDATED: Void Hunter has new predatory AI
 class VoidHunter extends WorldBoss {
-    constructor(x, y) { 
-        super(x, y, "VOID HUNTER", '#1f283e', 20000, "aclysmHunter"); 
-        this.radius = 25; 
-        this.isInvisible = true; 
+    constructor(x, y) {
+        super(x, y, "VOID HUNTER", '#1f283e', 20000, "aclysmHunter");
+        this.radius = 25;
+        this.isInvisible = true;
         this.attackTimer = 3;
-        this.lockedTargetId = null; // New property for predatory AI
-        this.leashRadius = Infinity; // This boss does not leash
+        this.lockedTargetId = null;
     }
     update(dt) {
-        // Predatory AI logic
         let targetPlayer = this.lockedTargetId ? players[this.lockedTargetId] : null;
 
-        // Reset if target is dead or disconnected
-        if (targetPlayer && (targetPlayer.isDead || !targetPlayer)) {
+        // Check if target is still valid
+        if (!targetPlayer || targetPlayer.isDead || Math.hypot(targetPlayer.x - this.x, targetPlayer.y - this.y) > this.aggroRadius) {
             this.lockedTargetId = null;
-            this.isInvisible = true;
-            this.x = this.spawnX;
-            this.y = this.spawnY;
-            return;
+            targetPlayer = null;
         }
 
-        // Find a new target if it doesn't have one
-        if (!targetPlayer) {
+        // Find a new target if we don't have one
+        if (!this.lockedTargetId) {
+            this.isInvisible = true;
+            // Return to spawn if idle
+            if (Math.hypot(this.x - this.spawnX, this.y - this.spawnY) > 10) {
+                const angleToSpawn = Math.atan2(this.spawnY - this.y, this.spawnX - this.x);
+                this.x += Math.cos(angleToSpawn) * this.speed * (dt*60);
+                this.y += Math.sin(angleToSpawn) * this.speed * (dt*60);
+            }
+            // Look for a new target
             for(const pid in players){
                 const p = players[pid]; 
-                if(!p.isDead && !p.isTeleporting && Math.hypot(p.x - this.x, p.y - this.y) < this.aggroRadius) {
+                if(!p.isDead && !p.isTeleporting && Math.hypot(p.x - this.x, p.y - this.y) < this.aggroRadius / 2) {
                     this.lockedTargetId = pid;
-                    targetPlayer = p;
                     break;
                 }
             }
+            return; // Wait until a target is found
         }
-
-        if (!targetPlayer) { // Still no target, do nothing
-            this.isInvisible = true;
-            return;
-        }
-
-        // --- Standard attack logic, but only against the locked target ---
-        const dX = targetPlayer.x - this.x, dY = targetPlayer.y - this.y;
-        this.x += (dX / Math.hypot(dX, dY)) * this.speed * (dt * 60);
-        this.y += (dY / Math.hypot(dX, dY)) * this.speed * (dt * 60);
-
+        
+        super.update(dt);
         this.attackTimer -= dt;
         if(this.attackTimer <= 0) {
             this.attackTimer = 5;
             this.isInvisible = false;
             setTimeout(() => {
-                if(this.isDead) return;
-                const currentTarget = players[this.lockedTargetId];
-                if (!currentTarget) return; // Target might have disconnected during the wait
-                for(let i=0; i<10; i++) {
-                    const proj = { source: {id: this.id, name: this.bossName }, angle: Math.atan2(currentTarget.y-this.y, currentTarget.x-this.x) + (Math.random()-0.5)*0.8, color: '#ff3355', damage: 120};
-                    entities.push(new Projectile(this.x, this.y, proj, 0.5));
-                }
-                setTimeout(() => {
-                    if(this.isDead) return;
-                    this.isInvisible = true;
-                    const angle = Math.random()*Math.PI*2;
-                    this.x = currentTarget.x + Math.cos(angle)*400;
-                    this.y = currentTarget.y + Math.sin(angle)*400;
-                }, 1000);
+                if(this.isDead || !this.lockedTargetId) return;
+                try {
+                    const currentTarget = players[this.lockedTargetId];
+                    if(!currentTarget) return;
+                    for(let i=0; i<10; i++) {
+                        const proj = { ownerId: this.id, angle: Math.atan2(currentTarget.y-this.y, currentTarget.x-this.x) + (Math.random()-0.5)*0.8, color: '#ff3355', damage: 120};
+                        entities.push(new Projectile(this.x, this.y, proj, 0.5));
+                    }
+                    setTimeout(() => {
+                        if(this.isDead) return;
+                        this.isInvisible = true;
+                        const angle = Math.random()*Math.PI*2;
+                        this.x = currentTarget.x + Math.cos(angle)*400;
+                        this.y = currentTarget.y + Math.sin(angle)*400;
+                    }, 1000);
+                } catch(e) {}
             }, 1000);
         }
     }
 }
 
 class MeleeSlash extends Entity {
-    constructor(x, y, angle, source, damage, color) { // UPDATED: Takes a source object now
+    constructor(x, y, angle, ownerId, damage, color) {
         super(x, y, 'MeleeSlash');
-        this.source = source;
+        this.ownerId = ownerId;
         this.angle = angle;
         this.damage = damage;
         this.color = color;
@@ -977,14 +946,14 @@ class MeleeSlash extends Entity {
     }
 }
 
-class Projectile extends Entity { constructor(x,y,p,l=1.5,r=4){ super(x,y,'Projectile'); this.source = p.source; this.angle = p.angle; this.radius=r; this.speed=15; this.life=l; this.color=p.color; this.damage=p.damage;} update(dt){ this.x+=Math.cos(this.angle)*this.speed*(dt*60); this.y+=Math.sin(this.angle)*this.speed*(dt*60); this.life-=dt; if(this.life<=0||isSolid(getTile(this.x,this.y))) this.isDead=true; } }
-class MortarProjectile extends Entity { constructor(sX,sY,tX,tY,source){ super(sX,sY,'MortarProjectile'); this.tX=tX; this.tY=tY; this.source=source; this.life=2; this.radius=15 } update(dt){ this.life-=dt; if(this.life<=0){ this.isDead=true; entities.push(new Shockwave(this.tX,this.tY,150,40,this.source)); } } }
-class Laser extends Entity { constructor(x,y,p,l){ super(x,y,'Laser'); this.source=p.source; this.angle=p.angle; this.color=p.color; this.damage=p.damage; this.length=l; this.life=0.1;} update(dt){ this.life-=dt; if(this.life<=0) this.isDead = true; } }
-class Grenade extends Projectile { constructor(x,y,p,rad) { super(x,y,p,0.8,8); this.type='Grenade'; this.speed=10; this.explosionRadius = rad; } update(dt) { super.update(dt); if(this.life <= 0) { this.isDead = true; entities.push(new Shockwave(this.x, this.y, this.explosionRadius, this.damage, this.source)); } } }
-class Shockwave extends Entity { constructor(x,y,mR,d,source){ super(x,y,'Shockwave'); this.source=source; this.radius=0; this.maxRadius=mR; this.damage=d; this.life=0.5; this.hitTargets=[]; } update(dt){ this.radius += this.maxRadius * 3 * dt; this.life -= dt; if(this.life <= 0) this.isDead = true; } }
-class NPC extends Entity { constructor(x, y, name, color = '#8a2be2') { super(x, y, 'NPC'); this.name = name; this.radius = 12; this.color = color; } }
+class Projectile extends Entity { constructor(x,y,p,l=1.5,r=4){ super(x,y,'Projectile'); this.ownerId = p.ownerId; this.angle = p.angle; this.radius=r; this.speed=15; this.life=l; this.color=p.color; this.damage=p.damage;} update(dt){ this.x+=Math.cos(this.angle)*this.speed*(dt*60); this.y+=Math.sin(this.angle)*this.speed*(dt*60); this.life-=dt; if(this.life<=0||isSolid(getTile(this.x,this.y))) this.isDead=true; } }
+class MortarProjectile extends Entity { constructor(sX,sY,tX,tY,ownerId){ super(sX,sY,'MortarProjectile'); this.tX=tX; this.tY=tY; this.ownerId=ownerId; this.life=2; this.radius=15 } update(dt){ this.life-=dt; if(this.life<=0){ this.isDead=true; entities.push(new Shockwave(this.tX,this.tY,150,40,this.ownerId)); } } }
+class Laser extends Entity { constructor(x,y,p,l){ super(x,y,'Laser'); this.ownerId=p.ownerId; this.angle=p.angle; this.color=p.color; this.damage=p.damage; this.length=l; this.life=0.1;} update(dt){ this.life-=dt; if(this.life<=0) this.isDead = true; } }
+class Grenade extends Projectile { constructor(x,y,p,rad) { super(x,y,p,0.8,8); this.type='Grenade'; this.speed=10; this.explosionRadius = rad; } update(dt) { super.update(dt); if(this.life <= 0) { this.isDead = true; entities.push(new Shockwave(this.x, this.y, this.explosionRadius, this.damage, this.ownerId)); } } }
+class Shockwave extends Entity { constructor(x,y,mR,d,ownerId){ super(x,y,'Shockwave'); this.ownerId=ownerId; this.radius=0; this.maxRadius=mR; this.damage=d; this.life=0.5; this.hitTargets=[]; } update(dt){ this.radius += this.maxRadius * 3 * dt; this.life -= dt; if(this.life <= 0) this.isDead = true; } }
+class NPC extends Entity { constructor(x, y, name, color = '#8a2be2') { super(x, y, 'NPC'); this.name = name; this.radius = 10; this.color = color; } }
 class MedBay extends Entity { constructor(x, y) { super(x, y, 'MedBay'); this.name = 'Med-Bay'; this.radius = 12; this.color = '#ffffff'; } }
-class AdminPanel extends Entity { constructor(x, y) { super(x, y, 'AdminPanel'); this.name = 'Admin'; this.radius = 12; this.color = '#1a1a1a'; } }
+class AdminPanel extends Entity { constructor(x, y) { super(x, y, 'AdminPanel'); this.name = 'Admin'; this.radius = 10; this.color = '#1a1a1a'; } }
 class Portal extends Entity { constructor(x, y) { super(x, y, 'Portal'); this.name = 'Portal'; this.radius = 25; } }
 class LootDrop extends Entity { constructor(x,y,v){ super(x + Math.random()*20-10, y + Math.random()*20-10, 'LootDrop'); this.value=v*5; this.radius=5; this.color='#ffff00'; this.life=60; } update(dt){ this.life-=dt; if (this.life <= 0) this.isDead=true; } }
 class EquipmentDrop extends Entity { constructor(x, y, item) { super(x + Math.random()*20-10, y+Math.random()*20-10, 'EquipmentDrop'); this.item = item; this.radius = 8; this.color = TIER_COLORS[item.tier] || '#fff'; this.life = 60; this.pickupDelay = 0.5; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0) this.isDead = true; } }
@@ -1011,7 +980,7 @@ class Tombstone extends Entity {
 // --- INITIALIZE WORLD ---
 function initializeWorld() {
     entities = []; 
-    entities.push(new NPC(2.5 * TILE_SIZE, 2.5 * TILE_SIZE, 'Exchange', '#8a2be2'));
+    entities.push(new NPC(2.5 * TILE_SIZE, 2.5 * TILE_SIZE, 'Exchange'));
     entities.push(new NPC(13.5 * TILE_SIZE, 2.5 * TILE_SIZE, 'Bank', '#e3d400'));
     entities.push(new MedBay(2.5 * TILE_SIZE, 10.5 * TILE_SIZE));
     entities.push(new AdminPanel(13.5 * TILE_SIZE, 10.5 * TILE_SIZE));
@@ -1048,7 +1017,7 @@ function gameLoop() {
     if (playerIds.length > 0) {
         for (let i = entities.length - 1; i >= 0; i--) {
             const entity = entities[i];
-            if ((entity instanceof Enemy && !entity.isBoss && !entity.isBossComponent)) { 
+            if ((entity instanceof Enemy && !entity.isBoss && !entity.isBossComponent)) {
                 let isNearPlayer = false;
                 for (const pid of playerIds) {
                     const player = players[pid];
@@ -1077,10 +1046,10 @@ function gameLoop() {
         if (!entity || entity.isDead) continue;
 
         if (entity.type === 'Projectile' || entity.type === 'Grenade') {
-            const ownerIsPlayer = players[entity.source.id] !== undefined;
+            const ownerIsPlayer = entity.ownerId.startsWith('player_');
             for(const pid in players) {
                 const p = players[pid];
-                if (ownerIsPlayer && pid === entity.source.id) continue;
+                if (ownerIsPlayer && pid === entity.ownerId) continue;
                 if (!p.isDead && Math.hypot(entity.x - p.x, entity.y - p.y) < entity.radius + p.radius) {
                     if(isCity(p.x, p.y) && ownerIsPlayer) continue;
                     p.takeDamage(entity.damage, entity);
@@ -1094,9 +1063,9 @@ function gameLoop() {
                 for(let j = entities.length - 1; j >= 0; j--) {
                     const other = entities[j];
                     if(other instanceof Enemy && Math.hypot(entity.x - other.x, entity.y - other.y) < entity.radius + other.radius){
-                        other.takeDamage(entity.damage, entity);
+                        other.takeDamage(entity.damage, {ownerId: entity.ownerId});
                         if (entity.type === 'Grenade') {
-                             entities.push(new Shockwave(entity.x, entity.y, entity.explosionRadius, entity.damage, entity.source));
+                             entities.push(new Shockwave(entity.x, entity.y, entity.explosionRadius, entity.damage, entity.ownerId));
                         }
                         entity.isDead = true;
                         break;
@@ -1106,7 +1075,7 @@ function gameLoop() {
             }
         }
         else if (entity.type === 'MeleeSlash') {
-            const owner = players[entity.source.id];
+            const owner = players[entity.ownerId];
             if (!owner) continue;
              for(const other of entities) {
                 if (other instanceof Enemy && !entity.hitTargets.includes(other.id)) {
@@ -1116,7 +1085,7 @@ function gameLoop() {
                         let angleDiff = Math.abs(entity.angle - angleToTarget);
                         if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
                         if (angleDiff < entity.arc / 2) {
-                            other.takeDamage(entity.damage, entity);
+                            other.takeDamage(entity.damage, { ownerId: entity.ownerId });
                             entity.hitTargets.push(other.id);
                             if (other instanceof Enemy && !other.isBoss) {
                                 const knockbackStrength = 15;
@@ -1132,7 +1101,7 @@ function gameLoop() {
              }
         }
         else if (entity.type === 'Laser') {
-             const ownerIsPlayer = players[entity.source.id] !== undefined;
+             const ownerIsPlayer = entity.ownerId.startsWith('player_');
              if(ownerIsPlayer) {
                 for(const other of entities) {
                     if (other instanceof Enemy) {
@@ -1143,7 +1112,7 @@ function gameLoop() {
                             let angleDiff = Math.abs(entity.angle - angleToTarget);
                             if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
                             if (angleDiff < Math.atan2(other.radius, dist)) {
-                                other.takeDamage(entity.damage * dt * 20, entity);
+                                other.takeDamage(entity.damage * dt * 20, {ownerId: entity.ownerId});
                             }
                         }
                     }
@@ -1151,11 +1120,10 @@ function gameLoop() {
              }
         }
         else if(entity.type === 'Shockwave'){
-             const ownerIsPlayer = players[entity.source.id] !== undefined;
              for(const pid in players) {
                 const p = players[pid];
                 if (!p.isDead && !entity.hitTargets.includes(pid) && Math.hypot(entity.x - p.x, entity.y - p.y) < entity.radius) {
-                    if(isCity(p.x, p.y) && ownerIsPlayer) continue;
+                    if(isCity(p.x, p.y) && entity.ownerId.startsWith('player_')) continue;
                     p.takeDamage(entity.damage, entity);
                     entity.hitTargets.push(pid);
                 }
@@ -1227,16 +1195,14 @@ function gameLoop() {
 }
 setInterval(gameLoop, 1000 / TICK_RATE);
 
-function countFreeInventorySlots(player) {
-    return player.inventory.filter(slot => slot === null).length;
-}
-
-// --- TRADE LOGIC (UPDATED) ---
+// --- TRADE LOGIC ---
 function startTrade(player1Id, player2Id) {
+    const tradeId = `trade_${Date.now()}`;
     const p1 = players[player1Id];
     const p2 = players[player2Id];
-    if (!p1 || !p2 || p1.trade.partnerId || p2.trade.partnerId) return;
 
+    activeTrades[tradeId] = { p1: player1Id, p2: player2Id };
+    
     p1.trade.partnerId = player2Id;
     p2.trade.partnerId = player1Id;
     
@@ -1253,15 +1219,16 @@ function cancelTrade(cancellerId, reason) {
     const partnerId = player.trade.partnerId;
     const partner = players[partnerId];
     
-    const resetTradeState = (p) => {
-        if (!p) return;
-        p.trade = { partnerId: null, offerItems: [], offerBits: 0, acceptedStage1: false, acceptedStage2: false };
+    [player, partner].forEach(p => {
+        if(!p) return;
+        p.trade.offer.forEach(offerItem => {
+            p.inventory[offerItem.originalIndex] = offerItem.item;
+        });
+        p.dataBits += p.trade.offerBits;
+        p.trade = { partnerId: null, offer: [], offerBits: 0, accepted: false };
         const socket = getSocketByPlayerId(p.id);
         if(socket) socket.send(JSON.stringify({ type: 'tradeCancelled', reason: reason }));
-    };
-
-    resetTradeState(player);
-    resetTradeState(partner);
+    });
 }
 
 function finalizeTrade(p1Id, p2Id) {
@@ -1272,35 +1239,17 @@ function finalizeTrade(p1Id, p2Id) {
         cancelTrade(p1Id, "An error occurred during trade.");
         return;
     }
-
-    const p1FreeSlots = countFreeInventorySlots(p1);
-    const p2FreeSlots = countFreeInventorySlots(p2);
-
-    if (p1FreeSlots < p2.trade.offerItems.length || p2FreeSlots < p1.trade.offerItems.length) {
-        cancelTrade(p1Id, "Not enough inventory space to complete the trade.");
-        return;
-    }
     
-    p1.dataBits = p1.dataBits - p1.trade.offerBits + p2.trade.offerBits;
-    p2.dataBits = p2.dataBits - p2.trade.offerBits + p1.trade.offerBits;
+    p1.dataBits -= p1.trade.offerBits;
+    p2.dataBits -= p2.trade.offerBits;
+    p1.dataBits += p2.trade.offerBits;
+    p2.dataBits += p1.trade.offerBits;
 
-    const p1ItemsToGive = [...p1.trade.offerItems];
-    const p2ItemsToGive = [...p2.trade.offerItems];
-
-    p1ItemsToGive.forEach(itemToGive => {
-        const index = p1.inventory.findIndex(invItem => invItem && invItem.id === itemToGive.id);
-        if (index !== -1) p1.inventory[index] = null;
-    });
-    p2ItemsToGive.forEach(itemToGive => {
-        const index = p2.inventory.findIndex(invItem => invItem && invItem.id === itemToGive.id);
-        if (index !== -1) p2.inventory[index] = null;
-    });
-
-    p1ItemsToGive.forEach(item => p2.addToInventory(item));
-    p2ItemsToGive.forEach(item => p1.addToInventory(item));
+    p2.trade.offer.forEach(item => p1.addToInventory(item.item));
+    p1.trade.offer.forEach(item => p2.addToInventory(item.item));
 
     [p1, p2].forEach(p => {
-        p.trade = { partnerId: null, offerItems: [], offerBits: 0, acceptedStage1: false, acceptedStage2: false };
+        p.trade = { partnerId: null, offer: [], offerBits: 0, accepted: false };
         const socket = getSocketByPlayerId(p.id);
         if (socket) socket.send(JSON.stringify({ type: 'tradeCompleted' }));
     });
@@ -1339,65 +1288,52 @@ wss.on('connection', (ws) => {
                     } else if (lootBag.type === 'EquipmentDrop') { if(player.addToInventory(lootBag.item)) { lootBag.isDead = true; } }
                 }
             }
-            // UPDATED: New bank logic for "Deposit-All" and "Deposit-X"
-            if (player && data.type === 'bankAction') {
-                const playerBank = banks[player.username] || [];
+             if (player && data.type === 'bankAction') {
+                if (!banks[player.username]) banks[player.username] = [];
+                const playerBank = banks[player.username];
+
                 if (data.action === 'deposit') {
                     const itemToDeposit = player.inventory[data.itemIndex];
                     if (itemToDeposit) {
-                        let amountToDeposit = 0;
-                        if (data.amount === 'all') {
+                        let amountToDeposit = data.amount;
+                        if (amountToDeposit === 'all') {
                             amountToDeposit = player.inventory.filter(i => i && i.id === itemToDeposit.id).length;
-                        } else {
-                            amountToDeposit = Math.min(
-                                player.inventory.filter(i => i && i.id === itemToDeposit.id).length,
-                                data.amount || 1
-                            );
                         }
-                        
-                        if (amountToDeposit > 0) {
-                            const existingStack = playerBank.find(stack => stack.item.id === itemToDeposit.id);
-                            if (existingStack) {
-                                existingStack.quantity += amountToDeposit;
-                            } else {
-                                playerBank.push({ item: { ...itemToDeposit }, quantity: amountToDeposit });
-                            }
-                            
-                            // Remove items from inventory
-                            let removedCount = 0;
-                            for (let i = player.inventory.length - 1; i >= 0; i--) {
-                                if (removedCount >= amountToDeposit) break;
-                                if (player.inventory[i] && player.inventory[i].id === itemToDeposit.id) {
-                                    player.inventory[i] = null;
-                                    removedCount++;
+
+                        let depositedCount = 0;
+                        for (let i = player.inventory.length - 1; i >= 0 && depositedCount < amountToDeposit; i--) {
+                            if (player.inventory[i] && player.inventory[i].id === itemToDeposit.id) {
+                                const existingStack = playerBank.find(stack => stack && stack.item.id === itemToDeposit.id);
+                                if (existingStack) {
+                                    existingStack.quantity++;
+                                } else {
+                                    playerBank.push({ item: itemToDeposit, quantity: 1 });
                                 }
+                                player.inventory[i] = null;
+                                depositedCount++;
                             }
                         }
                     }
                 } else if (data.action === 'withdraw') {
-                    const bankStack = playerBank[data.itemIndex];
-                    if (bankStack) {
-                        const amountToWithdraw = data.amount === 'all' ? bankStack.quantity : Math.min(bankStack.quantity, data.amount || 1);
-                        if (amountToWithdraw > 0) {
-                            if (countFreeInventorySlots(player) >= amountToWithdraw) {
-                                for(let i = 0; i < amountToWithdraw; i++) {
-                                    player.addToInventory(bankStack.item);
-                                }
-                                bankStack.quantity -= amountToWithdraw;
-                                if (bankStack.quantity <= 0) {
-                                    playerBank.splice(data.itemIndex, 1);
-                                }
-                            }
+                    const stackToWithdraw = playerBank[data.itemIndex];
+                    if (stackToWithdraw) {
+                        let amountToWithdraw = data.amount === 'all' ? stackToWithdraw.quantity : (data.amount || 1);
+                        amountToWithdraw = Math.min(amountToWithdraw, stackToWithdraw.quantity);
+                        
+                        const addedCount = player.addToInventory(stackToWithdraw.item, amountToWithdraw);
+                        
+                        if(addedCount > 0) {
+                             stackToWithdraw.quantity -= addedCount;
+                             if (stackToWithdraw.quantity <= 0) {
+                                 playerBank.splice(data.itemIndex, 1);
+                             }
                         }
                     }
                 }
-                banks[player.username] = playerBank;
                 saveData('banks.json', banks);
                 ws.send(JSON.stringify({ type: 'openBank', bank: playerBank }));
             }
-
             if (player && data.type === 'marketAction') { /* ... existing market code ... */ }
-            
             if (player && data.type === 'tradeRequest') {
                 const targetPlayer = players[data.targetId];
                 if (targetPlayer && !targetPlayer.trade.partnerId) {
@@ -1414,43 +1350,42 @@ wss.on('connection', (ws) => {
                 }
             }
             if (player && player.trade.partnerId && data.type === 'tradeUpdate') {
-                const partner = players[player.trade.partnerId];
-                if (!partner) return;
-                player.trade.offerItems = data.offerItems;
+                player.trade.offer = [];
+                data.offerItems.forEach(offerItem => {
+                    const originalItem = player.inventory[offerItem.originalIndex];
+                    if (originalItem && originalItem.id === offerItem.item.id) {
+                        player.trade.offer.push(offerItem);
+                    }
+                });
+                player.inventory.forEach((item, index) => {
+                    if (item && player.trade.offer.some(o => o.originalIndex === index)) {
+                        player.inventory[index] = null;
+                    }
+                });
+                 data.offerItems.forEach(offerItem => {
+                     if (!player.inventory[offerItem.originalIndex]) {
+                         player.inventory[offerItem.originalIndex] = offerItem.item;
+                     }
+                 });
                 player.trade.offerBits = Math.max(0, parseInt(data.offerBits, 10)) || 0;
-                player.trade.acceptedStage1 = false;
-                partner.trade.acceptedStage1 = false;
-                
-                const partnerSocket = getSocketByPlayerId(partner.id);
-                if (partnerSocket) {
-                    partnerSocket.send(JSON.stringify({ type: 'tradeUpdate', offer: { offer: player.trade.offerItems, offerBits: player.trade.offerBits } }));
-                    partnerSocket.send(JSON.stringify({ type: 'tradeStatusChange', myAccepted: partner.trade.acceptedStage1, partnerAccepted: player.trade.acceptedStage1 }));
-                }
-                ws.send(JSON.stringify({ type: 'tradeStatusChange', myAccepted: player.trade.acceptedStage1, partnerAccepted: partner.trade.acceptedStage1 }));
-            }
-            if (player && player.trade.partnerId && data.type === 'tradeAcceptStage1') {
+                player.trade.accepted = false;
                 const partner = players[player.trade.partnerId];
-                if (!partner) return;
-                player.trade.acceptedStage1 = true;
-
-                if (partner.trade.acceptedStage1) {
-                    const myOfferSummary = { items: player.trade.offerItems, bits: player.trade.offerBits };
-                    const partnerOfferSummary = { items: partner.trade.offerItems, bits: partner.trade.offerBits };
-                    ws.send(JSON.stringify({ type: 'tradeShowConfirmation', myOffer: myOfferSummary, partnerOffer: partnerOfferSummary }));
+                if (partner) {
+                    partner.trade.accepted = false;
                     const partnerSocket = getSocketByPlayerId(partner.id);
-                    if(partnerSocket) partnerSocket.send(JSON.stringify({ type: 'tradeShowConfirmation', myOffer: partnerOfferSummary, partnerOffer: myOfferSummary }));
-                } else {
-                    const partnerSocket = getSocketByPlayerId(partner.id);
-                    if(partnerSocket) partnerSocket.send(JSON.stringify({ type: 'tradeStatusChange', myAccepted: partner.trade.acceptedStage1, partnerAccepted: player.trade.acceptedStage1 }));
-                    ws.send(JSON.stringify({ type: 'tradeStatusChange', myAccepted: player.trade.acceptedStage1, partnerAccepted: partner.trade.acceptedStage1 }));
+                    if (partnerSocket) {
+                        partnerSocket.send(JSON.stringify({ type: 'tradeUpdate', offer: player.trade }));
+                    }
                 }
             }
-            if (player && player.trade.partnerId && data.type === 'tradeAcceptStage2') {
+             if (player && player.trade.partnerId && data.type === 'tradeAccept') {
+                player.trade.accepted = true;
                 const partner = players[player.trade.partnerId];
-                if (!partner) return;
-                player.trade.acceptedStage2 = true;
-                if (partner.trade.acceptedStage2) {
+                if (partner && partner.trade.accepted) {
                     finalizeTrade(player.id, partner.id);
+                } else if (partner) {
+                    const partnerSocket = getSocketByPlayerId(partner.id);
+                    if(partnerSocket) partnerSocket.send(JSON.stringify({ type: 'tradePartnerAccepted' }));
                 }
             }
             if (player && player.trade.partnerId && data.type === 'tradeCancel') {
@@ -1464,7 +1399,7 @@ wss.on('connection', (ws) => {
             if (data.type === 'unequipItem') { const item = player.equipment[data.slot]; if (item && player.addToInventory(item)) { player.equipment[data.slot] = null; player.recalculateStats(); } }
             if (data.type === 'dropItem') { let itemToDrop = null; if (data.source === 'inventory') { itemToDrop = player.inventory[data.index]; player.inventory[data.index] = null; } else { itemToDrop = player.equipment[data.index]; player.equipment[data.index] = null; } if (itemToDrop) entities.push(new EquipmentDrop(player.x, player.y, itemToDrop)); player.recalculateStats(); }
             if (data.type === 'buyNpcItem') { const shop = shopInventories[data.shopName]; const shopItem = shop ? shop[data.itemIndex] : null; if(shopItem && player.dataBits >= shopItem.cost) { if(player.addToInventory(shopItem.item)) { player.dataBits -= shopItem.cost; } } }
-            if (data.type === 'sellItem') { const item = player.inventory[data.itemIndex]; if(item) { player.dataBits += Math.floor(getItemBaseValue(item) / 3); player.inventory[data.index] = null; } }
+            if (data.type === 'sellItem') { const item = player.inventory[data.itemIndex]; if(item) { player.dataBits += Math.floor(getItemBaseValue(item) / 3); player.inventory[data.itemIndex] = null; } }
         
         } catch (error) { console.error(`[SERVER] Error processing message from ${ws.playerId}:`, error); }
     });
@@ -1474,6 +1409,9 @@ wss.on('connection', (ws) => {
         if (player) {
             if (player.trade.partnerId) {
                 cancelTrade(player.id, `${player.username} has disconnected.`);
+            }
+             if (banks[player.username]) {
+                saveData('banks.json', banks);
             }
             console.log(`[SERVER] Player ${player.username} (${ws.playerId}) disconnected.`);
             delete players[ws.playerId];
