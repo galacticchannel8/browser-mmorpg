@@ -320,6 +320,7 @@ class Player {
         const weapon = this.equipment.Weapon || { type: 'Default' };
         this.gunCooldown = 1 / this.stats.fireRate;
         const p = { ownerId: this.id, angle: this.angle, color: this.color, damage: this.stats.damage };
+        broadcastMessage({ type: 'sfx', effect: 'shoot' });
         switch(weapon.type) {
             case 'Beam': if(this.energy > 5){ this.energy -= 5; entities.push(new Laser(this.x, this.y, p, 800)); } break;
             case 'Scatter': for(let i=0; i < 5; i++) { p.angle = this.angle + (Math.random() - 0.5) * 0.4; entities.push(new Projectile(this.x, this.y, p)); } break;
@@ -332,6 +333,7 @@ class Player {
         if (this.trade.partnerId || this.isTeleporting) return;
         this.meleeCooldown = 0.8;
         const meleeDamage = this.stats.damage * 1.5;
+        broadcastMessage({ type: 'sfx', effect: 'melee' });
         entities.push(new MeleeSlash(this.x, this.y, this.angle, this.id, meleeDamage, this.color));
     }
 
@@ -588,7 +590,7 @@ class Enemy extends Entity {
         }
     }
 }
-class Stinger extends Enemy { constructor(x, y, tL) { super(x, y, tL, 'Stinger'); this.radius = 10; this.speed = 4; this.health = this.maxHealth = 40; this.color = '#f07cff'; this.shootCooldown = 1.6; this.xpValue = 20 * tL; this.applyThreatLevel(); } update(dt) { super.update(dt); this.shootCooldown -= dt; if (this.shootCooldown <= 0) { this.shootCooldown = 1.6; for(const pid in players){ const player = players[pid]; if(!player.isDead && !player.isTeleporting && Math.hypot(player.x - this.x, player.y - this.y) < this.aggroRadius){ const p = { ownerId: this.id, angle: Math.atan2(player.y - this.y, player.x - this.x), color: this.color, damage: 30*this.damageMultiplier }; entities.push(new Projectile(this.x, this.y, p, 0.8)); break; } } } } }
+class Stinger extends Enemy { constructor(x, y, tL) { super(x, y, tL, 'Stinger'); this.radius = 10; this.speed = 4; this.health = this.maxHealth = 40; this.color = '#f07cff'; this.shootCooldown = 1.6; this.xpValue = 20 * tL; this.applyThreatLevel(); } update(dt) { super.update(dt); this.shootCooldown -= dt; if (this.shootCooldown <= 0) { this.shootCooldown = 1.6; for(const pid in players){ const player = players[pid]; if(!player.isDead && !player.isTeleporting && Math.hypot(player.x - this.x, player.y - this.y) < this.aggroRadius){ const p = { ownerId: this.id, angle: Math.atan2(player.y - this.y, player.x - this.x), color: this.color, damage: 30*this.damageMultiplier }; broadcastMessage({ type: 'sfx', effect: 'shoot' }); entities.push(new Projectile(this.x, this.y, p, 0.8)); break; } } } } }
 class VoidSwarmer extends Enemy {
     constructor(x, y, tL) {
         super(x, y, tL, 'VoidSwarmer');
@@ -745,7 +747,7 @@ class Dreadnought extends WorldBoss {
             switch(this.attackPhase) {
                 case 'idle': case 'barrage':
                     this.attackTimer = 3;
-                    for(let i=0;i<10;i++) { setTimeout(() => { if(this.isDead) return; try { const currentTarget = players[Object.keys(players).find(id => players[id] === targetPlayer)]; if(!currentTarget) return; const targetAngle = Math.atan2(currentTarget.y-this.y, currentTarget.x-this.x); p.angle = targetAngle + (Math.random() - 0.5) * 0.3; entities.push(new Projectile(this.x, this.y, p, 1.5, 10)); } catch(e){} }, i * 100); }
+                    for(let i=0;i<10;i++) { setTimeout(() => { if(this.isDead) return; try { const currentTarget = players[Object.keys(players).find(id => players[id] === targetPlayer)]; if(!currentTarget) return; const targetAngle = Math.atan2(currentTarget.y-this.y, currentTarget.x-this.x); p.angle = targetAngle + (Math.random() - 0.5) * 0.3; broadcastMessage({ type: 'sfx', effect: 'shoot' }); entities.push(new Projectile(this.x, this.y, p, 1.5, 10)); } catch(e){} }, i * 100); }
                     this.attackPhase = 'mortar'; break;
                 case 'mortar':
                     this.attackTimer = 5;
@@ -792,6 +794,7 @@ class SerpentHead extends WorldBoss {
             if(this.attackTimer <= 0) {
                 this.attackTimer = 0.3;
                 const proj = { ownerId: this.id, angle: Math.atan2(targetPlayer.y-this.y, targetPlayer.x-this.x), color: this.color, damage: 60 };
+                broadcastMessage({ type: 'sfx', effect: 'shoot' });
                 entities.push(new Projectile(this.x, this.y, proj, 1.2, 8));
             }
         }
@@ -838,6 +841,7 @@ class SerpentBody extends Enemy {
             let targetPlayer=null; for(const pid in players){const p=players[pid]; if(!p.isDead && !p.isTeleporting && Math.hypot(p.x-this.x,p.y-this.y) < this.aggroRadius){targetPlayer=p; break;}}
             if (targetPlayer) {
                  const p = { ownerId: this.id, angle: Math.atan2(targetPlayer.y - this.y, targetPlayer.x - this.x), color: this.color, damage: 40 };
+                 broadcastMessage({ type: 'sfx', effect: 'shoot' });
                  entities.push(new Projectile(this.x, this.y, p));
             }
         }
@@ -854,7 +858,7 @@ class TheOracle extends WorldBoss {
             const p = { ownerId: this.id, color: this.color, damage: 50};
             switch(this.attackPhase) {
                 case 'idle': case 'barrage':
-                    for(let i=0; i<12; i++) { p.angle = (i/12) * Math.PI*2 + Date.now()/1000; entities.push(new Projectile(this.x, this.y, p)); }
+                    for(let i=0; i<12; i++) { p.angle = (i/12) * Math.PI*2 + Date.now()/1000; broadcastMessage({ type: 'sfx', effect: 'shoot' }); entities.push(new Projectile(this.x, this.y, p)); }
                     this.attackTimer = 3.5;
                     this.attackPhase = 'summon';
                     break;
@@ -919,6 +923,7 @@ class VoidHunter extends WorldBoss {
                     if(!currentTarget) return;
                     for(let i=0; i<10; i++) {
                         const proj = { ownerId: this.id, angle: Math.atan2(currentTarget.y-this.y, currentTarget.x-this.x) + (Math.random()-0.5)*0.8, color: '#ff3355', damage: 120};
+                        broadcastMessage({ type: 'sfx', effect: 'shoot' });
                         entities.push(new Projectile(this.x, this.y, proj, 0.5));
                     }
                     setTimeout(() => {

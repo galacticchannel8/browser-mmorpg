@@ -251,7 +251,7 @@ All Rights Reserved.
             }
         },
 
-        playLaser: function() {
+        playShoot: function() {
             if (!this.context) return;
             const now = this.context.currentTime;
             const osc = this.context.createOscillator();
@@ -260,6 +260,22 @@ All Rights Reserved.
             osc.frequency.setValueAtTime(1200, now);
             osc.frequency.linearRampToValueAtTime(400, now + 0.1);
             gain.gain.setValueAtTime(0.3, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            osc.connect(gain);
+            gain.connect(this.context.destination);
+            osc.start(now);
+            osc.stop(now + 0.1);
+        },
+
+        playMelee: function() {
+            if (!this.context) return;
+            const now = this.context.currentTime;
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.linearRampToValueAtTime(100, now + 0.1);
+            gain.gain.setValueAtTime(0.1, now);
             gain.gain.linearRampToValueAtTime(0, now + 0.1);
             osc.connect(gain);
             gain.connect(this.context.destination);
@@ -304,11 +320,11 @@ All Rights Reserved.
             const now = this.context.currentTime;
             this.boostNode = this.context.createOscillator();
             const gain = this.context.createGain();
-            this.boostNode.type = 'sawtooth';
-            this.boostNode.frequency.setValueAtTime(100, now);
-            this.boostNode.frequency.linearRampToValueAtTime(150, now + 0.1);
+            this.boostNode.type = 'sine'; // Changed to sine for a smoother hum
+            this.boostNode.frequency.setValueAtTime(80, now);
+            this.boostNode.frequency.linearRampToValueAtTime(120, now + 0.1);
             gain.gain.setValueAtTime(0, now);
-            gain.gain.linearRampToValueAtTime(0.1, now + 0.1);
+            gain.gain.linearRampToValueAtTime(0.08, now + 0.1); // Lowered volume
             this.boostNode.connect(gain);
             gain.connect(this.context.destination);
             this.boostNode.start(now);
@@ -355,7 +371,7 @@ All Rights Reserved.
     const ws = new WebSocket(`${protocol}//${window.location.host}`);
     let myPlayerId = null, localWorld = {}, gameState = { players: {}, entities: [] };
     let camera = { x: 0, y: 0, zoom: 1 };
-    let inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, space: false, mouse: { x: 0, y: 0, down: false } };
+    let inputs = { w: false, a: false, s: false, d: false, h: false, shift: false, q: false, e: false, space: false, mouse: { down: false } };
     let isGameRunning = false, isChatting = false, isShopOpen = false, isBankOpen = false, isTrading = false;
     let loggedInUser = "Player", chosenClassName = null;
     let currentShopName = null;
@@ -364,6 +380,7 @@ All Rights Reserved.
     let currentBankData = []; 
     let currentPartyInvite = null;
     let currentTradeRequest = null;
+    let chatChannel = 'all';
 
     const TILE_SIZE = 40, CHUNK_SIZE = 16;
     const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
@@ -410,6 +427,8 @@ All Rights Reserved.
             const data = JSON.parse(message.data);
             if (data.type === 'sfx') {
                 if (data.effect === 'explosion') Sound.playExplosion();
+                else if (data.effect === 'shoot') Sound.playShoot();
+                else if (data.effect === 'melee') Sound.playMelee();
                 else if (data.effect === 'blink') {
                     for(let i=0; i<20; i++) particles.push({x: data.x, y: data.y, life: 1, size: Math.random()*3+1, color: data.color, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2});
                 } else if (data.effect === 'teleportCharge') {
@@ -1469,7 +1488,7 @@ All Rights Reserved.
     
     function updatePartyUI(partyMembers) {
         const partyList = document.getElementById('party-members-list');
-        if (!partyMembers || partyMembers.length === 0) {
+        if (!partyMembers || partyMembers.length <= 1) { // Hide if only you are in the party
             partyPanel.style.display = 'none';
             document.getElementById('leave-party-btn').style.display = 'none';
             return;
@@ -1578,7 +1597,7 @@ All Rights Reserved.
         if (isChatting) {
             if (e.key === 'Enter') {
                 const msg = chatInput.value.trim();
-                if (msg) sendToServer({ type: 'chat', message: msg });
+                if (msg) sendToServer({ type: 'chat', message: msg, channel: chatChannel });
                 chatInput.value = '';
                 chatInput.blur();
             }
@@ -1650,7 +1669,6 @@ All Rights Reserved.
         if(e.target.closest('.ui-panel, .context-menu')) return;
         if(e.button === 0) {
             inputs.mouse.down = true;
-            Sound.playLaser();
         }
         hideAllContextMenus();
     });
@@ -1659,7 +1677,6 @@ All Rights Reserved.
         if(e.button === 0) inputs.mouse.down = false;
     });
 
-    // This listener is now just a fallback for the render-loop based one
     canvas.addEventListener('contextmenu', e => {
         e.preventDefault();
     });
