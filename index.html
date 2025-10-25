@@ -478,9 +478,6 @@ All Rights Reserved.
             drawBossHealthbar(e);
         },
         'SerpentBody': (e) => { ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = e.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.shadowColor = e.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.restore(); if(e.health < e.maxHealth){ const barW=30, barH=4, barX=e.x-barW/2, barY=e.y-e.radius-10; ctx.fillStyle='rgba(255,51,85,0.5)'; ctx.fillRect(barX,barY,barW,barH); ctx.fillStyle=e.color; ctx.fillRect(barX,barY,barW*(e.health/e.maxHealth),barH); } },
-        
-        // ... CONTINUATION OF SCRIPT ...
-
         'TheOracle': (e) => {
             ctx.save();
             ctx.translate(e.x, e.y);
@@ -531,7 +528,7 @@ All Rights Reserved.
             ctx.fillStyle='#fff';
             ctx.fillText(n.name, n.x, n.y - n.radius-5);
         },
-        'Hospital': (n) => {
+        'MedBay': (n) => { // CORRECTED: Renamed from 'Hospital'
             ctx.save();
             ctx.translate(n.x, n.y);
             ctx.fillStyle = n.color;

@@ -71,23 +71,20 @@ const MAP_SEED = 'galactic_os_final_frontier';
 const perlin = new Perlin(MAP_SEED), biomeNoise = new Perlin(MAP_SEED + '_biomes');
 const TILE_TYPES = { 0:{n:'V',c:'#05060a'}, 1:{n:'P',c:'#10121f'}, 2:{n:'F',c:'#10121f',wc:'#005f6b'}, 3:{n:'C',c:'#150f1f',wc:'#6b00b3'}, 10:{n:'CF',c:'#1f283e'}, 11:{n:'CW',c:'#00f0ff',wc:'#00f0ff'}, 12:{n:'OW',c:'#a8b3d3',wc:'#a8b3d3'}, 13:{n:'OF',c:'#4a4a52'}, 14:{n:'E',c:'#000000'}, 15:{n:'D', c:'#00f0ff'} };
 
+// --- CORRECTED: Restored original city walls and doors, with a cleared interior ---
 const cityData = [
-    [11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],
-    [11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],
-    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
-    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
-    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
-    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
-    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
-    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
-    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
-    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
-    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
-    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
-    [11,11,10,10,10,10,10,10,10,10,10,10,10,10,11,11],
-    [11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],
-    [11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],
-    [11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],
+    [11,11,11,11,11,11,11,15,15,11,11,11,11,11,11,11],
+    [11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],
+    [11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],
+    [11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],
+    [11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],
+    [15,10,10,10,10,10,10,10,10,10,10,10,10,10,10,15],
+    [15,10,10,10,10,10,10,10,10,10,10,10,10,10,10,15],
+    [11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],
+    [11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],
+    [11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],
+    [11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11],
+    [11,11,11,11,11,11,11,15,15,11,11,11,11,11,11,11],
 ];
 
 const CITY_SPAWN_POINT = { x: 8 * TILE_SIZE, y: 8 * TILE_SIZE };
@@ -416,7 +413,7 @@ class Player {
 
         for(const entity of entities) {
             if(Math.hypot(this.x - entity.x, this.y - entity.y) < interactRadius) {
-                if (entity instanceof Hospital) {
+                if (entity instanceof MedBay) {
                     if (this.health < this.stats.maxHealth) {
                         this.health = this.stats.maxHealth;
                         entities.push(new FloatingText(this.x, this.y + this.radius, `+HP`, '#33ff99'));
@@ -514,6 +511,7 @@ class Enemy extends Entity {
         this.wanderTarget = null; this.wanderTimer = 0;
         this.xpValue = 15 * threatLevel;
         this.timeOutsidePlayerRange = 0;
+        this.isBossComponent = false; // Add a flag for boss parts
         this.applyThreatLevel();
     }
     applyThreatLevel() { this.health = this.maxHealth = this.health * (1 + (this.threatLevel-1)*0.6); this.damageMultiplier = 1 + (this.threatLevel-1)*0.4; }
@@ -785,6 +783,7 @@ class SerpentHead extends WorldBoss {
 class SerpentBody extends Enemy {
     constructor(x, y, head) {
         super(x, y, 5, 'SerpentBody');
+        this.isBossComponent = true; // --- CORRECTED: Mark this as a boss part to prevent despawning ---
         this.head = head;
         this.radius = 25;
         this.health = this.maxHealth = 2000;
@@ -900,7 +899,7 @@ class Laser extends Entity { constructor(x,y,p,l){ super(x,y,'Laser'); this.owne
 class Grenade extends Projectile { constructor(x,y,p,rad) { super(x,y,p,0.8,8); this.type='Grenade'; this.speed=10; this.explosionRadius = rad; } update(dt) { super.update(dt); if(this.life <= 0) { this.isDead = true; entities.push(new Shockwave(this.x, this.y, this.explosionRadius, this.damage, this.ownerId)); } } }
 class Shockwave extends Entity { constructor(x,y,mR,d,ownerId){ super(x,y,'Shockwave'); this.ownerId=ownerId; this.radius=0; this.maxRadius=mR; this.damage=d; this.life=0.5; this.hitTargets=[]; } update(dt){ this.radius += this.maxRadius * 3 * dt; this.life -= dt; if(this.life <= 0) this.isDead = true; } }
 class NPC extends Entity { constructor(x, y, name, color = '#8a2be2') { super(x, y, 'NPC'); this.name = name; this.radius = 10; this.color = color; } }
-class Hospital extends Entity { constructor(x, y) { super(x, y, 'Hospital'); this.name = 'Hospital'; this.radius = 12; this.color = '#ffffff'; } }
+class MedBay extends Entity { constructor(x, y) { super(x, y, 'MedBay'); this.name = 'Med-Bay'; this.radius = 12; this.color = '#ffffff'; } }
 class AdminPanel extends Entity { constructor(x, y) { super(x, y, 'AdminPanel'); this.name = 'Admin'; this.radius = 10; this.color = '#1a1a1a'; } }
 class Portal extends Entity { constructor(x, y) { super(x, y, 'Portal'); this.name = 'Portal'; this.radius = 25; } }
 class LootDrop extends Entity { constructor(x,y,v){ super(x + Math.random()*20-10, y + Math.random()*20-10, 'LootDrop'); this.value=v*5; this.radius=5; this.color='#ffff00'; this.life=60; } update(dt){ this.life-=dt; if (this.life <= 0) this.isDead=true; } }
@@ -924,14 +923,15 @@ class Tombstone extends Entity {
     }
 }
 
+
 // --- INITIALIZE WORLD ---
 function initializeWorld() {
     entities = []; 
     entities.push(new NPC(2.5 * TILE_SIZE, 2.5 * TILE_SIZE, 'Exchange'));
     entities.push(new NPC(13.5 * TILE_SIZE, 2.5 * TILE_SIZE, 'Bank', '#e3d400'));
-    entities.push(new Hospital(2.5 * TILE_SIZE, 13.5 * TILE_SIZE));
-    entities.push(new AdminPanel(13.5 * TILE_SIZE, 13.5 * TILE_SIZE));
-    entities.push(new Portal(CITY_SPAWN_POINT.x, CITY_SPAWN_POINT.y));
+    entities.push(new MedBay(2.5 * TILE_SIZE, 10.5 * TILE_SIZE));
+    entities.push(new AdminPanel(13.5 * TILE_SIZE, 10.5 * TILE_SIZE));
+    entities.push(new Portal(CITY_SPAWN_POINT.x, CITY_SPAWN_POINT.y - (TILE_SIZE * 2)));
 
     generateChunk(0, 0); 
     const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter };
@@ -964,7 +964,7 @@ function gameLoop() {
     if (playerIds.length > 0) {
         for (let i = entities.length - 1; i >= 0; i--) {
             const entity = entities[i];
-            if (entity instanceof Enemy && !entity.isBoss) {
+            if ((entity instanceof Enemy && !entity.isBoss && !entity.isBossComponent)) { // --- CORRECTED: Added isBossComponent check ---
                 let isNearPlayer = false;
                 for (const pid of playerIds) {
                     const player = players[pid];
