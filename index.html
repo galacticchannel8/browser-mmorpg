@@ -372,17 +372,32 @@ All Rights Reserved.
         'Player': (p) => {
             if (p.isDead) return;
             
-            ctx.save();
-            
-            if (p.isInvisible) {
-                ctx.globalAlpha = 0.3;
-            }
+            // --- GAMEBREAKER FIX: Restructured drawing order to make player visible ---
+            // --- and positioned health bar correctly above the name ---
+            const r = p.radius || 15;
 
-            ctx.translate(p.x, p.y);
+            ctx.save();
+            if (p.isInvisible) { ctx.globalAlpha = 0.3; }
             
-            // --- FIX: Draw health bar ABOVE name ---
+            // Draw ship model first
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.angle);
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.moveTo(r, 0);
+            ctx.lineTo(-r / 2, -r / 2);
+            ctx.lineTo(-r / 2, r / 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore(); 
+
+            // Draw UI elements on top, without rotation
+            ctx.save();
+            ctx.translate(p.x, p.y);
             if (p.id !== myPlayerId && p.health < p.stats.maxHealth) {
-                const barW = 40, barH = 5, barX = -barW / 2, barY = -p.radius - 20;
+                const barW = 40, barH = 5, barX = -barW / 2, barY = -r - 25;
                 ctx.fillStyle = 'rgba(255, 51, 85, 0.7)'; ctx.fillRect(barX, barY, barW, barH);
                 ctx.fillStyle = p.color; ctx.fillRect(barX, barY, barW * (p.health / p.stats.maxHealth), barH);
             }
@@ -392,28 +407,16 @@ All Rights Reserved.
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 3;
             ctx.lineJoin = 'round';
-            ctx.strokeText(`[Lvl ${p.level}] ${p.username}`, 0, -p.radius - 5);
+            ctx.strokeText(`[Lvl ${p.level}] ${p.username}`, 0, -r - 15);
             ctx.fillStyle = '#fff';
-            ctx.fillText(`[Lvl ${p.level}] ${p.username}`, 0, -p.radius - 5);
+            ctx.fillText(`[Lvl ${p.level}] ${p.username}`, 0, -r - 15);
+            ctx.restore();
 
-            ctx.rotate(p.angle);
-            ctx.fillStyle = p.color;
-            ctx.shadowColor = p.color;
-            ctx.shadowBlur = 15;
-            const r = p.radius;
-            ctx.beginPath();
-            ctx.moveTo(r, 0);
-            ctx.lineTo(-r / 2, -r / 2);
-            ctx.lineTo(-r / 2, r / 2);
-            ctx.closePath();
-            ctx.fill();
-            
-            ctx.restore(); 
-
+            // Draw other effects
             if (p.isBoosting && p.id === myPlayerId) {
                 const angle = p.angle + Math.PI + (Math.random() - 0.5) * 0.5;
-                const x = p.x + Math.cos(angle) * (p.radius - 2);
-                const y = p.y + Math.sin(angle) * (p.radius - 2);
+                const x = p.x + Math.cos(angle) * (r - 2);
+                const y = p.y + Math.sin(angle) * (r - 2);
                 particles.push({x: x, y: y, vx: 0, vy: 0, life: 1, size: Math.random() * 3 + 2, color: p.color});
             }
             if(p.shieldActive){
@@ -422,7 +425,7 @@ All Rights Reserved.
                 ctx.shadowColor = p.color;
                 ctx.shadowBlur = 25;
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, p.radius + 8, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.restore();
             }
@@ -431,7 +434,7 @@ All Rights Reserved.
                 ctx.strokeStyle = '#00f0ff';
                 ctx.lineWidth = 4;
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, p.radius + 10, -Math.PI / 2, (-Math.PI / 2) + (chargePercent * Math.PI * 2));
+                ctx.arc(p.x, p.y, r + 10, -Math.PI / 2, (-Math.PI / 2) + (chargePercent * Math.PI * 2));
                 ctx.stroke();
             }
         },
@@ -542,17 +545,16 @@ All Rights Reserved.
             ctx.shadowColor = n.color;
             ctx.shadowBlur = 10;
             ctx.fillStyle = n.color;
-            ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
             
             // --- RESTORED: Draw unique icon based on name ---
             if (n.name === 'Bank') {
                 ctx.fillStyle = '#e3d400';
                 ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
                 ctx.fillStyle = '#fff';
-                const barHeight = n.radius * 0.2;
-                ctx.fillRect(-n.radius*0.6, -n.radius*0.5, n.radius*1.2, barHeight);
-                ctx.fillRect(-n.radius*0.6, 0, n.radius*1.2, barHeight);
-                ctx.fillRect(-n.radius*0.6, n.radius*0.5-barHeight, n.radius*1.2, barHeight);
+                const barHeight = n.radius * 0.3;
+                ctx.fillRect(-n.radius*0.7, -n.radius*0.6, n.radius*1.4, barHeight);
+                ctx.fillRect(-n.radius*0.7, 0, n.radius*1.4, barHeight);
+                ctx.fillRect(-n.radius*0.7, n.radius*0.6-barHeight, n.radius*1.4, barHeight);
             } else if (n.name === 'Exchange') {
                 ctx.fillStyle = '#8a2be2';
                 ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
@@ -561,11 +563,13 @@ All Rights Reserved.
                 ctx.font = 'bold 12px "Consolas",monospace';
                 // Draw arrows
                 ctx.beginPath();
-                ctx.moveTo(-n.radius*0.5, -n.radius*0.3); ctx.lineTo(n.radius*0.5, -n.radius*0.3); ctx.lineTo(n.radius*0.3, -n.radius*0.5);
-                ctx.moveTo(n.radius*0.5, -n.radius*0.3); ctx.lineTo(n.radius*0.3, -n.radius*0.1);
-                ctx.moveTo(n.radius*0.5, n.radius*0.3); ctx.lineTo(-n.radius*0.5, n.radius*0.3); ctx.lineTo(-n.radius*0.3, n.radius*0.5);
-                ctx.moveTo(-n.radius*0.5, n.radius*0.3); ctx.lineTo(-n.radius*0.3, n.radius*0.1);
+                ctx.moveTo(-n.radius*0.6, -n.radius*0.3); ctx.lineTo(n.radius*0.6, -n.radius*0.3); ctx.lineTo(n.radius*0.4, -n.radius*0.5);
+                ctx.moveTo(n.radius*0.6, -n.radius*0.3); ctx.lineTo(n.radius*0.4, -n.radius*0.1);
+                ctx.moveTo(n.radius*0.6, n.radius*0.3); ctx.lineTo(-n.radius*0.6, n.radius*0.3); ctx.lineTo(-n.radius*0.4, n.radius*0.5);
+                ctx.moveTo(-n.radius*0.6, n.radius*0.3); ctx.lineTo(-n.radius*0.4, n.radius*0.1);
                 ctx.stroke();
+            } else {
+                 ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
             }
             
             ctx.restore();
@@ -603,15 +607,15 @@ All Rights Reserved.
             ctx.translate(n.x, n.y);
             ctx.shadowColor = n.color;
             ctx.shadowBlur = 10;
-            ctx.fillStyle = '#4f0000';
+            ctx.fillStyle = n.color; // Dark Red
             ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
             
             // --- RESTORED: Draw console icon ---
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 12px "Consolas",monospace';
+            ctx.font = 'bold 14px "Consolas",monospace';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
-            ctx.fillText('>_', -n.radius*0.6, 0);
+            ctx.fillText('>_', -n.radius*0.7, n.radius * 0.1);
 
             ctx.restore();
             
