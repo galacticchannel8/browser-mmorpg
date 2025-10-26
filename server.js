@@ -437,13 +437,15 @@ class Player {
                 if (entity instanceof AdminPanel) {
                     if (this.username === "GalacticChannel8") { // CHANGE YOUR ADMIN NAME HERE
                         const playerSocket = getSocketByPlayerId(this.id);
-                        if (playerSocket) playerSocket.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Admin Panel Authenticated.', color: '#ff3355'}));
+                        // CHANGE 3: Add channel to system message
+                        if (playerSocket) playerSocket.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Admin Panel Authenticated.', color: '#ff3355', channel: 'all'}));
                     }
                     return;
                 }
                 if (entity instanceof Portal) {
                      const playerSocket = getSocketByPlayerId(this.id);
-                     if (playerSocket) playerSocket.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Teleportation System [OFFLINE].', color: '#f07cff'}));
+                     // CHANGE 3: Add channel to system message
+                     if (playerSocket) playerSocket.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Teleportation System [OFFLINE].', color: '#f07cff', channel: 'all'}));
                     return;
                 }
                 if (entity instanceof NPC) {
@@ -715,7 +717,8 @@ class WorldBoss extends Enemy {
         if (this.health <= 0 && !this.isDead) {
             this.isDead = true;
             if(damager && players[damager.ownerId]) {
-                broadcastMessage({ type: 'chat', sender: 'SYSTEM', message: `${players[damager.ownerId].username} has defeated the ${this.bossName}!`, color: '#ff00ff' });
+                // CHANGE 3: Add channel to system message
+                broadcastMessage({ type: 'chat', sender: 'SYSTEM', message: `${players[damager.ownerId].username} has defeated the ${this.bossName}!`, color: '#ff00ff', channel: 'all' });
                 players[damager.ownerId].addXp(this.xpValue);
             }
             broadcastMessage({ type: 'sfx', effect: 'explosion' });
@@ -1213,7 +1216,7 @@ function gameLoop() {
         } 
     }
 
-    for(const bossName in bossRespawnTimers) { if(bossRespawnTimers[bossName] > 0) { bossRespawnTimers[bossName] -= dt; if(bossRespawnTimers[bossName] <= 0) { const loc = BOSS_LOCATIONS[bossName]; const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter }; const BossClass = bossClasses[bossName]; if(BossClass) entities.push(new BossClass(loc.x, loc.y)); broadcastMessage({type: 'chat', sender: 'SYSTEM', message: `The ${bossName} has respawned!`, color: '#ff6a00'}); delete bossRespawnTimers[bossName]; } } }
+    for(const bossName in bossRespawnTimers) { if(bossRespawnTimers[bossName] > 0) { bossRespawnTimers[bossName] -= dt; if(bossRespawnTimers[bossName] <= 0) { const loc = BOSS_LOCATIONS[bossName]; const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter }; const BossClass = bossClasses[bossName]; if(BossClass) entities.push(new BossClass(loc.x, loc.y)); broadcastMessage({type: 'chat', sender: 'SYSTEM', message: `The ${bossName} has respawned!`, color: '#ff6a00', channel: 'all'}); delete bossRespawnTimers[bossName]; } } }
 
     enemySpawnTimer -= dt;
     if (enemySpawnTimer <= 0) {
@@ -1333,11 +1336,12 @@ wss.on('connection', (ws) => {
     ws.playerId = playerId;
     console.log(`[SERVER] Player ${playerId} connected.`);
     ws.send(JSON.stringify({ type: 'init', playerId: playerId, world: localWorld }));
-    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Connection established. Welcome to Galactic OS.', color: '#ffff00'}));
-    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `DREADNOUGHT detected at [X:150, Y:150].`, color: '#ff6a00'}));
-    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `SERPENT detected at [X:-150, Y:-150].`, color: '#33ff99'}));
-    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `ORACLE detected at [X:0, Y:300].`, color: '#a832a4'}));
-    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `VOID HUNTER detected at [X:300, Y:0].`, color: '#777'}));
+    // CHANGE 3: Add channel to all system messages so they appear in the 'All' tab
+    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Connection established. Welcome to Galactic OS.', color: '#ffff00', channel: 'all'}));
+    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `DREADNOUGHT detected at [X:150, Y:150].`, color: '#ff6a00', channel: 'all'}));
+    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `SERPENT detected at [X:-150, Y:-150].`, color: '#33ff99', channel: 'all'}));
+    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `ORACLE detected at [X:0, Y:300].`, color: '#a832a4', channel: 'all'}));
+    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `VOID HUNTER detected at [X:300, Y:0].`, color: '#777', channel: 'all'}));
 
     ws.on('message', (message) => {
         try {
@@ -1513,17 +1517,21 @@ wss.on('connection', (ws) => {
 
             if (!player || player.isDead) return;
             if (data.type === 'input') { player.inputs = data.inputs; player.angle = data.angle; }
+            // CHANGE 3: Reworked chat logic to handle party vs all chat
             if (data.type === 'chat') { 
                 const partyId = getPartyIdForPlayer(player.id);
                 const chatData = { sender: player.username, message: data.message, color: player.color, channel: data.channel };
 
                 if (data.channel === 'party' && partyId) {
+                    // This is a party message, send only to party members.
                     parties[partyId].forEach(pid => {
                         const socket = getSocketByPlayerId(pid);
                         if(socket) socket.send(JSON.stringify(chatData));
                     });
                 } else {
-                     broadcastMessage(chatData);
+                    // This is a global message, ensure it's marked for the 'all' channel and broadcast it.
+                    chatData.channel = 'all';
+                    broadcastMessage(chatData);
                 }
             }
             if (data.type === 'interact') { player.attemptInteraction(); }
