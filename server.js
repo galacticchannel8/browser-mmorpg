@@ -1,4 +1,3 @@
-// test
 // Copyright (c) 2025 GalacticChannel8.com
 // All Rights Reserved.
 const express = require('express');
@@ -438,14 +437,12 @@ class Player {
                 if (entity instanceof AdminPanel) {
                     if (this.username === "GalacticChannel8") { // CHANGE YOUR ADMIN NAME HERE
                         const playerSocket = getSocketByPlayerId(this.id);
-                        // CHANGE 3: Add channel to system message
                         if (playerSocket) playerSocket.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Admin Panel Authenticated.', color: '#ff3355', channel: 'all'}));
                     }
                     return;
                 }
                 if (entity instanceof Portal) {
                      const playerSocket = getSocketByPlayerId(this.id);
-                     // CHANGE 3: Add channel to system message
                      if (playerSocket) playerSocket.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Teleportation System [OFFLINE].', color: '#f07cff', channel: 'all'}));
                     return;
                 }
@@ -718,7 +715,6 @@ class WorldBoss extends Enemy {
         if (this.health <= 0 && !this.isDead) {
             this.isDead = true;
             if(damager && players[damager.ownerId]) {
-                // CHANGE 3: Add channel to system message
                 broadcastMessage({ type: 'chat', sender: 'SYSTEM', message: `${players[damager.ownerId].username} has defeated the ${this.bossName}!`, color: '#ff00ff', channel: 'all' });
                 players[damager.ownerId].addXp(this.xpValue);
             }
@@ -738,7 +734,7 @@ class Dreadnought extends WorldBoss {
     constructor(x, y) {
         super(x, y, "DREADNOUGHT", '#ff6a00', 15000, "Dreadnought");
         this.leashRadius = 1000;
-        this.speed = 2.0; // Slightly reduced speed for smoother movement
+        this.speed = 2.0;
     }
     update(dt) {
         if (Math.hypot(this.x - this.spawnX, this.y - this.spawnY) > this.leashRadius) {
@@ -752,7 +748,6 @@ class Dreadnought extends WorldBoss {
         if (!targetPlayer) return;
         const dX = targetPlayer.x - this.x, dY = targetPlayer.y - this.y; const dP = Math.hypot(dX, dY);
         
-        // UPDATED: Removed collision checks to allow flying
         if(dP > 400) { 
             const timeAdjustedSpeed = this.speed * (dt * 60);
             this.x += (dX / dP) * timeAdjustedSpeed; 
@@ -770,7 +765,6 @@ class Dreadnought extends WorldBoss {
                     this.attackPhase = 'mortar'; break;
                 case 'mortar':
                     this.attackTimer = 5;
-                    // UPDATED: Added sound effect trigger
                     broadcastMessage({ type: 'sfx', effect: 'mortarLaunch' });
                     entities.push(new MortarProjectile(this.x, this.y, targetPlayer.x, targetPlayer.y, this.id));
                     this.attackPhase = 'barrage'; break;
@@ -1337,7 +1331,6 @@ wss.on('connection', (ws) => {
     ws.playerId = playerId;
     console.log(`[SERVER] Player ${playerId} connected.`);
     ws.send(JSON.stringify({ type: 'init', playerId: playerId, world: localWorld }));
-    // CHANGE 3: Add channel to all system messages so they appear in the 'All' tab
     ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Connection established. Welcome to Galactic OS.', color: '#ffff00', channel: 'all'}));
     ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `DREADNOUGHT detected at [X:150, Y:150].`, color: '#ff6a00', channel: 'all'}));
     ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `SERPENT detected at [X:-150, Y:-150].`, color: '#33ff99', channel: 'all'}));
@@ -1349,10 +1342,38 @@ wss.on('connection', (ws) => {
             const data = JSON.parse(message);
             const player = players[ws.playerId];
 
-            if (data.type === 'playerInit') { const PlayerClass = { 'Operator': Operator, 'Guardian': Guardian, 'Spectre': Spectre }[data.className]; if (PlayerClass) { players[ws.playerId] = new PlayerClass(ws.playerId, data.username, data.color); } }
-            if (data.type === 'playerRespawn') { if (player && player.isDead) player.respawn(); }
+            // --- CHAT FIX START ---
+            // Handle chat and early-game actions first, before checking if the player is fully initialized.
+            if (data.type === 'playerInit') {
+                const PlayerClass = { 'Operator': Operator, 'Guardian': Guardian, 'Spectre': Spectre }[data.className];
+                if (PlayerClass) { players[ws.playerId] = new PlayerClass(ws.playerId, data.username, data.color); }
+                return; // Stop processing after this
+            }
+            if (data.type === 'chat') { 
+                const partyId = player ? getPartyIdForPlayer(player.id) : null;
+                const senderName = player ? player.username : "Connecting..."; // Use a default name if player object doesn't exist yet
+                const senderColor = player ? player.color : "#777";
+                const chatData = { sender: senderName, message: data.message, color: senderColor, channel: data.channel };
+
+                if (data.channel === 'party' && partyId) {
+                    parties[partyId].forEach(pid => {
+                        const socket = getSocketByPlayerId(pid);
+                        if(socket) socket.send(JSON.stringify(chatData));
+                    });
+                } else {
+                    chatData.channel = 'all';
+                    broadcastMessage(chatData);
+                }
+                return; // Stop processing after this
+            }
+            // --- CHAT FIX END ---
+
+            // --- This is the old check that was causing the problem. Now it only protects game actions. ---
+            if (!player || player.isDead) return;
+
+            if (data.type === 'playerRespawn') { if (player.isDead) player.respawn(); }
             
-            if (data.type === 'pickupLoot' && player && !player.isDead) {
+            if (data.type === 'pickupLoot' && !player.isDead) {
                 const lootBag = entities.find(e => e.id === data.entityId);
                 if (lootBag && Math.hypot(player.x - lootBag.x, player.y - lootBag.y) < 100) {
                     if (lootBag.type === 'PlayerLootBag') {
@@ -1361,7 +1382,7 @@ wss.on('connection', (ws) => {
                     } else if (lootBag.type === 'EquipmentDrop') { if(player.addToInventory(lootBag.item)) { lootBag.isDead = true; } }
                 }
             }
-             if (player && data.type === 'bankAction') {
+            if (data.type === 'bankAction') {
                 if (!banks[player.username]) banks[player.username] = [];
                 const playerBank = banks[player.username];
 
@@ -1406,8 +1427,37 @@ wss.on('connection', (ws) => {
                 saveData('banks.json', banks);
                 ws.send(JSON.stringify({ type: 'openBank', bank: playerBank }));
             }
-            if (player && data.type === 'marketAction') { /* ... existing market code ... */ }
-            if (player && data.type === 'tradeRequest') {
+            // --- MARKET LISTING FIX START ---
+            if (data.type === 'marketAction') {
+                if (data.action === 'list') {
+                    const item = player.inventory[data.itemIndex];
+                    const price = parseInt(data.price, 10);
+                    if (item && price > 0) {
+                        player.inventory[data.itemIndex] = null; // Remove from inventory
+                        const listingId = `listing_${Date.now()}_${player.username}`;
+                        marketListings[listingId] = {
+                            item: item,
+                            price: price,
+                            seller: player.username
+                        };
+                        saveData('market.json', marketListings);
+                        broadcastMessage({ type: 'marketUpdate', marketListings: marketListings });
+                    }
+                } else if (data.action === 'buy') {
+                    const listing = marketListings[data.listingId];
+                    if (listing && player.dataBits >= listing.price) {
+                         if (player.addToInventory(listing.item)) {
+                            player.dataBits -= listing.price;
+                            // Note: We are not paying the seller yet. This would require a more complex system.
+                            delete marketListings[data.listingId];
+                            saveData('market.json', marketListings);
+                            broadcastMessage({ type: 'marketUpdate', marketListings: marketListings });
+                         }
+                    }
+                }
+            }
+            // --- MARKET LISTING FIX END ---
+            if (data.type === 'tradeRequest') {
                 const targetPlayer = players[data.targetId];
                 if (targetPlayer && !targetPlayer.trade.partnerId) {
                     const targetSocket = getSocketByPlayerId(data.targetId);
@@ -1416,13 +1466,13 @@ wss.on('connection', (ws) => {
                     }
                 }
             }
-            if (player && data.type === 'tradeResponse') {
+            if (data.type === 'tradeResponse') {
                 const requester = players[data.requesterId];
                 if (requester && data.accepted) {
                     startTrade(player.id, requester.id);
                 }
             }
-            if (player && player.trade.partnerId && data.type === 'tradeUpdate') {
+            if (player.trade.partnerId && data.type === 'tradeUpdate') {
                 const partner = players[player.trade.partnerId];
                 if (!partner) {
                     cancelTrade(player.id, "Trade partner disconnected.");
@@ -1456,7 +1506,7 @@ wss.on('connection', (ws) => {
                     partnerSocket.send(JSON.stringify({ type: 'tradeUpdate', offer: player.trade }));
                 }
             }
-             if (player && player.trade.partnerId && data.type === 'tradeAccept') {
+             if (player.trade.partnerId && data.type === 'tradeAccept') {
                 player.trade.accepted = true;
                 const partner = players[player.trade.partnerId];
                 if (partner && partner.trade.accepted) {
@@ -1466,16 +1516,16 @@ wss.on('connection', (ws) => {
                     if(partnerSocket) partnerSocket.send(JSON.stringify({ type: 'tradePartnerAccepted' }));
                 }
             }
-            if (player && player.trade.partnerId && data.type === 'tradeCancel') {
+            if (player.trade.partnerId && data.type === 'tradeCancel') {
                 cancelTrade(player.id, `${player.username} cancelled the trade.`);
             }
-            if (player && data.type === 'partyInvite') {
+            if (data.type === 'partyInvite') {
                 const targetSocket = getSocketByPlayerId(data.targetId);
                 if (targetSocket) {
                     targetSocket.send(JSON.stringify({ type: 'partyInvite', from: player.getData() }));
                 }
             }
-            if (player && data.type === 'partyResponse') {
+            if (data.type === 'partyResponse') {
                 const inviter = players[data.inviterId];
                 if (inviter && data.accepted) {
                     const inviterPartyId = getPartyIdForPlayer(inviter.id);
@@ -1494,7 +1544,7 @@ wss.on('connection', (ws) => {
                     }
                 }
             }
-            if (player && data.type === 'leaveParty') {
+            if (data.type === 'leaveParty') {
                 const partyId = getPartyIdForPlayer(player.id);
                 if (partyId) {
                     const party = parties[partyId];
@@ -1515,26 +1565,7 @@ wss.on('connection', (ws) => {
                 }
             }
 
-
-            if (!player || player.isDead) return;
             if (data.type === 'input') { player.inputs = data.inputs; player.angle = data.angle; }
-            // CHANGE 3: Reworked chat logic to handle party vs all chat
-            if (data.type === 'chat') { 
-                const partyId = getPartyIdForPlayer(player.id);
-                const chatData = { sender: player.username, message: data.message, color: player.color, channel: data.channel };
-
-                if (data.channel === 'party' && partyId) {
-                    // This is a party message, send only to party members.
-                    parties[partyId].forEach(pid => {
-                        const socket = getSocketByPlayerId(pid);
-                        if(socket) socket.send(JSON.stringify(chatData));
-                    });
-                } else {
-                    // This is a global message, ensure it's marked for the 'all' channel and broadcast it.
-                    chatData.channel = 'all';
-                    broadcastMessage(chatData);
-                }
-            }
             if (data.type === 'interact') { player.attemptInteraction(); }
             if (data.type === 'equipItem') { const item = player.inventory[data.itemIndex]; if (item) { const currentEquipped = player.equipment[item.slot]; player.equipment[item.slot] = item; player.inventory[data.itemIndex] = currentEquipped; player.recalculateStats(); } }
             if (data.type === 'unequipItem') { const item = player.equipment[data.slot]; if (item && player.addToInventory(item)) { player.equipment[data.slot] = null; player.recalculateStats(); } }

@@ -12,8 +12,7 @@ All Rights Reserved.
     <style>
         body, html { background-color: #05060a; color: #00f0ff; font-family: 'Consolas', 'Monaco', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; user-select: none; }
         #gameCanvas { background-color: #05060a; cursor: crosshair; }
-        /* UPDATED: Changed display from 'none' to 'block'. The JS will handle hiding it on the login screen. */
-        #chat-container { display: block; position: fixed; bottom: 20px; left: 20px; width: 400px; background-color: rgba(5, 6, 10, 0.7); border: 1px solid #00f0ff; border-radius: 5px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; z-index: 10; }
+        #chat-container { display: none; position: fixed; bottom: 20px; left: 20px; width: 400px; background-color: rgba(5, 6, 10, 0.7); border: 1px solid #00f0ff; border-radius: 5px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); color: #fff; z-index: 10; }
         #chat-log { height: 150px; padding: 10px; overflow-y: scroll; font-size: 14px; list-style: none; margin: 0; }
         #chat-log::-webkit-scrollbar { width: 4px; } #chat-log::-webkit-scrollbar-thumb { background: #00f0ff; }
         #chat-input { width: 100%; border: none; border-top: 1px solid #00f0ff; background-color: #05060a; color: #fff; padding: 8px; font-family: 'Consolas', 'Monaco', monospace; box-sizing: border-box; }
@@ -67,7 +66,7 @@ All Rights Reserved.
         .shop-tab.active { background: #00f0ff; color: #05060a; border-color: #00f0ff; }
         .shop-content { display: none; }
         .shop-content.active { display: block; }
-        .shop-grid { display: grid; grid-template-columns: 1fr; gap: 5px; max-height: 300px; overflow-y: auto; padding: 5px; border: 1px solid #333; }
+        .shop-grid { display: grid; grid-template-columns: 1fr; gap: 5px; min-height: 255px; /* --- PAGINATION FIX: Set a fixed height --- */ max-height: 255px; overflow-y: auto; padding: 5px; border: 1px solid #333; }
         .shop-item, .market-item { display: grid; grid-template-columns: 2fr 1fr 1fr; align-items: center; background-color: rgba(0,0,0,0.5); border: 1px solid #555; padding: 8px; }
         .market-item { grid-template-columns: 2fr 1fr 1fr 1fr; }
         .shop-item-name, .market-item-name { font-size: 14px; }
@@ -76,6 +75,24 @@ All Rights Reserved.
         #market-sell-panel { margin-top: 15px; border-top: 1px solid #555; padding-top: 10px; }
         #market-sell-panel select, #market-sell-panel input { background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; font-family: inherit; margin: 0 5px; }
         #market-sell-panel button { background: #00f0ff; color: #05060a; border: none; padding: 8px 15px; cursor: pointer; font-family: inherit; }
+        /* --- DROPDOWN STYLE FIX START --- */
+        #market-sell-panel select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg fill='%2300f0ff' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+            background-repeat: no-repeat;
+            background-position-x: 100%;
+            background-position-y: 5px;
+            padding-right: 20px;
+        }
+        /* --- DROPDOWN STYLE FIX END --- */
+        /* --- PAGINATION STYLE START --- */
+        #market-pagination-controls { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 10px; }
+        .pagination-button { background: #00f0ff; color: #05060a; border: none; padding: 5px 10px; cursor: pointer; font-family: inherit; font-weight: bold; }
+        .pagination-button:disabled { background: #555; cursor: default; }
+        #market-page-info { color: #ffff00; font-size: 14px; }
+        /* --- PAGINATION STYLE END --- */
         #left-ui-container { display: none; position: fixed; top: 20px; left: 20px; width: 300px; z-index: 15; }
         #hud-container { text-align: left; font-size: 16px; margin-bottom: 10px; }
         #hud-info .hud-line { display: flex; align-items: center; justify-content: space-between; margin: 6px 0; }
@@ -191,6 +208,12 @@ All Rights Reserved.
         </div>
         <div id="market-content" class="shop-content">
             <div class="shop-grid" id="market-buy-grid"></div>
+            <!-- --- PAGINATION FIX: Added pagination controls --- -->
+            <div id="market-pagination-controls">
+                <button id="market-prev-btn" class="pagination-button">&lt; Prev</button>
+                <span id="market-page-info">Page 1 / 1</span>
+                <button id="market-next-btn" class="pagination-button">Next &gt;</button>
+            </div>
             <div id="market-sell-panel">
                  <select id="market-item-select"></select>
                  <input type="number" id="market-price-input" placeholder="Price..." min="1">
@@ -245,7 +268,6 @@ All Rights Reserved.
     const Sound = {
         context: null,
         boostNode: null,
-        // CHANGE 2: Added boostGainNode to allow for fade out
         boostGainNode: null,
         ambientNode: null,
         init: function() {
@@ -299,7 +321,7 @@ All Rights Reserved.
             osc.type = 'square';
             osc.frequency.setValueAtTime(200, now);
             osc.frequency.linearRampToValueAtTime(100, now + 0.1);
-            gain.gain.setValueAtTime(0.1, now); // UPDATED: Volume lowered from 0.15
+            gain.gain.setValueAtTime(0.1, now);
             gain.gain.linearRampToValueAtTime(0, now + 0.1);
             osc.connect(gain);
             gain.connect(this.context.destination);
@@ -331,7 +353,7 @@ All Rights Reserved.
             osc.type = 'sawtooth';
             osc.frequency.setValueAtTime(300, now);
             osc.frequency.exponentialRampToValueAtTime(50, now + 0.4);
-            gain.gain.setValueAtTime(0.1, now); // UPDATED: Lowered volume from 0.15
+            gain.gain.setValueAtTime(0.1, now);
             gain.gain.linearRampToValueAtTime(0, now + 0.4);
             osc.connect(gain);
             gain.connect(this.context.destination);
@@ -360,7 +382,7 @@ All Rights Reserved.
             const now = this.context.currentTime;
             const osc = this.context.createOscillator();
             const gain = this.context.createGain();
-            let vol = 0.1; // UPDATED: Volume lowered from 0.15
+            let vol = 0.1;
 
             if (type === 'Guardian') { 
                 osc.type = 'sine';
@@ -384,27 +406,25 @@ All Rights Reserved.
             osc.stop(now + 0.3);
         },
 
-        // CHANGE 2: Updated boost sound to be more pleasant
         startBoost: function() {
             if (!this.context || this.boostNode) return;
             const now = this.context.currentTime;
             this.boostNode = this.context.createOscillator();
             this.boostGainNode = this.context.createGain();
-            this.boostNode.type = 'triangle'; // Softer tone
-            this.boostNode.frequency.setValueAtTime(150, now); // Higher pitch
+            this.boostNode.type = 'triangle';
+            this.boostNode.frequency.setValueAtTime(150, now);
             this.boostNode.frequency.linearRampToValueAtTime(250, now + 0.2);
             this.boostGainNode.gain.setValueAtTime(0, now);
-            this.boostGainNode.gain.linearRampToValueAtTime(0.06, now + 0.2); // Smoother fade in
+            this.boostGainNode.gain.linearRampToValueAtTime(0.06, now + 0.2);
             this.boostNode.connect(this.boostGainNode);
             this.boostGainNode.connect(this.context.destination);
             this.boostNode.start(now);
         },
 
-        // CHANGE 2: Updated stopBoost to have a fade out
         stopBoost: function() {
             if (!this.context || !this.boostNode || !this.boostGainNode) return;
             const now = this.context.currentTime;
-            this.boostGainNode.gain.linearRampToValueAtTime(0, now + 0.15); // Fade out
+            this.boostGainNode.gain.linearRampToValueAtTime(0, now + 0.15);
             this.boostNode.stop(now + 0.15);
             this.boostNode = null;
             this.boostGainNode = null;
@@ -479,6 +499,11 @@ All Rights Reserved.
     let currentPartyInvite = null;
     let currentTradeRequest = null;
     let chatChannel = 'all';
+    // --- PAGINATION FIX: State variables for market pagination ---
+    let marketCurrentPage = 1;
+    const marketItemsPerPage = 5; // You can change this number
+    let fullMarketListings = {};
+
 
     const TILE_SIZE = 40, CHUNK_SIZE = 16;
     const TIER_COLORS = { 1: '#9ea3a1', 2: '#ffffff', 3: '#32a852', 4: '#3273a8', 5: '#a832a4', 6: '#e3d400' };
@@ -849,21 +874,17 @@ All Rights Reserved.
             ctx.fillText(n.name, 0, -n.radius-5);
             ctx.restore();
         },
-        // CHANGE 1: Updated Admin Panel to look like a CMD console
         'AdminPanel': (n) => {
             ctx.save();
             ctx.translate(n.x, n.y);
             
-            // Black background
             ctx.fillStyle = '#000000';
             ctx.fillRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
             
-            // Light grey border
             ctx.strokeStyle = '#cccccc';
             ctx.lineWidth = 2;
             ctx.strokeRect(-n.radius, -n.radius, n.radius*2, n.radius*2);
             
-            // Green console text
             ctx.fillStyle = '#00ff00';
             ctx.font = 'bold 14px "Consolas",monospace';
             ctx.textAlign = 'left';
@@ -898,7 +919,7 @@ All Rights Reserved.
         },
         'LootDrop': (l) => { ctx.fillStyle=l.color; ctx.shadowColor=l.color; ctx.shadowBlur=10; ctx.fillRect(l.x-l.radius,l.y-l.radius,l.radius*2,l.radius*2)},
         'EquipmentDrop': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.color; ctx.shadowColor = d.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, d.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
-        'PlayerLootBag': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.item.color || TIER_COLORS[6]; ctx.shadowColor = d.item.color || TIER_COLORS[6]; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, 12, 0, Math.PI*2); ctx.fill(); ctx.restore(); },
+        'PlayerLootBag': (d) => { ctx.save(); ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5; ctx.fillStyle = d.item.color || TIER_COLORS[6]; ctx.shadowColor = d.item.color || TIER_COLORS[6]; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(d.x, d.y, 12, 0, Math.PI * 2); ctx.fill(); ctx.restore(); },
         'Tombstone': (t) => {
             ctx.save();
             ctx.translate(t.x, t.y);
@@ -1113,7 +1134,7 @@ All Rights Reserved.
     }
 
     function showLoginScreen() {
-        chatContainer.style.display = 'none';
+        chatContainer.style.display = 'block'; // <!-- CHAT FIX: Show chat on login screen -->
         loginContainer.style.display = 'block';
         classSelectionPanel.style.display = 'none';
         shipSelectionPanel.style.display = 'none';
@@ -1531,7 +1552,10 @@ All Rights Reserved.
         document.getElementById('shop-tab-npc').classList.toggle('active', tab === 'npc');
         document.getElementById('shop-tab-market').classList.toggle('active', tab === 'market');
         if(tab === 'npc') updateNpcTradeView(data.npcInventory); 
-        else if(tab === 'market') updateMarketView(data.marketListings); 
+        else if(tab === 'market') {
+            marketCurrentPage = 1; // Reset to page 1 when switching to market tab
+            updateMarketView(data.marketListings);
+        }
     }
 
     function updateNpcTradeView(npcInventory) {
@@ -1567,8 +1591,9 @@ All Rights Reserved.
             sellGrid.appendChild(div);
         });
     }
-
+    // --- PAGINATION FIX: This entire function is updated ---
     function updateMarketView(marketListings) {
+        fullMarketListings = marketListings; // Store the full list
         const buyGrid = document.getElementById('market-buy-grid');
         const itemSelect = document.getElementById('market-item-select');
         const myPlayer = gameState.players[myPlayerId];
@@ -1576,8 +1601,16 @@ All Rights Reserved.
         buyGrid.innerHTML = '';
         itemSelect.innerHTML = '';
 
-        for(const id in marketListings) {
-            const listing = marketListings[id];
+        const listingIds = Object.keys(fullMarketListings);
+        const totalPages = Math.max(1, Math.ceil(listingIds.length / marketItemsPerPage));
+        marketCurrentPage = Math.max(1, Math.min(marketCurrentPage, totalPages));
+
+        const startIndex = (marketCurrentPage - 1) * marketItemsPerPage;
+        const endIndex = startIndex + marketItemsPerPage;
+        const pageListingIds = listingIds.slice(startIndex, endIndex);
+
+        pageListingIds.forEach(id => {
+            const listing = fullMarketListings[id];
             const div = document.createElement('div');
             div.className = 'market-item';
             div.innerHTML = `<span class="market-item-name" style="color:${TIER_COLORS[listing.item.tier]}">${listing.item.name}</span><span>${listing.seller}</span><span>${listing.price} bits</span><button>BUY</button>`;
@@ -1585,7 +1618,13 @@ All Rights Reserved.
             btn.onclick = () => sendToServer({type: 'marketAction', action: 'buy', listingId: id});
             btn.disabled = myPlayer.dataBits < listing.price || myPlayer.username === listing.seller;
             buyGrid.appendChild(div);
-        }
+        });
+        
+        // Update pagination controls
+        document.getElementById('market-page-info').textContent = `Page ${marketCurrentPage} / ${totalPages}`;
+        document.getElementById('market-prev-btn').disabled = (marketCurrentPage <= 1);
+        document.getElementById('market-next-btn').disabled = (marketCurrentPage >= totalPages);
+
         myPlayer.inventory.forEach((item, index) => {
             if(item) {
                 const option = document.createElement('option');
@@ -1640,15 +1679,11 @@ All Rights Reserved.
     chatInput.addEventListener('focus', () => { isChatting = true; });
     chatInput.addEventListener('blur', () => { isChatting = false; });
 
-    // CHANGE 3: Chat system fixes
     function addChatMessage(data) {
         const li = document.createElement('li');
-        // Assuming server sends back the channel the message belongs to.
-        // If not, we default to 'all'. System messages should be 'all'.
         li.dataset.channel = data.channel || 'all';
         li.innerHTML = `<strong style="color:${data.color || '#00f0ff'};">[${data.sender}]</strong>: ${data.message}`;
         
-        // Hide the message if it doesn't belong in the current active channel view
         if (chatChannel === 'party' && li.dataset.channel !== 'party') {
             li.style.display = 'none';
         }
@@ -1657,16 +1692,13 @@ All Rights Reserved.
         chatLog.scrollTop = chatLog.scrollHeight;
     }
     
-    // CHANGE 3: Function to filter chat messages when switching tabs
     function filterChatView() {
         const messages = chatLog.querySelectorAll('li');
         messages.forEach(msg => {
             const msgChannel = msg.dataset.channel || 'all';
             if (chatChannel === 'all') {
-                // Show all messages in the 'all' tab
                 msg.style.display = 'list-item';
             } else if (chatChannel === 'party') {
-                // Show only party messages in the 'party' tab
                 msg.style.display = (msgChannel === 'party') ? 'list-item' : 'none';
             }
         });
@@ -1729,7 +1761,6 @@ All Rights Reserved.
         sendToServer({ type: 'leaveParty' });
     });
     
-    // CHANGE 3: Updated tab click handlers to filter the view
     document.getElementById('chat-tab-all').addEventListener('click', () => {
         chatChannel = 'all';
         document.getElementById('chat-tab-all').classList.add('active');
@@ -1742,6 +1773,22 @@ All Rights Reserved.
         document.getElementById('chat-tab-all').classList.remove('active');
         document.getElementById('chat-tab-party').classList.add('active');
         filterChatView();
+    });
+    
+    // --- PAGINATION FIX: Added event listeners for new buttons ---
+    document.getElementById('market-prev-btn').addEventListener('click', () => {
+        if (marketCurrentPage > 1) {
+            marketCurrentPage--;
+            updateMarketView(fullMarketListings);
+        }
+    });
+    
+    document.getElementById('market-next-btn').addEventListener('click', () => {
+        const totalPages = Math.ceil(Object.keys(fullMarketListings).length / marketItemsPerPage);
+        if (marketCurrentPage < totalPages) {
+            marketCurrentPage++;
+            updateMarketView(fullMarketListings);
+        }
     });
 
 
