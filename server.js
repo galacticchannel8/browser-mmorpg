@@ -1343,18 +1343,13 @@ wss.on('connection', (ws) => {
             const player = players[ws.playerId];
 
             // --- CHAT FIX START ---
-            // Handle chat and early-game actions first, before checking if the player is fully initialized.
-            if (data.type === 'playerInit') {
-                const PlayerClass = { 'Operator': Operator, 'Guardian': Guardian, 'Spectre': Spectre }[data.className];
-                if (PlayerClass) { players[ws.playerId] = new PlayerClass(ws.playerId, data.username, data.color); }
-                return; // Stop processing after this
-            }
-            if (data.type === 'chat') { 
-                const player = players[ws.playerId];
+            // This logic is now robust and handles chat messages at any stage of connection.
+            if (data.type === 'chat') {
                 const partyId = player ? getPartyIdForPlayer(player.id) : null;
                 
-                const senderName = player ? player.username : data.username || "User";
-                const senderColor = player ? player.color : "#777";
+                // If the player object exists, use its name and color. Otherwise, use the username sent from the client and a default color.
+                const senderName = player ? player.username : (data.username || "Connecting...");
+                const senderColor = player ? player.color : "#9ea3a1"; // Default gray color
 
                 const chatData = {
                     sender: senderName,
@@ -1364,15 +1359,23 @@ wss.on('connection', (ws) => {
                 };
 
                 if (data.channel === 'party' && partyId) {
+                    // Send to party members only
                     parties[partyId].forEach(pid => {
                         const socket = getSocketByPlayerId(pid);
                         if(socket) socket.send(JSON.stringify(chatData));
                     });
                 } else {
+                    // It's a global message, so broadcast to everyone
                     chatData.channel = 'all';
                     broadcastMessage(chatData);
                 }
-                return; // Stop processing after this
+                return; // IMPORTANT: Stop processing here for chat messages.
+            }
+            
+            if (data.type === 'playerInit') {
+                const PlayerClass = { 'Operator': Operator, 'Guardian': Guardian, 'Spectre': Spectre }[data.className];
+                if (PlayerClass) { players[ws.playerId] = new PlayerClass(ws.playerId, data.username, data.color); }
+                return;
             }
             // --- CHAT FIX END ---
 
