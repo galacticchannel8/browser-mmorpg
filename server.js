@@ -1350,10 +1350,18 @@ wss.on('connection', (ws) => {
                 return; // Stop processing after this
             }
             if (data.type === 'chat') { 
+                const player = players[ws.playerId];
                 const partyId = player ? getPartyIdForPlayer(player.id) : null;
-                const senderName = player ? player.username : "Connecting..."; // Use a default name if player object doesn't exist yet
+                
+                const senderName = player ? player.username : data.username || "User";
                 const senderColor = player ? player.color : "#777";
-                const chatData = { sender: senderName, message: data.message, color: senderColor, channel: data.channel };
+
+                const chatData = {
+                    sender: senderName,
+                    message: data.message,
+                    color: senderColor,
+                    channel: data.channel
+                };
 
                 if (data.channel === 'party' && partyId) {
                     parties[partyId].forEach(pid => {
@@ -1368,7 +1376,7 @@ wss.on('connection', (ws) => {
             }
             // --- CHAT FIX END ---
 
-            // --- This is the old check that was causing the problem. Now it only protects game actions. ---
+            // This check now correctly protects only the actions that require a fully spawned player.
             if (!player || player.isDead) return;
 
             if (data.type === 'playerRespawn') { if (player.isDead) player.respawn(); }
@@ -1427,13 +1435,12 @@ wss.on('connection', (ws) => {
                 saveData('banks.json', banks);
                 ws.send(JSON.stringify({ type: 'openBank', bank: playerBank }));
             }
-            // --- MARKET LISTING FIX START ---
             if (data.type === 'marketAction') {
                 if (data.action === 'list') {
                     const item = player.inventory[data.itemIndex];
                     const price = parseInt(data.price, 10);
                     if (item && price > 0) {
-                        player.inventory[data.itemIndex] = null; // Remove from inventory
+                        player.inventory[data.itemIndex] = null;
                         const listingId = `listing_${Date.now()}_${player.username}`;
                         marketListings[listingId] = {
                             item: item,
@@ -1445,10 +1452,15 @@ wss.on('connection', (ws) => {
                     }
                 } else if (data.action === 'buy') {
                     const listing = marketListings[data.listingId];
-                    if (listing && player.dataBits >= listing.price) {
+                    if (listing && player.username !== listing.seller && player.dataBits >= listing.price) {
                          if (player.addToInventory(listing.item)) {
                             player.dataBits -= listing.price;
-                            // Note: We are not paying the seller yet. This would require a more complex system.
+                            
+                            const seller = Object.values(players).find(p => p.username === listing.seller);
+                            if(seller){
+                                seller.dataBits += listing.price;
+                            }
+                            
                             delete marketListings[data.listingId];
                             saveData('market.json', marketListings);
                             broadcastMessage({ type: 'marketUpdate', marketListings: marketListings });
@@ -1456,7 +1468,6 @@ wss.on('connection', (ws) => {
                     }
                 }
             }
-            // --- MARKET LISTING FIX END ---
             if (data.type === 'tradeRequest') {
                 const targetPlayer = players[data.targetId];
                 if (targetPlayer && !targetPlayer.trade.partnerId) {

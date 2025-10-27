@@ -1,4 +1,3 @@
-<!-- FORCE UPDATE -->
 <!--
 Copyright (c) 2025 GalacticChannel8.com
 All Rights Reserved.
@@ -66,33 +65,19 @@ All Rights Reserved.
         .shop-tab.active { background: #00f0ff; color: #05060a; border-color: #00f0ff; }
         .shop-content { display: none; }
         .shop-content.active { display: block; }
-        .shop-grid { display: grid; grid-template-columns: 1fr; gap: 5px; min-height: 255px; /* --- PAGINATION FIX: Set a fixed height --- */ max-height: 255px; overflow-y: auto; padding: 5px; border: 1px solid #333; }
+        .shop-grid { display: grid; grid-template-columns: 1fr; gap: 5px; min-height: 255px; max-height: 255px; overflow-y: auto; padding: 5px; border: 1px solid #333; }
         .shop-item, .market-item { display: grid; grid-template-columns: 2fr 1fr 1fr; align-items: center; background-color: rgba(0,0,0,0.5); border: 1px solid #555; padding: 8px; }
         .market-item { grid-template-columns: 2fr 1fr 1fr 1fr; }
         .shop-item-name, .market-item-name { font-size: 14px; }
         .shop-item-buy, .shop-item-sell, .market-buy-btn { background: #00f0ff; color: #05060a; border: none; padding: 5px 10px; cursor: pointer; }
         .shop-item-buy:disabled, .market-buy-btn:disabled { background: #555; cursor: default; }
-        #market-sell-panel { margin-top: 15px; border-top: 1px solid #555; padding-top: 10px; }
-        #market-sell-panel select, #market-sell-panel input { background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; font-family: inherit; margin: 0 5px; }
+        #market-sell-panel { margin-top: 15px; border-top: 1px solid #555; padding-top: 10px; display: flex; align-items: center; justify-content: center; }
+        #market-sell-panel input { background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px; font-family: inherit; margin: 0 5px; }
         #market-sell-panel button { background: #00f0ff; color: #05060a; border: none; padding: 8px 15px; cursor: pointer; font-family: inherit; }
-        /* --- DROPDOWN STYLE FIX START --- */
-        #market-sell-panel select {
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-            background-image: url("data:image/svg+xml;utf8,<svg fill='%2300f0ff' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
-            background-repeat: no-repeat;
-            background-position-x: 100%;
-            background-position-y: 5px;
-            padding-right: 20px;
-        }
-        /* --- DROPDOWN STYLE FIX END --- */
-        /* --- PAGINATION STYLE START --- */
         #market-pagination-controls { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 10px; }
         .pagination-button { background: #00f0ff; color: #05060a; border: none; padding: 5px 10px; cursor: pointer; font-family: inherit; font-weight: bold; }
         .pagination-button:disabled { background: #555; cursor: default; }
         #market-page-info { color: #ffff00; font-size: 14px; }
-        /* --- PAGINATION STYLE END --- */
         #left-ui-container { display: none; position: fixed; top: 20px; left: 20px; width: 300px; z-index: 15; }
         #hud-container { text-align: left; font-size: 16px; margin-bottom: 10px; }
         #hud-info .hud-line { display: flex; align-items: center; justify-content: space-between; margin: 6px 0; }
@@ -125,6 +110,31 @@ All Rights Reserved.
         .trade-slot.offered::after { content: '✓'; position: absolute; top: 0; right: 2px; color: #33ff99; font-weight: bold; }
         #party-invite-popup, #trade-request-popup { display: none; position: fixed; bottom: 200px; left: 50%; transform: translateX(-50%); z-index: 100; padding: 15px; text-align: center; }
         #party-invite-popup p, #trade-request-popup p { margin: 0 0 10px 0; font-size: 14px; }
+        
+        /* --- CUSTOM DROPDOWN FIX START --- */
+        .custom-select-container { position: relative; display: inline-block; font-family: inherit; }
+        .custom-select-trigger {
+            background: #10121f; border: 1px solid #00f0ff; color: #fff; padding: 8px;
+            font-family: inherit; cursor: pointer; width: 150px; text-align: left;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .custom-select-trigger.disabled { color: #555; border-color: #555; cursor: default; }
+        .custom-select-trigger.disabled::after { color: #555; }
+        .custom-select-trigger::after {
+            content: '▼'; font-size: 12px; color: #00f0ff;
+        }
+        .custom-select-options {
+            display: none; position: absolute; bottom: 100%; left: 0; right: 0;
+            background: #10121f; border: 1px solid #00f0ff; z-index: 55;
+            max-height: 150px; overflow-y: auto;
+        }
+        .custom-select-options::-webkit-scrollbar { width: 4px; } 
+        .custom-select-options::-webkit-scrollbar-thumb { background: #00f0ff; }
+        .custom-select-option { padding: 8px; cursor: pointer; }
+        .custom-select-option:hover { background-color: #00f0ff; color: #05060a; }
+        .custom-select-option.disabled { color: #555; cursor: default; background: none; }
+        /* --- CUSTOM DROPDOWN FIX END --- */
+
     </style>
 </head>
 
@@ -208,16 +218,22 @@ All Rights Reserved.
         </div>
         <div id="market-content" class="shop-content">
             <div class="shop-grid" id="market-buy-grid"></div>
-            <!-- --- PAGINATION FIX: Added pagination controls --- -->
             <div id="market-pagination-controls">
                 <button id="market-prev-btn" class="pagination-button">&lt; Prev</button>
                 <span id="market-page-info">Page 1 / 1</span>
                 <button id="market-next-btn" class="pagination-button">Next &gt;</button>
             </div>
             <div id="market-sell-panel">
-                 <select id="market-item-select"></select>
-                 <input type="number" id="market-price-input" placeholder="Price..." min="1">
-                 <button id="market-list-btn">List Item</button>
+                <!-- --- CUSTOM DROPDOWN FIX START --- -->
+                <div class="custom-select-container">
+                    <div class="custom-select-trigger" id="market-item-select-trigger">Select Item</div>
+                    <div class="custom-select-options" id="market-item-select-options"></div>
+                </div>
+                <!-- This hidden input will store the actual value -->
+                <input type="hidden" id="market-item-select-value">
+                <!-- --- CUSTOM DROPDOWN FIX END --- -->
+                <input type="number" id="market-price-input" placeholder="Price..." min="1">
+                <button id="market-list-btn">List Item</button>
             </div>
         </div>
     </div>
@@ -499,9 +515,8 @@ All Rights Reserved.
     let currentPartyInvite = null;
     let currentTradeRequest = null;
     let chatChannel = 'all';
-    // --- PAGINATION FIX: State variables for market pagination ---
     let marketCurrentPage = 1;
-    const marketItemsPerPage = 5; // You can change this number
+    const marketItemsPerPage = 5;
     let fullMarketListings = {};
 
 
@@ -1134,7 +1149,7 @@ All Rights Reserved.
     }
 
     function showLoginScreen() {
-        chatContainer.style.display = 'block'; // <!-- CHAT FIX: Show chat on login screen -->
+        chatContainer.style.display = 'none';
         loginContainer.style.display = 'block';
         classSelectionPanel.style.display = 'none';
         shipSelectionPanel.style.display = 'none';
@@ -1149,6 +1164,7 @@ All Rights Reserved.
         shipSelectionPanel.style.display = 'none';
         deathScreen.style.display = 'none';
         classSelectionPanel.style.display = 'block';
+        chatContainer.style.display = 'block';
     }
     function showShipSelection() {
         classSelectionPanel.style.display = 'none';
@@ -1553,7 +1569,7 @@ All Rights Reserved.
         document.getElementById('shop-tab-market').classList.toggle('active', tab === 'market');
         if(tab === 'npc') updateNpcTradeView(data.npcInventory); 
         else if(tab === 'market') {
-            marketCurrentPage = 1; // Reset to page 1 when switching to market tab
+            marketCurrentPage = 1;
             updateMarketView(data.marketListings);
         }
     }
@@ -1591,15 +1607,13 @@ All Rights Reserved.
             sellGrid.appendChild(div);
         });
     }
-    // --- PAGINATION FIX: This entire function is updated ---
+
     function updateMarketView(marketListings) {
-        fullMarketListings = marketListings; // Store the full list
+        fullMarketListings = marketListings; 
         const buyGrid = document.getElementById('market-buy-grid');
-        const itemSelect = document.getElementById('market-item-select');
         const myPlayer = gameState.players[myPlayerId];
         if(!myPlayer) return;
         buyGrid.innerHTML = '';
-        itemSelect.innerHTML = '';
 
         const listingIds = Object.keys(fullMarketListings);
         const totalPages = Math.max(1, Math.ceil(listingIds.length / marketItemsPerPage));
@@ -1620,21 +1634,57 @@ All Rights Reserved.
             buyGrid.appendChild(div);
         });
         
-        // Update pagination controls
         document.getElementById('market-page-info').textContent = `Page ${marketCurrentPage} / ${totalPages}`;
         document.getElementById('market-prev-btn').disabled = (marketCurrentPage <= 1);
         document.getElementById('market-next-btn').disabled = (marketCurrentPage >= totalPages);
 
-        myPlayer.inventory.forEach((item, index) => {
-            if(item) {
-                const option = document.createElement('option');
-                option.value = index;
-                option.textContent = item.name;
-                itemSelect.appendChild(option);
-            }
-        });
+        updateMarketItemSelector(myPlayer);
     }
     
+    function updateMarketItemSelector(player) {
+        const optionsContainer = document.getElementById('market-item-select-options');
+        const trigger = document.getElementById('market-item-select-trigger');
+        const valueInput = document.getElementById('market-item-select-value');
+        optionsContainer.innerHTML = '';
+        
+        const sellableItems = player.inventory.map((item, index) => ({item, index})).filter(i => i.item !== null);
+
+        if (sellableItems.length === 0) {
+            trigger.textContent = 'No items to sell';
+            trigger.classList.add('disabled');
+            valueInput.value = '';
+            const noItemOption = document.createElement('div');
+            noItemOption.className = 'custom-select-option disabled';
+            noItemOption.textContent = 'No items to sell';
+            optionsContainer.appendChild(noItemOption);
+            return;
+        }
+        
+        trigger.classList.remove('disabled');
+        const currentSelection = valueInput.value;
+        const selectedItem = sellableItems.find(i => i.index == currentSelection);
+        
+        if (selectedItem) {
+             trigger.textContent = selectedItem.item.name;
+        } else {
+            trigger.textContent = sellableItems[0].item.name;
+            valueInput.value = sellableItems[0].index;
+        }
+
+        sellableItems.forEach(({item, index}) => {
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'custom-select-option';
+            optionDiv.textContent = item.name;
+            optionDiv.dataset.value = index;
+            optionDiv.addEventListener('click', () => {
+                trigger.textContent = item.name;
+                valueInput.value = index;
+                optionsContainer.style.display = 'none';
+            });
+            optionsContainer.appendChild(optionDiv);
+        });
+    }
+
     function updatePartyUI(partyMembers) {
         const partyList = document.getElementById('party-members-list');
         if (!partyMembers || partyMembers.length <= 1) { 
@@ -1663,7 +1713,7 @@ All Rights Reserved.
 
 
     function listMarketItem() {
-        const itemIndex = document.getElementById('market-item-select').value;
+        const itemIndex = document.getElementById('market-item-select-value').value;
         const price = document.getElementById('market-price-input').value;
         if(itemIndex !== '' && price > 0) {
             sendToServer({type: 'marketAction', action: 'list', itemIndex: parseInt(itemIndex), price: parseInt(price)});
@@ -1775,7 +1825,6 @@ All Rights Reserved.
         filterChatView();
     });
     
-    // --- PAGINATION FIX: Added event listeners for new buttons ---
     document.getElementById('market-prev-btn').addEventListener('click', () => {
         if (marketCurrentPage > 1) {
             marketCurrentPage--;
@@ -1791,12 +1840,19 @@ All Rights Reserved.
         }
     });
 
+    document.getElementById('market-item-select-trigger').addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevents the window click from firing immediately
+        if (e.target.classList.contains('disabled')) return;
+        const options = document.getElementById('market-item-select-options');
+        options.style.display = options.style.display === 'block' ? 'none' : 'block';
+    });
+
 
     document.addEventListener('keydown', e => {
         if (isChatting) {
             if (e.key === 'Enter') {
                 const msg = chatInput.value.trim();
-                if (msg) sendToServer({ type: 'chat', message: msg, channel: chatChannel });
+                if (msg) sendToServer({ type: 'chat', message: msg, channel: chatChannel, username: loggedInUser });
                 chatInput.value = '';
                 chatInput.blur();
             }
@@ -1865,6 +1921,11 @@ All Rights Reserved.
     });
 
     window.addEventListener('mousedown', (e) => {
+        const selectContainer = e.target.closest('.custom-select-container');
+        if (!selectContainer) {
+            document.getElementById('market-item-select-options').style.display = 'none';
+        }
+
         if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('.chat-tab')) {
             return;
         }
