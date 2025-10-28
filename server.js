@@ -1358,7 +1358,7 @@ wss.on('connection', (ws) => {
                     channel: data.channel
                 };
 
-                if (data.channel === 'party' && partyId) {
+                if (data.channel === 'party' && partyId && parties[partyId]) {
                     // Send to party members only
                     parties[partyId].forEach(pid => {
                         const socket = getSocketByPlayerId(pid);
