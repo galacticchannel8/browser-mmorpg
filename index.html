@@ -155,9 +155,9 @@ All Rights Reserved.
         <ul id="chat-log"></ul>
         <input type="text" id="chat-input" placeholder="Press Enter to chat..." maxlength="100">
     </div>
-    <div id="login-container" class="ui-panel"><div id="login-form" class="login-form"><h2>LOGIN</h2><input type="text" id="login-username" placeholder="Username" required><input type="password" id="login-password" placeholder="Password" required><button onclick="handleLogin()">ENTER GALACTIC OS</button><p class="login-toggle" onclick="toggleLoginRegister(false)">Need an account? Register</p></div><div id="register-form" class="login-form" style="display: none;"><h2>REGISTER</h2><input type="text" id="register-username" placeholder="Username" required><input type="password" id="register-password" placeholder="Password" required><button onclick="handleRegister()">CREATE ACCOUNT</button><p class="login-toggle" onclick="toggleLoginRegister(true)">Already have an account? Login</p></div><div id="login-error"></div></div>
-    <div id="class-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR CLASS</h2><div class="class-option" onclick="chooseClass('Operator')"><h3>OPERATOR</h3><p>High speed, low health. Ability: Invisibility.</p></div><div class="class-option" onclick="chooseClass('Guardian')"><h3>GUARDIAN</h3><p>High health, low speed. Ability: Personal Shield.</p></div><div class="class-option" onclick="chooseClass('Spectre')"><h3>SPECTRE</h3><p>Balanced stats. Ability: Short-range Blink.</p></div></div>
-    <div id="ship-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR SHIP COLOR</h2><div id="color-grid"><div class="color-option" style="background-color: #00f0ff;" onclick="chooseColor('#00f0ff')"></div><div class="color-option" style="background-color: #33ff99;" onclick="chooseColor('#33ff99')"></div><div class="color-option" style="background-color: #f07cff;" onclick="chooseColor('#f07cff')"></div><div class="color-option" style="background-color: #ff3355;" onclick="chooseColor('#ff3355')"></div><div class="color-option" style="background-color: #e3d400;" onclick="chooseColor('#e3d400')"></div><div class="color-option" style="background-color: #ffffff;" onclick="chooseColor('#ffffff')"></div></div></div>
+    <div id="login-container" class="ui-panel"><div id="login-form" class="login-form"><h2>LOGIN</h2><input type="text" id="login-username" placeholder="Username" required><input type="password" id="login-password" placeholder="Password" required><button id="login-btn">ENTER GALACTIC OS</button><p class="login-toggle" onclick="toggleLoginRegister(false)">Need an account? Register</p></div><div id="register-form" class="login-form" style="display: none;"><h2>REGISTER</h2><input type="text" id="register-username" placeholder="Username" required><input type="password" id="register-password" placeholder="Password" required><button id="register-btn">CREATE ACCOUNT</button><p class="login-toggle" onclick="toggleLoginRegister(true)">Already have an account? Login</p></div><div id="login-error"></div></div>
+    <div id="class-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR CLASS</h2><div class="class-option" id="class-operator"><h3>OPERATOR</h3><p>High speed, low health. Ability: Invisibility.</p></div><div class="class-option" id="class-guardian"><h3>GUARDIAN</h3><p>High health, low speed. Ability: Personal Shield.</p></div><div class="class-option" id="class-spectre"><h3>SPECTRE</h3><p>Balanced stats. Ability: Short-range Blink.</p></div></div>
+    <div id="ship-selection" class="ui-panel selection-panel"><h2>CHOOSE YOUR SHIP COLOR</h2><div id="color-grid"></div></div>
     
     <div id="left-ui-container">
         <div id="hud-container" class="ui-panel">
@@ -224,14 +224,11 @@ All Rights Reserved.
                 <button id="market-next-btn" class="pagination-button">Next &gt;</button>
             </div>
             <div id="market-sell-panel">
-                <!-- --- CUSTOM DROPDOWN FIX START --- -->
                 <div class="custom-select-container">
                     <div class="custom-select-trigger" id="market-item-select-trigger">Select Item</div>
                     <div class="custom-select-options" id="market-item-select-options"></div>
                 </div>
-                <!-- This hidden input will store the actual value -->
                 <input type="hidden" id="market-item-select-value">
-                <!-- --- CUSTOM DROPDOWN FIX END --- -->
                 <input type="number" id="market-price-input" placeholder="Price..." min="1">
                 <button id="market-list-btn">List Item</button>
             </div>
@@ -275,7 +272,7 @@ All Rights Reserved.
         </div>
     </div>
 
-    <div id="death-screen" class="ui-panel"><h2>YOU ARE OFFLINE</h2><p>Your journey has ended. Your legacy is stored in the Bank.</p><button onclick="handleRespawn()">RE-ESTABLISH CONNECTION</button></div>
+    <div id="death-screen" class="ui-panel"><h2>YOU ARE OFFLINE</h2><p>Your journey has ended. Your legacy is stored in the Bank.</p><button id="respawn-btn">RE-ESTABLISH CONNECTION</button></div>
 
     <div id="xp-bar-container"><div id="xp-bar"></div></div>
 
@@ -1129,9 +1126,9 @@ All Rights Reserved.
             
             ctx.restore();
             
-            if (!myPlayer.isDead) { 
-                drawUI(myPlayer); 
-                drawMinimap(myPlayer); 
+            if (myPlayerId && gameState.players[myPlayerId] && !gameState.players[myPlayerId].isDead) { 
+                drawUI(gameState.players[myPlayerId]); 
+                drawMinimap(gameState.players[myPlayerId]); 
             }
         }
 
@@ -1201,13 +1198,43 @@ All Rights Reserved.
             sendToServer({type: 'playerRespawn'});
             showClassSelection();
         }
-        function handleLogin() { const u=document.getElementById('login-username').value, p=document.getElementById('login-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]&&users[u]===p){loggedInUser=u;showClassSelection()}else{e.textContent='Invalid username or password.'} }
-        function handleRegister() { const u=document.getElementById('register-username').value, p=document.getElementById('register-password').value, e=document.getElementById('login-error'); if(!u||!p){e.textContent='All fields are required.';return} if(u.length<3){e.textContent='Username must be at least 3 characters.';return} const users=JSON.parse(localStorage.getItem('galactic_os_users')||'{}'); if(users[u]){e.textContent='Username already taken.'}else{users[u]=p;localStorage.setItem('galactic_os_users',JSON.stringify(users));loggedInUser=u;showClassSelection()} }
-        function toggleLoginRegister(showLogin) { document.getElementById('login-form').style.display=showLogin?'block':'none';document.getElementById('register-form').style.display=showLogin?'none':'block';document.getElementById('login-error').textContent=''; }
+        function handleLogin() { 
+            const u = document.getElementById('login-username').value;
+            const p = document.getElementById('login-password').value;
+            const e = document.getElementById('login-error'); 
+            if(!u || !p) { e.textContent='All fields are required.'; return; }
+            const users = JSON.parse(localStorage.getItem('galactic_os_users') || '{}'); 
+            if(users[u] && users[u] === p) {
+                loggedInUser = u;
+                showClassSelection();
+            } else {
+                e.textContent='Invalid username or password.';
+            } 
+        }
+        function handleRegister() { 
+            const u = document.getElementById('register-username').value;
+            const p = document.getElementById('register-password').value;
+            const e = document.getElementById('login-error'); 
+            if(!u || !p) { e.textContent='All fields are required.'; return; }
+            if(u.length < 3) { e.textContent='Username must be at least 3 characters.'; return; }
+            const users = JSON.parse(localStorage.getItem('galactic_os_users') || '{}'); 
+            if(users[u]) {
+                e.textContent='Username already taken.';
+            } else {
+                users[u] = p;
+                localStorage.setItem('galactic_os_users', JSON.stringify(users));
+                loggedInUser = u;
+                showClassSelection();
+            } 
+        }
+        function toggleLoginRegister(showLogin) { 
+            document.getElementById('login-form').style.display = showLogin ? 'block' : 'none';
+            document.getElementById('register-form').style.display = showLogin ? 'none' : 'block';
+            document.getElementById('login-error').textContent = ''; 
+        }
 
         function drawUI(player) {
             if (!player || !player.stats) return;
-            const abilityName = player.className === 'Operator' ? 'Invis' : (player.className === 'Guardian' ? 'Shield' : 'Blink');
             hudInfo.innerHTML = `
                 <div class="hud-line"><strong>Data Bits:</strong> <span>${player.dataBits}</span></div>
                 <div class="hud-line"><strong>Ability:</strong> <span style="color: ${player.abilityCooldown > 0 ? '#777' : '#00f0ff'}">${player.abilityCooldown > 0 ? player.abilityCooldown.toFixed(1) + 's' : 'READY'}</span></div>
@@ -1727,6 +1754,8 @@ All Rights Reserved.
             return (item.tier * item.tier) * 20;
         }
 
+        // --- All Event Listeners are now safely below this point ---
+
         chatInput.addEventListener('focus', () => { isChatting = true; });
         chatInput.addEventListener('blur', () => { isChatting = false; });
 
@@ -1755,6 +1784,23 @@ All Rights Reserved.
             });
             chatLog.scrollTop = chatLog.scrollHeight;
         }
+
+        document.getElementById('login-btn').onclick = handleLogin;
+        document.getElementById('register-btn').onclick = handleRegister;
+        document.getElementById('respawn-btn').onclick = handleRespawn;
+        document.getElementById('class-operator').onclick = () => chooseClass('Operator');
+        document.getElementById('class-guardian').onclick = () => chooseClass('Guardian');
+        document.getElementById('class-spectre').onclick = () => chooseClass('Spectre');
+        
+        const colors = ['#00f0ff', '#33ff99', '#f07cff', '#ff3355', '#e3d400', '#ffffff'];
+        const colorGrid = document.getElementById('color-grid');
+        colors.forEach(color => {
+            const colorOption = document.createElement('div');
+            colorOption.className = 'color-option';
+            colorOption.style.backgroundColor = color;
+            colorOption.onclick = () => chooseColor(color);
+            colorGrid.appendChild(colorOption);
+        });
 
         document.getElementById('login-password').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') handleLogin();
@@ -1842,7 +1888,7 @@ All Rights Reserved.
         });
 
         document.getElementById('market-item-select-trigger').addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevents the window click from firing immediately
+            e.stopPropagation();
             if (e.target.classList.contains('disabled')) return;
             const options = document.getElementById('market-item-select-options');
             options.style.display = options.style.display === 'block' ? 'none' : 'block';
@@ -1944,7 +1990,6 @@ All Rights Reserved.
         canvas.addEventListener('contextmenu', e => {
             e.preventDefault();
         });
-
 
         showLoginScreen();
         initGameStars();
