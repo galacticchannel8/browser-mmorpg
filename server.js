@@ -17,9 +17,11 @@ const WebSocket = require('ws');
 const fs = require('fs'); // We need the file system to save player data
 
 // --- SETUP ---
+// Use the port the hosting service provides, or 8080 for local testing
 const PORT = process.env.PORT || 8080;
 const TICK_RATE = 30; // 30 updates per second
 
+// Attach WebSocket server to our HTTP server
 const wss = new WebSocket.Server({ server });
 
 console.log(`[SERVER] Galactic OS server is operational on port ${PORT}`);
@@ -510,8 +512,6 @@ class Spectre extends Player {
     }
 }
 
-// ... CONTINUATION OF SCRIPT ...
-
 // --- ENTITY & ENEMY CLASSES (SERVER-SIDE) ---
 class Entity { constructor(x, y, type) { this.id = `${type}_${Date.now()}_${Math.random()}`; this.x = x; this.y = y; this.type = type; } update(dt) {} getData() { const data = {}; for(const key in this) { if (typeof this[key] !== 'function' && key !== 'owner' && key !== 'head' && key !== 'segments') data[key] = this[key]; } return data; } }
 
@@ -973,16 +973,40 @@ class Laser extends Entity { constructor(x,y,p,l){ super(x,y,'Laser'); this.owne
 class Grenade extends Projectile { constructor(x,y,p,rad) { super(x,y,p,0.8,8); this.type='Grenade'; this.speed=10; this.explosionRadius = rad; } update(dt) { super.update(dt); if(this.life <= 0) { this.isDead = true; entities.push(new Shockwave(this.x, this.y, this.explosionRadius, this.damage, this.ownerId)); } } }
 class Shockwave extends Entity { constructor(x,y,mR,d,ownerId){ super(x,y,'Shockwave'); this.ownerId=ownerId; this.radius=0; this.maxRadius=mR; this.damage=d; this.life=0.5; this.hitTargets=[]; } update(dt){ this.radius += this.maxRadius * 3 * dt; this.life -= dt; if(this.life <= 0) this.isDead = true; } }
 class NPC extends Entity { constructor(x, y, name, color = '#8a2be2') { super(x, y, 'NPC'); this.name = name; this.radius = 10; this.color = color; } }
+class MedBay extends Entity { constructor(x, y) { super(x, y, 'MedBay'); this.name = 'Med-Bay'; this.radius = 12; this.color = '#ffffff'; } }
+class AdminPanel extends Entity { constructor(x, y) { super(x, y, 'AdminPanel'); this.name = 'Admin'; this.radius = 10; this.color = '#4f0000'; } }
+class Portal extends Entity { constructor(x, y) { super(x, y, 'Portal'); this.name = 'Portal'; this.radius = 25; } }
 class LootDrop extends Entity { constructor(x,y,v){ super(x + Math.random()*20-10, y + Math.random()*20-10, 'LootDrop'); this.value=v*5; this.radius=5; this.color='#ffff00'; this.life=60; } update(dt){ this.life-=dt; if (this.life <= 0) this.isDead=true; } }
 class EquipmentDrop extends Entity { constructor(x, y, item) { super(x + Math.random()*20-10, y+Math.random()*20-10, 'EquipmentDrop'); this.item = item; this.radius = 8; this.color = TIER_COLORS[item.tier] || '#fff'; this.life = 60; this.pickupDelay = 0.5; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0) this.isDead = true; } }
 class PlayerLootBag extends Entity { constructor(x, y, items, bits, color) { super(x, y, 'PlayerLootBag'); this.item = { color: color }; this.items = items; this.bits = bits; this.life = 180; this.pickupDelay = 3; } update(dt) { this.life -= dt; if (this.pickupDelay > 0) this.pickupDelay -= dt; if (this.life <= 0 || (this.bits <= 0 && this.items.every(i => i === null))) this.isDead = true; } }
 class FloatingText extends Entity { constructor(x, y, text, color = '#ff8888') { super(x, y, 'floatingText'); this.text = text; this.color = color; this.life = 1; } update(dt) { this.y -= 20 * dt; this.life -= dt; if (this.life <= 0) this.isDead = true; } }
+class Tombstone extends Entity {
+    constructor(x, y, playerName, causeOfDeath, playerColor, lootBagId = null) {
+        super(x, y, 'Tombstone');
+        this.playerName = playerName;
+        this.causeOfDeath = causeOfDeath;
+        this.playerColor = playerColor;
+        this.lootBagId = lootBagId;
+        this.life = 180;
+    }
+    update(dt) {
+        this.life -= dt;
+        if (this.life <= 0) {
+            this.isDead = true;
+        }
+    }
+}
 
 
 // --- INITIALIZE WORLD ---
 function initializeWorld() {
-    entities.push(new NPC(6.5 * TILE_SIZE, 3.5 * TILE_SIZE, 'Exchange'));
-    entities.push(new NPC(8.5 * TILE_SIZE, 3.5 * TILE_SIZE, 'Bank', '#e3d400'));
+    entities = []; 
+    entities.push(new NPC(2.5 * TILE_SIZE, 2.5 * TILE_SIZE, 'Exchange'));
+    entities.push(new NPC(13.5 * TILE_SIZE, 2.5 * TILE_SIZE, 'Bank', '#e3d400'));
+    entities.push(new MedBay(2.5 * TILE_SIZE, 10.5 * TILE_SIZE));
+    entities.push(new AdminPanel(13.5 * TILE_SIZE, 10.5 * TILE_SIZE));
+    entities.push(new Portal(CITY_SPAWN_POINT.x, CITY_SPAWN_POINT.y - (TILE_SIZE * 2)));
+
     generateChunk(0, 0); 
     const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter };
     for(const bossName in BOSS_LOCATIONS) {
@@ -993,6 +1017,42 @@ function initializeWorld() {
     console.log('[SERVER] World initialized and bosses have been spawned.');
 }
 initializeWorld();
+
+// --- PARTY HELPERS ---
+function getPartyIdForPlayer(playerId) {
+    for (const partyId in parties) {
+        if (parties[partyId].includes(playerId)) {
+            return partyId;
+        }
+    }
+    return null;
+}
+
+function areInSameParty(player1Id, player2Id) {
+    const partyId1 = getPartyIdForPlayer(player1Id);
+    return partyId1 !== null && parties[partyId1].includes(player2Id);
+}
+
+function sendPartyUpdate(partyId) {
+    if (!parties[partyId]) return;
+    const partyMembers = parties[partyId].map(pid => players[pid]).filter(p => p);
+    
+    const simplePartyData = partyMembers.map(p => ({
+        id: p.id,
+        username: p.username,
+        level: p.level,
+        health: p.health,
+        maxHealth: p.stats.maxHealth
+    }));
+
+    parties[partyId].forEach(pid => {
+        const socket = getSocketByPlayerId(pid);
+        if (socket) {
+            socket.send(JSON.stringify({ type: 'partyUpdate', party: simplePartyData }));
+        }
+    });
+}
+
 
 // --- MAIN GAME LOOP ---
 function gameLoop() {
@@ -1010,6 +1070,33 @@ function gameLoop() {
         if (entity.isDead) { entities.splice(i, 1); continue; }
     }
 
+    const playerIds = Object.keys(players);
+    if (playerIds.length > 0) {
+        for (let i = entities.length - 1; i >= 0; i--) {
+            const entity = entities[i];
+            if ((entity instanceof Enemy && !entity.isBoss && !entity.isBossComponent)) {
+                let isNearPlayer = false;
+                for (const pid of playerIds) {
+                    const player = players[pid];
+                    if (player.isDead) continue;
+                    if (Math.hypot(entity.x - player.x, entity.y - player.y) < DESPAWN_RADIUS) {
+                        isNearPlayer = true;
+                        break;
+                    }
+                }
+
+                if (isNearPlayer) {
+                    entity.timeOutsidePlayerRange = 0;
+                } else {
+                    entity.timeOutsidePlayerRange += dt;
+                    if (entity.timeOutsidePlayerRange > DESPAWN_TIME) {
+                        entity.isDead = true;
+                    }
+                }
+            }
+        }
+    }
+
     // Handle Collisions
     for (let i = entities.length - 1; i >= 0; i--) {
         const entity = entities[i];
@@ -1020,6 +1107,7 @@ function gameLoop() {
             for(const pid in players) {
                 const p = players[pid];
                 if (ownerIsPlayer && pid === entity.ownerId) continue;
+                if (ownerIsPlayer && areInSameParty(entity.ownerId, pid)) continue; // --- FRIENDLY FIRE CHECK ---
                 if (!p.isDead && Math.hypot(entity.x - p.x, entity.y - p.y) < entity.radius + p.radius) {
                     if(isCity(p.x, p.y) && ownerIsPlayer) continue;
                     p.takeDamage(entity.damage, entity);
@@ -1057,6 +1145,14 @@ function gameLoop() {
                         if (angleDiff < entity.arc / 2) {
                             other.takeDamage(entity.damage, { ownerId: entity.ownerId });
                             entity.hitTargets.push(other.id);
+                            if (other instanceof Enemy && !other.isBoss) {
+                                const knockbackStrength = 15;
+                                const knockbackAngle = entity.angle;
+                                const knockbackX = other.x + Math.cos(knockbackAngle) * knockbackStrength;
+                                const knockbackY = other.y + Math.sin(knockbackAngle) * knockbackStrength;
+                                if (!isSolid(getTile(knockbackX, other.y))) other.x = knockbackX;
+                                if (!isSolid(getTile(other.x, knockbackY))) other.y = knockbackY;
+                            }
                         }
                     }
                 }
@@ -1084,6 +1180,7 @@ function gameLoop() {
         else if(entity.type === 'Shockwave'){
              for(const pid in players) {
                 const p = players[pid];
+                if(entity.ownerId.startsWith('player_') && areInSameParty(entity.ownerId, pid)) continue; // --- FRIENDLY FIRE CHECK ---
                 if (!p.isDead && !entity.hitTargets.includes(pid) && Math.hypot(entity.x - p.x, entity.y - p.y) < entity.radius) {
                     if(isCity(p.x, p.y) && entity.ownerId.startsWith('player_')) continue;
                     p.takeDamage(entity.damage, entity);
@@ -1112,7 +1209,7 @@ function gameLoop() {
         } 
     }
 
-    for(const bossName in bossRespawnTimers) { if(bossRespawnTimers[bossName] > 0) { bossRespawnTimers[bossName] -= dt; if(bossRespawnTimers[bossName] <= 0) { const loc = BOSS_LOCATIONS[bossName]; const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter }; const BossClass = bossClasses[bossName]; if(BossClass) entities.push(new BossClass(loc.x, loc.y)); broadcastMessage({type: 'chat', sender: 'SYSTEM', message: `The ${bossName} has respawned!`, color: '#ff6a00'}); delete bossRespawnTimers[bossName]; } } }
+    for(const bossName in bossRespawnTimers) { if(bossRespawnTimers[bossName] > 0) { bossRespawnTimers[bossName] -= dt; if(bossRespawnTimers[bossName] <= 0) { const loc = BOSS_LOCATIONS[bossName]; const bossClasses = { 'DREADNOUGHT': Dreadnought, 'SERPENT': SerpentHead, 'ORACLE': TheOracle, 'VOID_HUNTER': VoidHunter }; const BossClass = bossClasses[bossName]; if(BossClass) entities.push(new BossClass(loc.x, loc.y)); broadcastMessage({type: 'chat', sender: 'SYSTEM', message: `The ${bossName} has respawned!`, color: '#ff6a00', channel: 'all'}); delete bossRespawnTimers[bossName]; } } }
 
     enemySpawnTimer -= dt;
     if (enemySpawnTimer <= 0) {
@@ -1130,7 +1227,9 @@ function gameLoop() {
                 if(!isCity(spawnX, spawnY) && !isSolid(getTile(spawnX, spawnY))){
                      const threat = getThreatLevel(spawnX, spawnY);
                      let enemyType;
-                     if (distFromCenter > 400 && Math.random() < 0.6) {
+                     if (distFromCenter > 500 && Math.random() < 0.2) {
+                        enemyType = GravityWell;
+                     } else if (distFromCenter > 400 && Math.random() < 0.6) {
                          enemyType = VoidSwarmer;
                      } else if (threat >= 3 && Math.random() < 0.3) {
                          enemyType = Warden;
@@ -1143,6 +1242,11 @@ function gameLoop() {
                 }
             }
         }
+    }
+    
+    // Update all parties
+    for (const partyId in parties) {
+        sendPartyUpdate(partyId);
     }
 
     const playersData = {};
@@ -1179,17 +1283,13 @@ function cancelTrade(cancellerId, reason) {
     const partnerId = player.trade.partnerId;
     const partner = players[partnerId];
     
-    // Return items to both players
     [player, partner].forEach(p => {
         if(!p) return;
         p.trade.offer.forEach(offerItem => {
             p.inventory[offerItem.originalIndex] = offerItem.item;
         });
         p.dataBits += p.trade.offerBits;
-
-        // Reset trade state
         p.trade = { partnerId: null, offer: [], offerBits: 0, accepted: false };
-
         const socket = getSocketByPlayerId(p.id);
         if(socket) socket.send(JSON.stringify({ type: 'tradeCancelled', reason: reason }));
     });
@@ -1199,23 +1299,19 @@ function finalizeTrade(p1Id, p2Id) {
     const p1 = players[p1Id];
     const p2 = players[p2Id];
 
-    // Safety checks
     if (!p1 || !p2 || p1.dataBits < p1.trade.offerBits || p2.dataBits < p2.trade.offerBits) {
         cancelTrade(p1Id, "An error occurred during trade.");
         return;
     }
     
-    // Exchange bits
     p1.dataBits -= p1.trade.offerBits;
     p2.dataBits -= p2.trade.offerBits;
     p1.dataBits += p2.trade.offerBits;
     p2.dataBits += p1.trade.offerBits;
 
-    // Exchange items
     p2.trade.offer.forEach(item => p1.addToInventory(item.item));
     p1.trade.offer.forEach(item => p2.addToInventory(item.item));
 
-    // Reset trade state for both
     [p1, p2].forEach(p => {
         p.trade = { partnerId: null, offer: [], offerBits: 0, accepted: false };
         const socket = getSocketByPlayerId(p.id);
@@ -1233,21 +1329,62 @@ wss.on('connection', (ws) => {
     ws.playerId = playerId;
     console.log(`[SERVER] Player ${playerId} connected.`);
     ws.send(JSON.stringify({ type: 'init', playerId: playerId, world: localWorld }));
-    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Connection established. Welcome to Galactic OS.', color: '#ffff00'}));
-    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `DREADNOUGHT detected at [X:150, Y:150].`, color: '#ff6a00'}));
-    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `SERPENT detected at [X:-150, Y:-150].`, color: '#33ff99'}));
-    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `ORACLE detected at [X:0, Y:300].`, color: '#a832a4'}));
-    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `VOID HUNTER detected at [X:300, Y:0].`, color: '#777'}));
+    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: 'Connection established. Welcome to Galactic OS.', color: '#ffff00', channel: 'all'}));
+    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `DREADNOUGHT detected at [X:150, Y:150].`, color: '#ff6a00', channel: 'all'}));
+    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `SERPENT detected at [X:-150, Y:-150].`, color: '#33ff99', channel: 'all'}));
+    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `ORACLE detected at [X:0, Y:300].`, color: '#a832a4', channel: 'all'}));
+    ws.send(JSON.stringify({type: 'chat', sender: 'SYSTEM', message: `VOID HUNTER detected at [X:300, Y:0].`, color: '#777', channel: 'all'}));
 
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
             const player = players[ws.playerId];
 
-            if (data.type === 'playerInit') { const PlayerClass = { 'Operator': Operator, 'Guardian': Guardian, 'Spectre': Spectre }[data.className]; if (PlayerClass) { players[ws.playerId] = new PlayerClass(ws.playerId, data.username, data.color); } }
-            if (data.type === 'playerRespawn') { if (player && player.isDead) player.respawn(); }
+            if (data.type === 'chat') {
+                const partyId = player ? getPartyIdForPlayer(player.id) : null;
+                const senderName = player ? player.username : (data.username || "Connecting...");
+                const senderColor = player ? player.color : "#9ea3a1";
+
+                const chatData = {
+                    sender: senderName,
+                    message: data.message,
+                    color: senderColor,
+                    channel: data.channel
+                };
+
+                if (data.channel === 'party') {
+                    if (partyId && parties[partyId]) {
+                        chatData.channel = 'party';
+                        parties[partyId].forEach(pid => {
+                            const socket = getSocketByPlayerId(pid);
+                            if(socket) socket.send(JSON.stringify(chatData));
+                        });
+                    } else {
+                        ws.send(JSON.stringify({
+                            sender: 'SYSTEM',
+                            message: 'You are not in a party.',
+                            color: '#ff3355',
+                            channel: 'all'
+                        }));
+                    }
+                } else {
+                    chatData.channel = 'all';
+                    broadcastMessage(chatData);
+                }
+                return;
+            }
             
-            if (data.type === 'pickupLoot' && player && !player.isDead) {
+            if (data.type === 'playerInit') {
+                const PlayerClass = { 'Operator': Operator, 'Guardian': Guardian, 'Spectre': Spectre }[data.className];
+                if (PlayerClass) { players[ws.playerId] = new PlayerClass(ws.playerId, data.username, data.color); }
+                return;
+            }
+
+            if (!player || player.isDead) return;
+
+            if (data.type === 'playerRespawn') { if (player.isDead) player.respawn(); }
+            
+            if (data.type === 'pickupLoot' && !player.isDead) {
                 const lootBag = entities.find(e => e.id === data.entityId);
                 if (lootBag && Math.hypot(player.x - lootBag.x, player.y - lootBag.y) < 100) {
                     if (lootBag.type === 'PlayerLootBag') {
@@ -1256,25 +1393,52 @@ wss.on('connection', (ws) => {
                     } else if (lootBag.type === 'EquipmentDrop') { if(player.addToInventory(lootBag.item)) { lootBag.isDead = true; } }
                 }
             }
-            if (player && data.type === 'bankAction') {
+            if (data.type === 'bankAction') {
+                if (!banks[player.username]) banks[player.username] = [];
                 const playerBank = banks[player.username];
-                if(data.action === 'deposit') {
-                    const item = player.inventory[data.itemIndex];
-                    const bankIndex = playerBank.findIndex(slot => slot === null);
-                    if(item && bankIndex !== -1) {
-                        playerBank[bankIndex] = item;
-                        player.inventory[data.itemIndex] = null;
+
+                if (data.action === 'deposit') {
+                    const itemToDeposit = player.inventory[data.itemIndex];
+                    if (itemToDeposit) {
+                        let amountToDeposit = data.amount;
+                        if (amountToDeposit === 'all') {
+                            amountToDeposit = player.inventory.filter(i => i && i.id === itemToDeposit.id).length;
+                        }
+
+                        let depositedCount = 0;
+                        for (let i = player.inventory.length - 1; i >= 0 && depositedCount < amountToDeposit; i--) {
+                            if (player.inventory[i] && player.inventory[i].id === itemToDeposit.id) {
+                                const existingStack = playerBank.find(stack => stack && stack.item.id === itemToDeposit.id);
+                                if (existingStack) {
+                                    existingStack.quantity++;
+                                } else {
+                                    playerBank.push({ item: itemToDeposit, quantity: 1 });
+                                }
+                                player.inventory[i] = null;
+                                depositedCount++;
+                            }
+                        }
                     }
-                } else if(data.action === 'withdraw') {
-                    const item = playerBank[data.itemIndex];
-                    if(item && player.addToInventory(item)) {
-                        playerBank[data.itemIndex] = null;
+                } else if (data.action === 'withdraw') {
+                    const stackToWithdraw = playerBank[data.itemIndex];
+                    if (stackToWithdraw) {
+                        let amountToWithdraw = data.amount === 'all' ? stackToWithdraw.quantity : (data.amount || 1);
+                        amountToWithdraw = Math.min(amountToWithdraw, stackToWithdraw.quantity);
+                        
+                        const addedCount = player.addToInventory(stackToWithdraw.item, amountToWithdraw);
+                        
+                        if(addedCount > 0) {
+                             stackToWithdraw.quantity -= addedCount;
+                             if (stackToWithdraw.quantity <= 0) {
+                                 playerBank.splice(data.itemIndex, 1);
+                             }
+                        }
                     }
                 }
                 saveData('banks.json', banks);
                 ws.send(JSON.stringify({ type: 'openBank', bank: playerBank }));
             }
-            if (player && data.type === 'marketAction') {
+            if (data.type === 'marketAction') {
                 if (data.action === 'list') {
                     const item = player.inventory[data.itemIndex];
                     const price = parseInt(data.price, 10);
@@ -1294,9 +1458,12 @@ wss.on('connection', (ws) => {
                     if (listing && player.username !== listing.seller && player.dataBits >= listing.price) {
                          if (player.addToInventory(listing.item)) {
                             player.dataBits -= listing.price;
-                            if (players[listing.seller]) {
-                                players[listing.seller].dataBits += listing.price;
+                            
+                            const seller = Object.values(players).find(p => p.username === listing.seller);
+                            if(seller){
+                                seller.dataBits += listing.price;
                             }
+                            
                             delete marketListings[data.listingId];
                             saveData('market.json', marketListings);
                             broadcastMessage({ type: 'marketUpdate', marketListings: marketListings });
@@ -1304,8 +1471,7 @@ wss.on('connection', (ws) => {
                     }
                 }
             }
-
-            if (player && data.type === 'tradeRequest') {
+            if (data.type === 'tradeRequest') {
                 const targetPlayer = players[data.targetId];
                 if (targetPlayer && !targetPlayer.trade.partnerId) {
                     const targetSocket = getSocketByPlayerId(data.targetId);
@@ -1314,15 +1480,19 @@ wss.on('connection', (ws) => {
                     }
                 }
             }
-            if (player && data.type === 'tradeResponse') {
+            if (data.type === 'tradeResponse') {
                 const requester = players[data.requesterId];
                 if (requester && data.accepted) {
                     startTrade(player.id, requester.id);
                 }
             }
-            if (player && player.trade.partnerId && data.type === 'tradeUpdate') {
+            if (player.trade.partnerId && data.type === 'tradeUpdate') {
                 const partner = players[player.trade.partnerId];
-                if (!partner) return;
+                if (!partner) {
+                    cancelTrade(player.id, "Trade partner disconnected.");
+                    return;
+                }
+
                 player.trade.offer.forEach(offeredItem => {
                     player.inventory[offeredItem.originalIndex] = offeredItem.item;
                 });
@@ -1350,7 +1520,7 @@ wss.on('connection', (ws) => {
                     partnerSocket.send(JSON.stringify({ type: 'tradeUpdate', offer: player.trade }));
                 }
             }
-             if (player && player.trade.partnerId && data.type === 'tradeAccept') {
+             if (player.trade.partnerId && data.type === 'tradeAccept') {
                 player.trade.accepted = true;
                 const partner = players[player.trade.partnerId];
                 if (partner && partner.trade.accepted) {
@@ -1360,13 +1530,57 @@ wss.on('connection', (ws) => {
                     if(partnerSocket) partnerSocket.send(JSON.stringify({ type: 'tradePartnerAccepted' }));
                 }
             }
-            if (player && player.trade.partnerId && data.type === 'tradeCancel') {
+            if (player.trade.partnerId && data.type === 'tradeCancel') {
                 cancelTrade(player.id, `${player.username} cancelled the trade.`);
             }
+            if (data.type === 'partyInvite') {
+                const targetSocket = getSocketByPlayerId(data.targetId);
+                if (targetSocket) {
+                    targetSocket.send(JSON.stringify({ type: 'partyInvite', from: player.getData() }));
+                }
+            }
+            if (data.type === 'partyResponse') {
+                const inviter = players[data.inviterId];
+                if (inviter && data.accepted) {
+                    const inviterPartyId = getPartyIdForPlayer(inviter.id);
+                    const inviteePartyId = getPartyIdForPlayer(player.id);
 
-            if (!player || player.isDead) return;
+                    if (inviterPartyId && !inviteePartyId) {
+                        parties[inviterPartyId].push(player.id);
+                        sendPartyUpdate(inviterPartyId);
+                    } else if (!inviterPartyId && inviteePartyId) {
+                        parties[inviteePartyId].push(inviter.id);
+                        sendPartyUpdate(inviteePartyId);
+                    } else if (!inviterPartyId && !inviteePartyId) {
+                        const newPartyId = `party_${nextPartyId++}`;
+                        parties[newPartyId] = [inviter.id, player.id];
+                        sendPartyUpdate(newPartyId);
+                    }
+                }
+            }
+            if (data.type === 'leaveParty') {
+                const partyId = getPartyIdForPlayer(player.id);
+                if (partyId) {
+                    const party = parties[partyId];
+                    const index = party.indexOf(player.id);
+                    if (index > -1) party.splice(index, 1);
+                    
+                    ws.send(JSON.stringify({ type: 'partyUpdate', party: [] })); // Clear own party UI
+                    
+                    if (party.length < 2) { 
+                        party.forEach(pid => {
+                            const socket = getSocketByPlayerId(pid);
+                            if(socket) socket.send(JSON.stringify({ type: 'partyUpdate', party: [] }));
+                        });
+                        delete parties[partyId];
+                    } else {
+                        sendPartyUpdate(partyId);
+                    }
+                }
+            }
+
             if (data.type === 'input') { player.inputs = data.inputs; player.angle = data.angle; }
-            if (data.type === 'chat') { broadcastMessage({ type: 'chat', sender: player.username, message: data.message, color: player.color }); }
+            if (data.type === 'interact') { player.attemptInteraction(); }
             if (data.type === 'equipItem') { const item = player.inventory[data.itemIndex]; if (item) { const currentEquipped = player.equipment[item.slot]; player.equipment[item.slot] = item; player.inventory[data.itemIndex] = currentEquipped; player.recalculateStats(); } }
             if (data.type === 'unequipItem') { const item = player.equipment[data.slot]; if (item && player.addToInventory(item)) { player.equipment[data.slot] = null; player.recalculateStats(); } }
             if (data.type === 'dropItem') { let itemToDrop = null; if (data.source === 'inventory') { itemToDrop = player.inventory[data.index]; player.inventory[data.index] = null; } else { itemToDrop = player.equipment[data.index]; player.equipment[data.index] = null; } if (itemToDrop) entities.push(new EquipmentDrop(player.x, player.y, itemToDrop)); player.recalculateStats(); }
@@ -1379,10 +1593,28 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         const player = players[ws.playerId];
         if (player) {
+            // Remove player from any party they are in
+            const partyId = getPartyIdForPlayer(ws.playerId);
+            if (partyId) {
+                const party = parties[partyId];
+                const index = party.indexOf(ws.playerId);
+                if (index > -1) {
+                    party.splice(index, 1);
+                }
+                if (party.length < 2) { 
+                    party.forEach(pid => {
+                        const socket = getSocketByPlayerId(pid);
+                        if(socket) socket.send(JSON.stringify({ type: 'partyUpdate', party: [] }));
+                    });
+                    delete parties[partyId];
+                } else {
+                    sendPartyUpdate(partyId);
+                }
+            }
             if (player.trade.partnerId) {
                 cancelTrade(player.id, `${player.username} has disconnected.`);
             }
-            if (banks[player.username]) {
+             if (banks[player.username]) {
                 saveData('banks.json', banks);
             }
             console.log(`[SERVER] Player ${player.username} (${ws.playerId}) disconnected.`);
